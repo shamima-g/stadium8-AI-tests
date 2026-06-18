@@ -1,0 +1,4 @@
+{
+  "transcripts": ["transcript.jsonl"],
+  "note": "Synthetic fixture. Transcript path is RELATIVE to the run root so the fixture is portable; the report generator resolves it against --root."
+}

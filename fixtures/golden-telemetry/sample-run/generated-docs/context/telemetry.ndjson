@@ -1,0 +1,14 @@
+{"ts":"2026-06-16T09:00:00.000Z","event":"phase_enter","phase":"INTAKE","epic":null,"story":null}
+{"ts":"2026-06-16T09:05:00.000Z","event":"turn_end","transcriptPath":"transcript.jsonl"}
+{"ts":"2026-06-16T09:09:00.000Z","event":"user_input"}
+{"ts":"2026-06-16T09:10:00.000Z","event":"phase_exit","phase":"INTAKE"}
+{"ts":"2026-06-16T09:10:00.000Z","event":"phase_enter","phase":"PLAN"}
+{"ts":"2026-06-16T09:20:00.000Z","event":"phase_exit","phase":"PLAN"}
+{"ts":"2026-06-16T09:20:00.000Z","event":"phase_enter","phase":"BUILD","epic":1,"story":1}
+{"ts":"2026-06-16T09:20:30.000Z","event":"agent_start","agent":"test-generator","epic":1,"story":1}
+{"ts":"2026-06-16T09:21:00.000Z","event":"turn_end","transcriptPath":"transcript.jsonl"}
+{"ts":"2026-06-16T09:25:30.000Z","event":"agent_stop","agent":"test-generator","epic":1,"story":1}
+{"ts":"2026-06-16T09:26:00.000Z","event":"agent_start","agent":"developer","epic":1,"story":1}
+{"ts":"2026-06-16T09:40:00.000Z","event":"agent_stop","agent":"developer","epic":1,"story":1}
+{"ts":"2026-06-16T09:45:00.000Z","event":"phase_exit","phase":"BUILD"}
+{"ts":"2026-06-16T09:45:00.000Z","event":"phase_enter","phase":"COMPLETE"}

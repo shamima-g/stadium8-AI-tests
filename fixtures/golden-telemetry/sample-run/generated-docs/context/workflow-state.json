@@ -1,0 +1,8 @@
+{
+  "featureName": "Sample Run",
+  "currentPhase": "COMPLETE",
+  "totalEpics": 1,
+  "epics": {
+    "1": { "totalStories": 1, "stories": { "1": { "phase": "COMPLETE" } } }
+  }
+}

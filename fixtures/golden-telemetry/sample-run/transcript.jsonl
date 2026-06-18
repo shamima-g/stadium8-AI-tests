@@ -1,0 +1,2 @@
+{"type":"assistant","timestamp":"2026-06-16T09:21:00.000Z","message":{"usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":500}}}
+{"type":"assistant","timestamp":"2026-06-16T09:30:00.000Z","message":{"usage":{"input_tokens":3000,"output_tokens":900,"cache_read_input_tokens":1200}}}

@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "fileStamp": "20260616-1301",
+  "runIso": "2026-06-16 13:01:42",
+  "overall": "fail",
+  "counts": {
+    "total": 179,
+    "passed": 176,
+    "failed": 3,
+    "skipped": 0
+  },
+  "durationMs": 13029.2646484375,
+  "runBy": "shamima-g",
+  "machine": "SHAMIMA-NB",
+  "tokens": null,
+  "costUsd": null,
+  "report": "report-0.1.0-20260616-1301.md"
+}

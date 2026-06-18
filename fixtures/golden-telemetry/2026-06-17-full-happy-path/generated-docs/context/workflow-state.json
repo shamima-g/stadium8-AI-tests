@@ -1,0 +1,457 @@
+{
+  "featureName": "Team Task Manager",
+  "specPath": null,
+  "currentEpic": 2,
+  "currentStory": 2,
+  "currentPhase": "COMPLETE",
+  "phaseStatus": "complete",
+  "epics": {
+    "1": {
+      "index": 1,
+      "name": "Task Browsing",
+      "slug": "epic-1-task-browsing",
+      "summary": "Signed-in users see a role-scoped table of tasks (Admins see all tasks with assignee; Users see only their own), with empty and error states; auth and role-based access gating are foundational to this epic.",
+      "requirementIds": [
+        "R1",
+        "R2",
+        "R4",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+        "BR6",
+        "BR7",
+        "NFR1",
+        "NFR2",
+        "NFR3",
+        "NFR4",
+        "NFR5",
+        "NFR6"
+      ],
+      "dependsOn": [],
+      "nonGoals": [
+        "No public sign-up or self-registration — accounts are created for you out of band.",
+        "No password reset, single sign-on, or multi-factor sign-in.",
+        "No dark mode — the app is light mode only.",
+        "No searching or sorting the task list in this epic — only the role-scoped view and filtering by status.",
+        "Users will not see tasks assigned to other team members."
+      ],
+      "status": "complete",
+      "manualTestStatus": "skipped",
+      "epicIntroducesSharedSurface": true,
+      "infrastructureReuseNotes": [
+        "API client lives at web/src/lib/api/client.ts — use its get/post/put/del helpers for the task-list fetch; never call fetch() directly (CLAUDE.md §2).",
+        "Shared API types live in web/src/types/api.ts — extend it with the Task and User shapes from brief §6 rather than introducing a parallel type module.",
+        "Validation schemas live in web/src/lib/validation/schemas.ts — add the sign-in credentials schema here (Zod) rather than inline.",
+        "The root layout web/src/app/layout.tsx already wraps the app in ToastProvider + ToastContainer — per CLAUDE.md §6, add SessionProvider by editing this existing layout, and reuse the toast context for transient error feedback.",
+        "Shadcn primitives already present: button, card, input, label in web/src/components/ui/ — compose the sign-in form and task table from these (CLAUDE.md §1); add a Shadcn table primitive via mcp__shadcn__add_component rather than hand-rolling.",
+        "No auth utilities exist yet — next-auth (credentials provider), the auth config, the SessionProvider wrapper, and the role-based access gate are all new and introduced by Story 1.",
+        "Brand palette is light-only: primary #2563EB, row/sidebar background #F3F4F6 — reference tokens in web/src/app/globals.css; no hex literals in components."
+      ],
+      "prototypeSrcRoutes": {},
+      "stories": {
+        "1": {
+          "index": 1,
+          "title": "View the task list",
+          "slug": "story-1-view-task-list",
+          "plainSummary": "After signing in, a User lands on the Tasks page and sees a table of the tasks assigned to them with title, due date, and status; an Admin instead sees every task across the team with an extra assignee column. Anyone not signed in is sent to the sign-in page first.",
+          "summary": "Establishes the authentication + session foundation (next-auth credentials provider, SessionProvider in the root layout, a /sign-in page, redirect-to-sign-in for unauthenticated access, and role-based access gating) and delivers the role-scoped /tasks list as one routable vertical slice. Fetches tasks via the API client through the mock layer; Users see only tasks where they are the assignee, Admins see all tasks with an assignee column. Includes the loading state.",
+          "requirementIds": [
+            "R1",
+            "R2",
+            "R4",
+            "R10",
+            "R11",
+            "R9",
+            "BR6",
+            "BR7",
+            "NFR1",
+            "NFR2",
+            "NFR3",
+            "NFR4",
+            "NFR6"
+          ],
+          "roles": [
+            "Admin",
+            "User"
+          ],
+          "route": "/tasks",
+          "targetFile": "web/src/app/tasks/page.tsx",
+          "pageAction": "create_new",
+          "isInfrastructureOnly": false,
+          "acceptanceCriteria": [
+            {
+              "id": "AC-1",
+              "text": "An unauthenticated visitor opening any app page is redirected to the sign-in page.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-2",
+              "text": "A User who signs in lands on the Tasks page and sees a table showing only their own tasks with title, due date, and status columns.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-3",
+              "text": "An Admin who signs in sees a table of all tasks across the team, including an assignee column.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-4",
+              "text": "A User cannot see tasks assigned to other team members in the list.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-5",
+              "text": "While tasks are being fetched, a loading indicator is shown before the table renders.",
+              "coverage": "vitest"
+            },
+            {
+              "id": "AC-6",
+              "text": "A signed-in User who navigates to an Admin-only route is redirected or shown a permission-denied state rather than the admin content.",
+              "coverage": "playwright"
+            }
+          ],
+          "manualTestChecklist": [
+            "Open the app while signed out (or in a fresh private window) → you are taken to the sign-in page.",
+            "Sign in as a User → you land on the Tasks page showing only the tasks assigned to you, with title, due date, and status.",
+            "Confirm none of the rows show tasks belonging to other team members.",
+            "Sign in as an Admin → you see every task across the team, plus a column showing who each task is assigned to.",
+            "As a signed-in User, type an admin-only address into the URL bar → you see a 'you don't have permission' state on the page, not the admin content.",
+            "Reload the Tasks page → you briefly see a loading indicator before the table appears."
+          ],
+          "specGaps": [
+            "Story 1 implies GET /v1/tasks returning the task list, filtered by assignee for the User role — the API spec does not yet exist (dataSource: api-in-development), so design-api-agent must document this list endpoint and its role-scoping.",
+            "Story 1 implies a sign-in credential check (email + password) — frontend-only auth has no documented endpoint; the credentials provider validates against mock/seed user data."
+          ],
+          "status": "complete",
+          "e2eStatus": "passed-after-fix",
+          "e2eLastRun": "2026-06-17T05:42:51.931Z",
+          "e2ePassCount": 5,
+          "e2eFailCount": 0,
+          "e2eFixCycleCount": 1,
+          "phase": "COMPLETE",
+          "acceptance": {
+            "total": 0,
+            "checked": 0
+          },
+          "testFiles": 1
+        },
+        "2": {
+          "index": 2,
+          "title": "Empty and error states",
+          "slug": "story-2-empty-and-error-states",
+          "plainSummary": "A User who has no tasks assigned sees a friendly \"No tasks assigned to you yet\" message instead of an empty table. If the task list fails to load, everyone sees an error message with a Retry button that tries again.",
+          "summary": "Adds the empty-state and load-error handling to the /tasks list from Story 1. When the task fetch returns no rows for the current user, render an explicit empty-state message. When the fetch fails, render an error message with a Retry affordance that re-issues the same request and recovers to the populated table on success.",
+          "requirementIds": [
+            "R12",
+            "NFR5"
+          ],
+          "roles": [
+            "Admin",
+            "User"
+          ],
+          "route": "/tasks",
+          "targetFile": "web/src/app/tasks/page.tsx",
+          "pageAction": "modify_existing",
+          "isInfrastructureOnly": false,
+          "acceptanceCriteria": [
+            {
+              "id": "AC-1",
+              "text": "A User with no assigned tasks sees the message \"No tasks assigned to you yet\" instead of an empty table.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-2",
+              "text": "When the task list fails to load, the user sees an error message describing the failure with a Retry button.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-3",
+              "text": "Clicking Retry after a failure re-requests the task list and renders the populated table when the request succeeds.",
+              "coverage": "playwright"
+            }
+          ],
+          "manualTestChecklist": [
+            "Sign in as a User who has no tasks assigned → you see 'No tasks assigned to you yet' instead of an empty table.",
+            "With the task list set to fail loading → you see an error message and a Retry button.",
+            "Click Retry while the data is available again → the task table loads and the error message disappears."
+          ],
+          "specGaps": [],
+          "status": "complete",
+          "e2eStatus": "passed-after-fix",
+          "e2eLastRun": "2026-06-17T06:03:48.812Z",
+          "e2ePassCount": 3,
+          "e2eFailCount": 0,
+          "e2eFixCycleCount": 2,
+          "phase": "COMPLETE",
+          "acceptance": {
+            "total": 0,
+            "checked": 0
+          },
+          "testFiles": 1
+        }
+      },
+      "totalStories": 2,
+      "phase": "COMPLETE"
+    },
+    "2": {
+      "index": 2,
+      "name": "Task Actions",
+      "slug": "epic-2-task-actions",
+      "summary": "Admins create, edit, reassign, and delete tasks (with confirm-before-delete and due-date editing), and the assignee marks their own task complete; all write actions are gated to the permitted role.",
+      "requirementIds": [
+        "R3",
+        "R5",
+        "R6",
+        "R7",
+        "R8",
+        "BR1",
+        "BR2",
+        "BR3",
+        "BR4",
+        "BR5"
+      ],
+      "dependsOn": [
+        1
+      ],
+      "nonGoals": [
+        "No email notifications or due-date reminders when a task is created, assigned, or changed.",
+        "No task comments, attachments, or activity history.",
+        "No bulk actions — tasks are created, edited, and deleted one at a time.",
+        "Deleting a task removes it permanently — there is no trash or undo."
+      ],
+      "status": "complete",
+      "manualTestStatus": "skipped",
+      "epicIntroducesSharedSurface": false,
+      "infrastructureReuseNotes": [
+        "Typed endpoints already exist in web/src/lib/api/endpoints.ts — use createTask(), updateTask(), deleteTask(), getUsers(), getCurrentUser(); do NOT add new client wrappers or call fetch() directly (§2).",
+        "The /tasks/new route already exists as an admin-gated placeholder (web/src/app/tasks/new/page.tsx, wrapped in RequireRole role=admin + AppShell) — Story 1 replaces the placeholder body with the form, keeping the existing RequireRole gate.",
+        "Reuse web/src/components/auth/RequireRole.tsx for the Create entry point and Delete control visibility (BR1, R9); do not hand-roll role checks.",
+        "The Admin All tasks list is rendered by web/src/components/tasks/TasksView.tsx (fetch/loading/error/empty lifecycle, reloadKey-driven refetch) and TaskTable.tsx — Story 1's post-create refresh and Story 2's row removal hook into this existing state/refetch mechanism; extend, don't fork.",
+        "Error+Retry UX already has a working pattern in TasksView (role=alert region + Retry Button driving reloadKey) and a toast system at web/src/components/toast/ — reuse one rather than inventing a new error surface (R12, NFR5).",
+        "Zod validation lives in web/src/lib/validation/schemas.ts with validateRequest() and formFieldSchemas (incl. dateString) — add a createTask schema following the signInSchema pattern.",
+        "No Shadcn select or dialog primitive is installed yet — the assignee dropdown (Story 1) and confirm dialog (Story 2) require adding them via mcp__shadcn__add_component (§1); compose, don't hand-roll."
+      ],
+      "prototypeSrcRoutes": {},
+      "stories": {
+        "1": {
+          "index": 1,
+          "title": "Create a task",
+          "slug": "story-1-create-a-task",
+          "plainSummary": "An Admin opens the New Task form, fills in a title and picks an assignee (both required), optionally adds a description and a due date, and saves. The new task appears in the All tasks list right away without reloading the page. A User never sees a Create button or the New Task form.",
+          "summary": "Build the Admin task-creation flow on the existing /tasks/new route. Form with title, description, due date, and an assignee dropdown populated from getUsers(); validate title/due date/assignee present before submit (BR5); submit via createTask() (R5, R8) and surface the new task in the All tasks list without a full reload. Create entry point on /tasks is admin-only (BR1). New tasks created with status pending (BR4). Errors show an inline/toast message with retry (R12/NFR5).",
+          "requirementIds": [
+            "R5",
+            "R8",
+            "BR1",
+            "BR5",
+            "BR4"
+          ],
+          "roles": [
+            "Admin",
+            "User"
+          ],
+          "route": "/tasks/new",
+          "targetFile": "web/src/app/tasks/new/page.tsx",
+          "pageAction": "modify_existing",
+          "isInfrastructureOnly": false,
+          "acceptanceCriteria": [
+            {
+              "id": "AC-1",
+              "text": "An Admin on /tasks/new sees the create form with title, description, due date, and assignee fields.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-2",
+              "text": "The assignee selector lists team members fetched from the team roster, and the Admin can pick one.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-3",
+              "text": "Submitting with a missing title, due date, or assignee shows inline validation and does not save (BR5).",
+              "coverage": "vitest"
+            },
+            {
+              "id": "AC-4",
+              "text": "Submitting a valid form saves the task and it appears in the All tasks list without a full page reload, with status Pending (R5, R8, BR4).",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-5",
+              "text": "A signed-in User sees no Create/New Task entry point on /tasks, and visiting /tasks/new directly shows a permission-denied state (BR1, R9).",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-6",
+              "text": "When the save request fails, the Admin sees an error message with a retry affordance and the form input is preserved (R12, NFR5).",
+              "coverage": "vitest"
+            }
+          ],
+          "manualTestChecklist": [
+            "Sign in as an Admin, go to All tasks, click New Task -> you see a form with Title, Description, Due date, and an Assignee dropdown.",
+            "Open the Assignee dropdown -> you see the team members listed and can pick one.",
+            "Click Save with the Title empty -> you see a validation message and nothing is saved.",
+            "Fill in Title, pick a Due date and an Assignee, click Save -> the new task shows up in the All tasks list (status Pending) without the page reloading.",
+            "Sign in as a User and look at My tasks -> there is no New Task button anywhere.",
+            "As a User, type /tasks/new in the address bar -> you see a 'you do not have permission' message on the page (not an error page)."
+          ],
+          "specGaps": [],
+          "status": "complete",
+          "e2eStatus": "passed-after-fix",
+          "e2eLastRun": "2026-06-17T06:44:02.010Z",
+          "e2ePassCount": 4,
+          "e2eFailCount": 0,
+          "e2eFixCycleCount": 1,
+          "phase": "COMPLETE",
+          "acceptance": {
+            "total": 0,
+            "checked": 0
+          },
+          "testFiles": 1
+        },
+        "2": {
+          "index": 2,
+          "title": "Delete a task",
+          "slug": "story-2-delete-a-task",
+          "plainSummary": "An Admin clicks Delete on a task in the All tasks list and is asked to confirm. Confirming removes the task from the list right away without reloading the page; cancelling keeps the task exactly as it was. A User never sees a Delete button.",
+          "summary": "Add a Delete action to each row of the Admin All tasks list (TaskTable / TasksView). Clicking Delete opens a confirmation dialog; confirming calls deleteTask() (R7) and removes the row in place without a full reload; cancelling is a no-op. The Delete control is admin-only (BR1) — Users never render it. A failed delete shows an error with retry (R12, NFR5).",
+          "requirementIds": [
+            "R7",
+            "BR1"
+          ],
+          "roles": [
+            "Admin",
+            "User"
+          ],
+          "route": "/tasks",
+          "targetFile": "web/src/components/tasks/TaskTable.tsx",
+          "pageAction": "modify_existing",
+          "isInfrastructureOnly": false,
+          "acceptanceCriteria": [
+            {
+              "id": "AC-1",
+              "text": "An Admin sees a Delete control on each task row in the All tasks list (BR1).",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-2",
+              "text": "Clicking Delete opens a confirmation dialog naming the task before anything is removed.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-3",
+              "text": "Cancelling the dialog closes it and leaves the task in the list unchanged.",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-4",
+              "text": "Confirming the dialog removes the task from the list without a full page reload (R7).",
+              "coverage": "playwright"
+            },
+            {
+              "id": "AC-5",
+              "text": "A signed-in User sees no Delete control on any task row (BR1).",
+              "coverage": "vitest"
+            },
+            {
+              "id": "AC-6",
+              "text": "When the delete request fails, the Admin sees an error message with a retry affordance and the task remains in the list (R12, NFR5).",
+              "coverage": "vitest"
+            }
+          ],
+          "manualTestChecklist": [
+            "Sign in as an Admin and open All tasks -> each task row has a Delete control.",
+            "Click Delete on a task -> a confirmation dialog appears naming that task.",
+            "Click Cancel in the dialog -> the dialog closes and the task is still in the list.",
+            "Click Delete again and confirm -> the task disappears from the list without the page reloading.",
+            "Sign in as a User and open My tasks -> no row has a Delete control."
+          ],
+          "specGaps": [],
+          "status": "complete",
+          "e2eStatus": "passed-after-fix",
+          "e2eLastRun": "2026-06-17T07:22:57.520Z",
+          "e2ePassCount": 4,
+          "e2eFailCount": 0,
+          "e2eFixCycleCount": 1,
+          "phase": "COMPLETE",
+          "acceptance": {
+            "total": 0,
+            "checked": 0
+          },
+          "testFiles": 1
+        }
+      },
+      "totalStories": 2,
+      "phase": "COMPLETE"
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-06-17T04:29:40.691Z",
+      "epic": null,
+      "story": null,
+      "from": "NONE",
+      "to": "INTAKE",
+      "note": "Workflow initialized"
+    },
+    {
+      "timestamp": "2026-06-17T04:49:51.267Z",
+      "epic": null,
+      "story": null,
+      "from": "INTAKE",
+      "to": "PLAN"
+    },
+    {
+      "timestamp": "2026-06-17T04:58:57.688Z",
+      "epic": null,
+      "story": 1,
+      "from": "PLAN",
+      "to": "BUILD"
+    },
+    {
+      "timestamp": "2026-06-17T05:53:35.655Z",
+      "epic": 1,
+      "story": 1,
+      "from": "BUILD",
+      "to": "COMPLETE"
+    },
+    {
+      "timestamp": "2026-06-17T06:15:50.596Z",
+      "epic": 1,
+      "story": 2,
+      "from": "BUILD",
+      "to": "COMPLETE"
+    },
+    {
+      "timestamp": "2026-06-17T06:25:03.750Z",
+      "epic": null,
+      "story": 1,
+      "from": "PLAN",
+      "to": "BUILD"
+    },
+    {
+      "timestamp": "2026-06-17T06:45:18.554Z",
+      "epic": 2,
+      "story": 1,
+      "from": "BUILD",
+      "to": "COMPLETE"
+    },
+    {
+      "timestamp": "2026-06-17T07:24:22.013Z",
+      "epic": 2,
+      "story": 2,
+      "from": "BUILD",
+      "to": "COMPLETE"
+    }
+  ],
+  "lastUpdated": "2026-06-17T07:26:26.913Z",
+  "intake": {
+    "manifestExists": true,
+    "briefExists": true,
+    "requirementCount": 12,
+    "businessRuleCount": 7,
+    "capturedAt": "2026-06-17T04:49:51.267Z"
+  },
+  "totalEpics": 2,
+  "featureComplete": true
+}
