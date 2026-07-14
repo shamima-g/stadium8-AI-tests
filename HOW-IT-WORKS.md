@@ -1,37 +1,40 @@
 # How the Stadium 8 Workflow Works
 
 A plain-English reference for how this template drives Claude Code: the phases,
-the agents, the gates, the hooks, and the machinery underneath. If you want to
-*test* the template, see [TEST-GUIDE.md](TEST-GUIDE.md), [TEST-INPUTS.md](TEST-INPUTS.md),
-and [TEST-STRATEGY.md](TEST-STRATEGY.md). This document explains *what* you're
-testing.
+the commands, the helpers, the safety checks, and the machinery underneath. If
+you want to *test* the template, see the test guide, the inputs list, and the
+strategy document that sit alongside this one. This document explains *what* you
+are testing.
 
-> **One thing to get straight up front.** The workflow has **four phases** —
-> **INTAKE → PLAN → BUILD → COMPLETE**. If you read anything here (or anywhere)
-> that mentions DESIGN, SCOPE, STORIES, REALIGN, TEST-DESIGN, WRITE-TESTS,
-> IMPLEMENT, a "QA phase", an "FRS", a "spec-compliance watchdog", "Gate 6",
-> `/clear` boundaries, or a `[Logs saved]` marker — that's the old model and it's
-> gone.
+> **One thing to get straight up front.** The unit of work is the **epic** — one
+> meaningful chunk of the app. Each epic is built on its own branch (its own
+> separate copy of the project) and runs through a fixed set of stages:
+> **INTAKE → PLAN → BUILD → EPIC-END → MANUAL-TEST → COMPLETE-ON-BRANCH →
+> COMPLETE**. The facts that stay the same across the whole project live in one
+> shared file called `project.md`; each epic gets its own short requirements file
+> called `brief.md`. If you read older notes that mention four phases, a single
+> "project brief", a "code-reviewer", a spec-compliance watchdog, usage/telemetry
+> reports, or `/clear` boundaries — that's a previous version and it's gone.
 
 ---
 
 ## Table of contents
 
 1. [What this repository is](#1-what-this-repository-is)
-2. [The big picture — the four-phase workflow](#2-the-big-picture--the-four-phase-workflow)
+2. [The big picture — the epic-branch workflow](#2-the-big-picture--the-epic-branch-workflow)
 3. [Slash commands](#3-slash-commands)
 4. [The phases in detail](#4-the-phases-in-detail)
 5. [Agents — who does what](#5-agents--who-does-what)
-6. [How decisions get made — autonomy tiers and the journal](#6-how-decisions-get-made--autonomy-tiers-and-the-journal)
-7. [Context management](#7-context-management)
-8. [The questions INTAKE asks, and how the answers are used](#8-the-questions-intake-asks-and-how-the-answers-are-used)
+6. [How decisions get made — the four autonomy tiers](#6-how-decisions-get-made--the-four-autonomy-tiers)
+7. [The four approvals](#7-the-four-approvals)
+8. [The questions INTAKE asks](#8-the-questions-intake-asks)
 9. [Quality gates](#9-quality-gates)
 10. [Policies the workflow won't break](#10-policies-the-workflow-wont-break)
 11. [Hooks — what runs automatically](#11-hooks--what-runs-automatically)
 12. [The permission system](#12-the-permission-system)
-13. [How the orchestrator works](#13-how-the-orchestrator-works)
-14. [State tracking and recovery](#14-state-tracking-and-recovery)
-15. [Telemetry](#15-telemetry)
+13. [State tracking and recovery](#13-state-tracking-and-recovery)
+14. [Working on more than one epic at once](#14-working-on-more-than-one-epic-at-once)
+15. [How the app is tested](#15-how-the-app-is-tested)
 16. [The dashboard](#16-the-dashboard)
 17. [Key files and directories](#17-key-files-and-directories)
 18. [Technical stack](#18-technical-stack)
@@ -41,72 +44,83 @@ testing.
 
 ## 1. What this repository is
 
-A **template** for building production-ready frontend applications. You clone it
-and use Claude Code to build features through a guided, test-first workflow.
+A **template** — a starter kit — for building production-ready web apps. You make
+a copy of it and use Claude Code to build your app one epic at a time, through a
+guided, test-first process. You describe what you want in plain language; Claude
+plans it, builds it, tests it, and checks it, without expecting you to read or
+write any code.
 
-**Tech stack:**
-- Next.js 16 (App Router) + React 19 + TypeScript 5 (strict)
-- Tailwind CSS 4 + Shadcn UI
-- Vitest + React Testing Library, Playwright for end-to-end tests
-- An OpenAPI-driven API client
+**The layout of a project built from this template:**
 
-**Layout:**
-```
-project-root/
-├── .claude/         Claude config: agents, hooks, scripts, commands, policies
-├── web/             The Next.js application
-├── documentation/   What you provide: specs, API docs, wireframes
-└── generated-docs/  What the workflow produces: the brief, stories, dashboard, reports
-```
+- `documentation/` — what *you* provide: specs, requirements, wireframes, data
+  descriptions.
+- `generated-docs/` — what the workflow *produces*: the shared project facts, each
+  epic's folder, the plan, the dashboard.
+- `web/` — the actual Next.js application being built.
+- `.claude/` — Claude's own instructions and settings that make the workflow run.
 
 ---
 
-## 2. The big picture — the four-phase workflow
+## 2. The big picture — the epic-branch workflow
 
-Each feature runs through four phases. The first one is hands-on; the rest are
-mostly automatic.
+The work is split into **epics**. An epic is one meaningful piece of the app —
+for example, "let people sign in" or "show the task list". A whole project is
+just several epics built one after another (and sometimes side by side).
 
-```
-INTAKE  →  PLAN  →  BUILD  →  COMPLETE
-```
+Each epic is built on its own **branch**. A branch is a separate copy of the
+project where work happens without disturbing the finished, trusted version (which
+lives on the branch called `main`). When an epic is finished and you're happy with
+it, its work is merged into `main` and the branch is deleted.
 
-| Phase | How often | What happens | You're asked to… |
-|---|---|---|---|
-| **INTAKE** | Once per feature | Gather requirements into a single project brief | Approve the brief (Gate 1) |
-| **PLAN** | Once per feature (loops per epic) | Break the work into epics, then stories for one epic at a time | Approve the epics, then the stories (Gate 2) |
-| **BUILD** | Per story | Write tests, write code, review, commit — one story at a time | Nothing, unless it hits a decision it can't make alone, or you reach an epic's manual check |
-| **COMPLETE** | Once at the end | Mark the feature done, produce reports | Nothing |
+Two files carry the requirements:
+
+- **`project.md`** — the shared project facts that every epic inherits: who the
+  users are, how people sign in, where the app's data comes from, any rules the
+  app must follow, and the look and feel. It lives on `main`.
+- **`brief.md`** — a short description of what one particular epic needs to
+  deliver. Each epic has its own.
+
+**Every epic goes through these stages, in order:**
+
+| Stage | What happens | Are you asked anything? |
+|---|---|---|
+| **INTAKE** | Runs once at the very start of the project (before any branch). Gathers the project facts and splits your request into epics. | Yes — approve the project facts and the epic plan |
+| **PLAN** | Breaks one epic into a handful of small pieces of work ("stories"). | Yes — approve the story list |
+| **BUILD** | Builds each story, test-first, and saves it. | No — unless a risky decision comes up |
+| **EPIC-END** | Runs the full set of automatic checks, an automatic code review, and the browser tests over the whole epic. | No |
+| **MANUAL-TEST** | You try the finished epic yourself using a checklist. | Yes — confirm it works |
+| **COMPLETE-ON-BRANCH** | Opens a request to merge the epic into `main`, waits for automated checks, and merges once you approve. | Yes — approve the merge |
+| **COMPLETE** | The epic's record is frozen on `main`. | No |
 
 **The core ideas:**
-- Stories are planned and built **one epic at a time**, not all upfront — so what
+
+- Stories are planned and built **one epic at a time**, not all up front — so what
   you learn early can shape what comes next.
-- Tests are written **just before** the code for each story — real test-first
-  development.
-- BUILD runs on its own. It only stops to ask you about genuinely risky decisions
-  (a new dependency, an auth change, an undocumented API call) or to have you try
-  a finished epic in the browser.
+- Tests are written **just before** the code for each story — genuine test-first
+  building.
+- Building runs on its own. It stops only for genuinely risky decisions, or to have
+  you try a finished epic yourself.
 
 ---
 
 ## 3. Slash commands
 
-Type these in the Claude Code chat.
+You steer the workflow by typing these into the Claude Code chat.
 
 | Command | What it does |
 |---|---|
-| `/start` | Begins the workflow — installs anything missing, runs INTAKE through Gate 1, then chains into `/continue` |
-| `/continue` | Drives PLAN and BUILD; resumes from wherever the workflow left off |
-| `/status` | Shows progress (phase, epic, story, recent commits) without changing anything |
-| `/quality-check` | Runs the automated quality gates on demand |
-| `/dashboard` | Generates the HTML dashboard and opens it in the browser |
-| `/api-status` | Shows where each API endpoint came from, mock status, and handler coverage |
-| `/api-mock-refresh` | Rebuilds the mock handlers after the API spec changes |
-| `/api-go-live` | Switches the app from mocks to the real backend |
-| `/migrate-legacy` | Upgrades an old workflow-state file to the current format |
+| `/start` | Begins a new epic. The first time, it sets up the project, gathers the facts, and plans all the epics; after that, it starts the next epic. It then hands over to `/continue`. Run it from `main`. |
+| `/continue` | Carries the current epic forward through planning, building, checking, your review, and the merge. Also picks up wherever you left off. Run it on the epic's branch. |
+| `/status` | Shows where things stand — epics in progress and finished ones — without changing anything. |
+| `/quality-check` | Runs the automatic safety checks on demand. |
+| `/dashboard` | Opens a simple visual overview in your browser. |
+| `/migrate-legacy` | Upgrades a project built with an older version of this kit to the current epic-branch way of working. |
+| `/api-status` | Shows where each piece of the app's data comes from, whether stand-in data is in use, and whether the real data source has been reached. |
+| `/api-mock-refresh` | Rebuilds the stand-in data after the data-source description changes, keeping any hand-tuned examples. |
+| `/api-go-live` | Switches the app from stand-in data over to the real data source, after checking the real source can be reached. |
 
-Commands are markdown files in `.claude/commands/`. When you type one, Claude Code
-expands it into a set of instructions Claude follows — they're instruction sets,
-not shell scripts. (There is no separate `/setup` command; `/start` handles setup.)
+Commands are instruction files, not scripts — when you type one, Claude follows
+the instructions it contains.
 
 ---
 
@@ -114,499 +128,460 @@ not shell scripts. (There is no separate `/setup` command; `/start` handles setu
 
 ### 4.1 INTAKE
 
-**Goal:** understand what to build, and capture it in one document.
+**Goal:** understand the project, capture its facts, and plan the epics. INTAKE
+runs once, before any epic branch exists, driven by `/start`. There are two ways
+it can go.
 
-**Started by:** `/start`.
+**The first time (a brand-new project):**
 
-**How you can begin** (the first question after `/start`):
+1. **Setup.** If needed, Claude installs the app's dependencies in the background
+   and asks a one-time question: should it auto-approve saving and publishing work,
+   or ask you each time? Your answer is remembered and honored from then on.
+2. **How to begin.** Claude asks how you'd like to start: bring in a prototype you
+   built elsewhere, share your own documents, or describe the project together and
+   answer a few questions.
+3. **Setup questions.** A short checklist about who uses the app, how people sign
+   in, whether your data source is ready, and any rules you must follow (see
+   [section 8](#8-the-questions-intake-asks)).
+4. **Connection check.** If your app talks to a real data source, Claude runs a
+   quick test to confirm it can actually be reached, before any time is spent on it.
+5. **Project facts written.** Claude writes `project.md` — the shared facts sheet.
+6. **The epic plan.** Claude looks at your whole request and splits it into a list
+   of epics, showing which ones depend on others and confirming that every part of
+   your request is covered by some epic. If anything can't be placed (a conflict, a
+   missing detail, a rule that blocks it), Claude raises it with you first and
+   won't show a plan with an unresolved snag in it.
+7. **You approve** the project facts and the epic plan together. Claude also opens
+   an editable review page in your browser so you can adjust before approving.
+8. **Getting started.** Once approved, Claude writes a short requirements file for
+   every epic, saves the plan to `main`, then starts the first epic that's ready to
+   go (one with nothing it depends on) on its own branch, and hands over to
+   `/continue`. The other epics wait as drafts you can pick up later.
 
-| Option | What happens |
-|---|---|
-| **Share existing docs** | You drop files into `documentation/`; the workflow scans and extracts requirements |
-| **Import a prototype repo** | `import-prototype.js` pulls in docs, design tokens, and React source from a prototyping tool |
-| **Build requirements together** | You describe the project in free text and answer a few questions |
+**Every later epic (the project already exists):**
 
-**What runs:** the `intake-agent` scans `documentation/`, the orchestrator asks a
-short set of checklist questions (roles, authentication, backend readiness,
-compliance — see §8), and an optional `api-connectivity-agent` runs a quick
-connectivity check when there's a reachable backend.
-
-**The one output that matters:** `generated-docs/specs/project-brief.md` — the
-**project brief**, the single source of truth for everything that follows. It
-lists the goal, the roles, the chosen auth method, the data source, compliance
-needs, and the functional requirements and business rules.
-
-**Gate 1:** you approve the brief. Approving it is what lets the workflow move on
-to PLAN. INTAKE also writes `generated-docs/context/intake-manifest.json`, which
-records the captured configuration for later phases.
+1. Claude notices `project.md` is already there.
+2. It shows you the plan and asks which epic to do next — a ready draft, or
+   something new.
+3. It confirms the project facts still hold (a quick checklist; ticking anything
+   that changed re-runs just that part).
+4. If it's a new epic, it asks what the epic should deliver and whether it builds
+   on any other epic.
+5. It writes that epic's short requirements file.
+6. **You approve** the epic's requirements.
+7. Claude opens a fresh branch for the epic and hands over to `/continue`.
 
 ### 4.2 PLAN
 
-**Goal:** turn the brief into a buildable plan.
+**Goal:** turn one epic's requirements into a buildable list of small pieces of
+work, driven by `/continue`.
 
-**Driven by:** `/continue` (which `/start` chains into automatically).
+Claude proposes 2–8 **stories**. A story is a single thing a user can see or do,
+small enough to build and test in one go. Each story comes with a plain
+description, who it's for, and a short checklist of things you'll be able to try by
+hand later.
 
-**How it works** (the `feature-planner` agent does the proposing):
-1. **Epics first.** The planner proposes a list of epics covering the brief's
-   requirements. You approve the list (**Gate 2a**).
-2. **Then stories, one epic at a time.** For the current epic, the planner
-   proposes its stories, each with acceptance criteria, a role, and a short
-   manual-test checklist. You approve them (**Gate 2b**).
-
-**Single-epic shortcut:** if there's only one epic, the two approvals collapse
-into one combined gate — you approve the epic and its stories together.
-
-**Outputs:** `generated-docs/stories/_feature-overview.md`, a per-epic overview,
-and one `story-*.md` file per story.
-
-PLAN is revisited at each epic boundary: after BUILD finishes an epic, the
-workflow loops back to PLAN for the next epic's stories.
+**You approve the story list.** Claude shows it as plain text and opens an editable
+review page, including a "what this epic is *not* building" note so the boundaries
+are clear. Once approved, Claude writes a file for each story and moves on to
+building.
 
 ### 4.3 BUILD
 
-**Goal:** build each story, test-first, and commit it.
+**Goal:** build each story, test-first, and save it. Driven by `/continue`.
 
-**Driven by:** `/continue`.
+Before the per-story work begins, Claude does some one-time setup for the epic:
+it prepares realistic **stand-in data** (pretend data the app can use while the
+real data source isn't ready), and — if the project needs it — it designs a
+description of the data service, generates the matching data types, and sets up
+the stand-in data layer. It also writes all the stories' **tests up front, in one
+batch** — the tests describe what each finished story should do, and they fail at
+first because the code doesn't exist yet.
 
-**The per-story loop:**
-```
-test-generator (Vitest ∥ Playwright)  →  developer  →  (playwright-runner ∥ code-reviewer)  →  commit
-```
-1. **`test-generator`** writes the tests first — unit/integration tests (Vitest)
-   and an end-to-end spec (Playwright). They fail at this point, because the
-   feature doesn't exist yet. That's the point.
-2. **`developer`** writes the code to make those tests pass. All API calls go
-   through the API client; UI is built from Shadcn primitives.
-3. **`playwright-runner`** (runs the browser tests) and **`code-reviewer`** (runs
-   the automated quality gates and reviews the code) run **in parallel**.
-4. If either comes back with failures, the `developer` is sent back in to fix
-   them — up to **three attempts** per story. After the third, BUILD stops and
-   asks you what to do rather than looping forever.
-5. When the story passes, it's **committed and pushed**, and BUILD moves to the
-   next story.
+Then, for each story in turn:
 
-**Halts:** for genuinely risky decisions (see §6), BUILD stops and asks you,
-showing the options. Everything else it decides on its own and records.
+1. A helper writes the code to make that story's tests pass.
+2. Claude runs a quick check (formatting, basic code hygiene, and test quality).
+3. The work is saved.
 
-**Epic boundary:** when an epic's stories are all built, the workflow shows an
-**Epic Completion Summary** (commits made, decisions taken, anything worth a
-glance) and runs **Gate 1** — the manual check, where you try the epic in the
-browser and report back. Then it loops to PLAN for the next epic, or to COMPLETE
-if that was the last one.
+If the quick check fails, Claude sends the code back for a fix and checks again —
+up to three tries before it stops and asks you what to do. The heavier checks (a
+full build, all the tests, security, the browser tests, the code review) are *not*
+run per story — they run once over the whole epic at the end, which is faster.
 
-### 4.4 COMPLETE
+Along the way, Claude makes many small decisions on its own and only stops for
+genuinely risky ones (see [section 6](#6-how-decisions-get-made--the-four-autonomy-tiers)).
 
-**Goal:** wrap up.
+### 4.4 EPIC-END
 
-When the last epic is done, the workflow marks the feature complete, generates
-three telemetry reports (timing, tokens, and a final summary) under
-`generated-docs/reports/`, opens the final report, and prints a short completion
-message. If you later want to extend a completed feature, `/continue` reopens it
-and routes new requirements back through PLAN.
+**Goal:** check the epic as a whole. This runs three sweeps, in order:
+
+1. **The full safety checks** — security, code quality, and all the tests (see
+   [section 9](#9-quality-gates)). This also produces a real, production version of
+   the app for the browser tests to run against.
+2. **An automatic code review**, which also fixes what it finds. It's careful not
+   to "fix" things that are deliberate, and it re-runs the safety checks afterward
+   to confirm everything is still green.
+3. **The browser tests** — the "click-through" tests that act like a real person
+   using the app, run against that production version of the app.
+
+If anything fails, Claude traces it to the story responsible, fixes it, and runs
+the affected sweep again — up to three tries before it stops and asks you.
+
+### 4.5 MANUAL-TEST
+
+**Goal:** your hands-on check. Claude opens a checklist page in your browser (with
+any "please double-check this" items floated to the top, and one-click sign-ins for
+each type of user) and asks you to try the epic yourself. You tell it whether
+everything worked.
+
+- **All good** → the epic moves toward merging.
+- **Found a problem** → you describe it, Claude fixes it, re-runs the end-of-epic
+  checks, and shows you the checklist again (only the affected items un-ticked).
+- **Skip for now** → the epic moves toward merging, with a note recorded.
+
+### 4.6 COMPLETE-ON-BRANCH
+
+**Goal:** merge the finished epic into `main`. Claude opens a merge request,
+waits for the automated checks to pass, and asks for your go-ahead to merge. It
+**never merges on its own.** Once you approve, it merges, tidies away the branch,
+and updates the record.
+
+### 4.7 COMPLETE
+
+**Goal:** wrap up. The epic's record is now frozen on `main` — its requirements,
+its story files, its decision notebook, and its final status. No reports are
+generated at this stage. To build the next epic, you run `/start` again.
 
 ---
 
 ## 5. Agents — who does what
 
-Each agent is a markdown file in `.claude/agents/` with a frontmatter header
-(name, model, tools) and instructions. The orchestrator launches them; they don't
-talk to you directly (see §13 for why).
+Claude doesn't do everything as one big task. It hands specific jobs to
+specialised **helpers** (called agents). Each is good at one thing. **Helpers don't
+talk to you directly** — they report back to the main Claude (the "orchestrator"),
+and the orchestrator is the one who shows you results and asks you questions.
 
-| Agent | Phase | What it produces |
+| Helper | Stage | What it does |
 |---|---|---|
-| `intake-agent` | INTAKE | The project brief and the intake manifest |
-| `api-connectivity-agent` | INTAKE | A real connectivity check (parses the spec's auth, runs a smoke test) |
-| `feature-planner` | PLAN | The epic list and the per-epic story files |
-| `design-api-agent` | BUILD (on demand) | An OpenAPI spec, when the brief needs one and you didn't provide it |
-| `design-style-agent` | BUILD (on demand) | CSS design tokens and a style reference from the brief's styling |
-| `type-generator-agent` | BUILD (on demand) | TypeScript types and typed endpoint functions from the API spec |
-| `mock-setup-agent` | BUILD (on demand) | MSW mock handlers from the API spec |
-| `test-generator` | BUILD | Failing Vitest tests and Playwright specs (before the code) |
-| `developer` | BUILD | The implementation that makes the tests pass |
-| `playwright-runner` | BUILD | Runs the Playwright specs and returns a structured result |
-| `code-reviewer` | BUILD | Runs the quality gates, reviews the code, and commits |
+| Intake helper | INTAKE | Reads your documents and writes the project facts sheet and each epic's requirements file |
+| Connection checker | INTAKE | Confirms the real data source can be reached, and records the result |
+| Planner | INTAKE and PLAN | Splits the project into epics, and later breaks each epic into stories |
+| API designer | BUILD (when needed) | Writes a description of the data service when you didn't provide one |
+| Style designer | BUILD (when needed) | Turns your branding into the app's colours, fonts, and look |
+| Type generator | BUILD (when needed) | Creates the app's data types from the data-service description |
+| Stand-in data helper | BUILD (when needed) | Sets up realistic pretend data for when the real service isn't ready |
+| Test writer | BUILD | Writes the tests for every story first, before any code |
+| Developer | BUILD | Writes the code to make each story's tests pass |
+| Browser-test runner | EPIC-END | Runs the click-through browser tests over the whole epic |
 
-`tone-guide` is also in the folder, but it's a voice/style reference the others
-follow, not a workflow step.
+There is also a shared **tone guide** — not a helper that does work, just a
+reference the others follow so they all speak to you the same clear way.
 
-> **Why agents don't ask you questions.** `AskUserQuestion` silently auto-resolves
-> inside a subagent without waiting for you. So only the parent orchestrator uses
-> it. When an agent needs a decision, it returns the question to the orchestrator,
-> which shows you the content and asks. This is a Claude Code platform constraint,
-> and it's why approvals always come from the orchestrator, never an agent.
+There is **no** separate "reviewer" helper anymore — the code review at the end of
+an epic is done by a built-in review step, not a helper.
 
----
-
-## 6. How decisions get made — autonomy tiers and the journal
-
-BUILD agents make a lot of small calls on their own. To keep that safe and
-transparent, every decision falls into one of four tiers, defined in
-`.claude/shared/agent-autonomy.md`. The rule of thumb: when in doubt, pick the
-**more conservative** tier.
-
-| Tier | What it covers | What the agent does | Where you can see it |
-|---|---|---|---|
-| **1 — Autonomous** | Low-risk, easily reverted (file naming, common React patterns, which Shadcn component, ARIA labels) | Decide and proceed | One line in the commit body |
-| **2 — Journal as you go** | Worth knowing afterwards (naming/shape reconciliations, factual additions to the brief) | Decide, write a journal entry, proceed | The journal + the epic summary |
-| **3 — Surface at epic boundary** | Interpretations you might want to know *before the next epic plans against them* | Decide, journal with a `[review]` or `[affects-downstream]` tag, proceed | Called out in the Epic Completion Summary |
-| **4 — Halt** | Genuinely unsafe ground | Stop and ask you | An `AskUserQuestion` with options |
-
-**The "always-halt" (Tier 4) categories** include: a new external dependency, an
-API-contract change, calling an endpoint not in the spec, an auth-flow change, a
-state-management/data-fetching library switch, a cross-cutting architecture
-change, and a *structural* contradiction with the brief (not a naming or wording
-clarification — those are Tier 2/3).
-
-**The journal** (`generated-docs/context/journal.md`) is the running record of
-Tier 2 and Tier 3 decisions. It's written by `journal.js` (the orchestrator calls
-it before committing a story), kept in plain, conversational English, and
-organised by epic. The Epic Completion Summary reads the flagged (`[review]` /
-`[affects-downstream]`) entries back to you; the rest stay in the journal for
-reference. Tier 1 decisions don't go in the journal — they live in the commit
-body only.
-
-This replaces the old "discovered impacts → REALIGN" mechanism entirely.
+> **Why helpers don't ask you questions directly.** The tool that pops up a
+> question doesn't work properly inside a helper (it answers itself silently). So
+> only the main Claude asks you things. When a helper needs a decision, it hands
+> the question back to the main Claude, which shows you the details and asks. That's
+> why every approval comes from the main Claude, never from a helper.
 
 ---
 
-## 7. Context management
+## 6. How decisions get made — the four autonomy tiers
 
-The workflow **chains continuously** from INTAKE through COMPLETE. There are **no
-mandatory `/clear` boundaries** — you don't need to reset context between phases.
-The single source of truth for where things stand is
-`generated-docs/context/workflow-state.json`, and `/continue` re-enters at
-whatever phase that file shows.
+While building, Claude makes a lot of small choices. To keep that safe and open,
+every choice falls into one of four levels. The rule of thumb: when unsure, choose
+the more cautious level. The reason for this design is that stopping to ask you is
+by far the most time-consuming thing that can happen — so Claude saves your
+attention for the moments that genuinely need it, and lets you review the rest at
+natural pauses.
 
-**If auto-compaction fires** mid-workflow, the `inject-phase-context.ps1` hook
-restores the workflow state automatically: it reads `workflow-state.json` and the
-matching `.claude/hooks/phase-context/<phase>.md` file (`intake.md`, `plan.md`,
-or `build.md`) and injects them back into context. You don't have to do anything.
+- **Level 1 — Decide quietly.** For small, low-risk, easily-undone choices — naming
+  things, picking a standard building block, everyday code patterns, sensible
+  defaults. Claude just does it and mentions it briefly with the saved work.
+- **Level 2 — Decide and jot it down.** For choices worth knowing about afterwards.
+  Claude proceeds and writes a short, plain-English note in the epic's **notebook**
+  (`journal.md`). The important ones are read back to you when the epic finishes.
+- **Level 3 — Decide and record it for the right audience.** For things that matter
+  later. Claude proceeds and files a record where it belongs:
+  - A reusable piece of code or a project-wide convention → a shared **registry**
+    (`architecture.md`) that future work reads.
+  - Something about the outside world Claude couldn't verify (the exact shape of
+    the data source, a brand value, a rule) → a **"please double-check"** list that
+    is floated to the top of your hands-on check *before* the epic is merged.
+  - A problem with the template itself → a **feedback file** for the template's
+    maintainers. (Claude works around template problems; it never stops for them.)
+- **Level 4 — Stop and ask.** For genuinely risky ground only.
 
-**If state is lost** (the file is deleted), `/continue` runs
-`transition-phase.js --repair`, which reconstructs the phase from the artifacts on
-disk and tells you how confident it is (see §14).
+**Claude stops and asks you (Level 4)** for things like: changing who is allowed to
+do what; changing the agreed shape of the data or using data the plan didn't
+describe; adding a new outside tool or service; switching a core piece of the app's
+plumbing; changing how sign-in works; a big structural change; something that
+contradicts what you agreed; or something that would break a stated rule.
+
+When a risky decision would change the *project-level* facts (in `project.md`),
+Claude handles it in a single, streamlined step on `main` rather than asking you
+twice — you see one approval, then building resumes.
 
 ---
 
-## 8. The questions INTAKE asks, and how the answers are used
+## 7. The four approvals
 
-### Onboarding (right after `/start`)
+Everything else runs on its own, but there are exactly four points where Claude
+stops for your say-so. Every approval follows the same simple rule: **Claude shows
+you the thing to approve as plain text first, then asks.** It never asks you to
+approve something you can't see.
 
-**"How would you like to get started?"** → share existing docs / import a
-prototype repo / build requirements together. The "build together" path then asks
-for a free-text **elevator pitch** (a plain-text prompt, not buttons — because the
-answer is open-ended).
+1. **The intake approval** — you approve the project facts and the epic plan (first
+   time), or a single epic's requirements (every later epic).
+2. **The story approval** — you approve the list of stories for an epic before any
+   building starts.
+3. **The hands-on approval** — you confirm the finished epic works after trying it
+   yourself.
+4. **The merge approval** — you approve folding the epic into `main` after the
+   automated checks pass.
 
-### Checklist questions (asked by the orchestrator)
+Saving and publishing work is handled separately, according to the preference you
+set at the start (auto-approve, or ask each time).
 
-**1. Roles.** "Which roles template fits your app?" — presets (SaaS Standard,
-Internal Tool, Marketplace, Editorial) plus the option to describe your own.
-Recorded as the roles in the brief; drives permission handling.
+---
 
-**2. Authentication.** "How will users authenticate?" — **always asked
-explicitly**, never inferred:
-- **Backend For Frontend (BFF)** — the backend handles OIDC and sets cookies.
-  Follow-up (free text): login, userinfo, and logout URLs. A note explains that
-  CI can't reach a real BFF, so the performance gate runs against mocks.
-- **Frontend-only (next-auth)** — Next.js handles auth. A note explains the
-  trade-off: API calls won't carry session context, so it protects frontend
-  routes only.
-- **Custom** — follow-up: describe your approach.
+## 8. The questions INTAKE asks
 
-**3. Backend readiness.** "Is your backend API up and running?" — Yes / No, still
-in development / N/A, no backend. This, combined with whether a spec was found in
-`documentation/`, sets the **data source**:
+Right after you start a new project, Claude asks how you'd like to begin — bring in
+a prototype, share your own documents, or describe it together. Then it asks a
+short set of setup questions. Your answers are saved in the project facts sheet and
+inherited by every epic.
 
-| Spec found? | Backend? | Data source | Mock layer? |
-|---|---|---|---|
-| Yes | Running | `existing-api` | No |
-| Yes | In development | `api-in-development` | Yes |
-| No | Running | `new-api` | No |
-| No | In development | `api-in-development` | Yes |
-| (any) | N/A | `mock-only` | No |
-
-**4. Compliance.** A multi-select of regulated areas (payment/PCI, personal
-data/GDPR-POPIA-CCPA, health/HIPAA, multi-tenant/SOC 2), or "none." Picking
-personal data adds a region follow-up. Recorded as the compliance domains in the
-brief.
-
-### Approval questions
-
-- After the brief: **Gate 1** — approve the project brief.
-- During PLAN: **Gate 2** — approve the epics, then the stories per epic.
-- At each epic boundary: the manual verification check.
-
-### The two-step approval rule
-
-Every approval follows the same shape: **show the content as normal text first,
-then ask.** The orchestrator never pops an approval question without the thing to
-approve sitting right above it.
+- **Who uses the app?** You pick from common ready-made sets of user types — a
+  standard software product (owner / admin / member / viewer), an internal tool
+  (admin / user), a marketplace (moderator / seller / buyer), or a publishing setup
+  (editor / author / contributor / reader) — or you describe your own. This shapes
+  what different people are allowed to do.
+- **How do people sign in?** **Always asked openly, never guessed.** The choices
+  are: sign-in handled by your own server (the most secure option, where the app
+  never handles the login secrets itself), sign-in handled inside the app, or a
+  custom approach you describe. Claude explains the trade-offs, and asks the
+  necessary follow-up details for whichever you choose.
+- **Is your data source ready?** Whether the service the app gets its data from is
+  running, still being built, or not needed. Combined with whether you've provided a
+  description of that data, this decides whether the app talks to a real source or
+  uses realistic stand-in data for now.
+- **Any rules to follow?** Whether the app handles regulated things — payment card
+  data, personal data, health information, or shared-tenant business data. This is a
+  required question. If personal data is involved, Claude also asks which region's
+  rules apply. If you pick nothing, Claude double-checks with you before accepting
+  that no rules apply. (Basic accessibility is always applied regardless.)
 
 ---
 
 ## 9. Quality gates
 
-Gates are **binary** — pass or fail. No "expected failures count as passes," no
-conditional passes. There are **five** gates; there is no Gate 6.
+Before work is accepted it has to pass some checks. Each check is simply **pass or
+fail** — there's no "good enough" and no "expected failure". Claude always reports
+the true result and never waves a failure through.
 
-| Gate | Type | Checks | Passes when |
-|---|---|---|---|
-| **Gate 1 — Functional** | Manual | You confirm the feature works (at each epic boundary) | You say it works |
-| **Gate 2 — Security** | Automated | `npm audit`, secret scan | No high/critical vulnerabilities; no hardcoded secrets |
-| **Gate 3 — Code quality** | Automated | Prettier, TypeScript (`tsc --noEmit`), ESLint, build | Zero type/lint errors; build succeeds |
-| **Gate 4 — Testing** | Automated | Vitest, test-quality checks | All tests pass (and meet the quality bar) |
-| **Gate 5 — Performance** | Automated | Lighthouse (when configured) | Within budget, or reported as not-configured |
+There are four checks in all:
 
-Gates 2–5 run automatically inside BUILD (the `code-reviewer` runs them per
-story), and you can run them on demand with `/quality-check`. Gate 1 is the manual
-browser check at each epic boundary.
+| Check | How it runs | Passes when |
+|---|---|---|
+| **Does it work?** | You try it yourself in the browser at the end of each epic | You confirm it works |
+| **Is it safe?** | Automatic — scans for security problems and for secrets left in the code | No serious security problems; no secrets |
+| **Is the code sound?** | Automatic — checks formatting, correctness, and that the app builds | Everything is clean and the app builds |
+| **Do the tests pass?** | Automatic — runs all the tests and checks they're good tests | Every test passes and meets the quality bar |
 
-**When a gate fails:** the workflow reports the real result — what failed and why
-— and either fixes it (inside BUILD's fix cycle) or, on `/quality-check`, presents
-the failure for you to decide. It never rationalises a failure as acceptable.
+The three automatic checks run in a light form during building (per story) and in
+full over the whole epic at the end. You can also run them any time with
+`/quality-check`. When a check fails, Claude tells you plainly what failed and
+either fixes it or asks you what to do — it never rationalises a failure as
+acceptable.
 
 ---
 
 ## 10. Policies the workflow won't break
 
-These come from `CLAUDE.md` and the files under `.claude/policies/` and
-`.claude/shared/`.
+A few promises hold throughout:
 
-- **The brief overrides template code.** The template ships with starter code
-  (e.g. NextAuth wiring). If the brief specifies something different, the workflow
-  **replaces** the template code rather than wrapping new behaviour around it.
-- **No error suppressions.** Never `@ts-ignore`, `@ts-expect-error`,
-  `@ts-nocheck`, or `eslint-disable`. Errors get fixed, not hidden.
-- **Authentication is always asked explicitly.** Even if the docs make the answer
-  obvious, all three auth options are presented during INTAKE. Auth touches every
-  layer — no assumptions.
-- **Never auto-approve.** If something needs your approval, the workflow stops and
-  asks. It never proceeds on your behalf.
-- **The API spec is authoritative.** Before writing any API call, the workflow
-  checks `documentation/` and `generated-docs/specs/` for a spec, and uses its
-  exact paths, methods, and types. If a call fails, it reports the real error and
-  references the spec — it never guesses.
-- **Shadcn for UI primitives.** Buttons, dialogs, inputs, cards, etc. are Shadcn
-  components (installed via the Shadcn MCP). No hand-rolled "Shadcn-style"
-  components.
-- **Plain language for anything you read.** User-facing text avoids jargon — "the
-  app builds correctly," not "TypeScript compiled with zero diagnostics."
-- **First person.** When relaying an agent's findings, the workflow speaks as
-  "I"/"we," not "the intake-agent did X."
+- **What you agreed comes first.** The starter kit ships with some ready-made code.
+  If what you asked for is different, Claude replaces that code rather than piling
+  new behaviour on top of it.
+- **No hiding problems.** Claude fixes errors rather than silencing them.
+- **Sign-in is always discussed openly.** Even when the answer seems obvious, Claude
+  asks how people should sign in, because it affects everything.
+- **Nothing is approved on your behalf.** If something needs your say-so, Claude
+  stops and asks.
+- **The data source is the authority.** Before using any of the app's data, Claude
+  follows the agreed description exactly. If a data request fails, it reports the
+  real problem instead of guessing.
+- **Consistent, ready-made building blocks.** Buttons, dialogs, form fields and the
+  like come from a trusted set, not hand-made lookalikes.
+- **One place for the look and feel.** All the app's colours, fonts, and spacing are
+  defined in one central place and referenced by name — never scattered as one-off
+  colour codes in individual screens.
+- **Plain language for anything you read.** Messages to you avoid technical jargon.
+- **Claude speaks as itself.** When it shares a helper's findings, it says "I" or
+  "we", not "the helper did this".
 
 ---
 
 ## 11. Hooks — what runs automatically
 
-Hooks are commands Claude Code runs on certain events. They're defined in
-`.claude/settings.json`.
+Hooks are small commands Claude Code runs by itself at certain moments, without
+being asked. This template uses five:
 
-| Event | What runs | Purpose |
-|---|---|---|
-| `UserPromptSubmit` | `workflow-guard.ps1` | Nudges development requests into the workflow |
-| `UserPromptSubmit` | `telemetry.js` | Records a user-input event |
-| `SessionStart` (compact) | `inject-phase-context.ps1` | Restores workflow state after auto-compaction |
-| `SubagentStart` (named agents) | `inject-agent-context.ps1` | Injects the current phase/epic/story into the agent |
-| `SubagentStart` (named agents) | `telemetry.js` | Records an agent-start event |
-| `SubagentStop` | `telemetry.js` | Records an agent-stop event |
-| `Stop` | `telemetry.js` | Records the end of a response turn |
-| `PreToolUse` (Bash) | `bash-permission-checker.js` | Validates Bash commands before they run |
-| `PreToolUse` (Write/Edit) | `claude-md-permission-checker.js` | Guards edits to `CLAUDE.md` |
-| `PreToolUse` (Write/Edit) | `enforce-generated-doc-names.js` | Enforces the naming rules for generated docs |
-
-The named-agent matcher covers `developer`, `test-generator`, `code-reviewer`,
-`feature-planner`, `design-api-agent`, `design-style-agent`, `intake-agent`,
-`api-connectivity-agent`, `playwright-runner`, `mock-setup-agent`, and
-`type-generator-agent`.
-
-> There is **no** session-logging hook and **no** `capture-context.ps1` — the old
-> `.claude/logs/*.md` logging was replaced by telemetry (§15).
+| When it runs | What it does |
+|---|---|
+| Every time you send a message | Checks where the workflow stands and nudges you to the right command if you're trying to build something outside the workflow |
+| After Claude's memory is auto-trimmed in a long session | Restores its bearings — which epic, which stage, what's next |
+| When a helper starts | Tells the helper which epic, stage, and story it's working on |
+| Before any command line runs | Approves safe commands and blocks dangerous ones |
+| Before any generated file is written | Makes sure the file has the correct, expected name and location |
 
 ---
 
 ## 12. The permission system
 
-Defined in `.claude/settings.json` under `permissions`.
+Claude Code asks your permission before doing anything risky. This template
+pre-sets some of those answers so you're not interrupted for obviously safe things,
+and blocks some outright.
 
-**Always allowed (no prompt):**
-- All Shadcn MCP operations (`mcp__shadcn-ui__*`)
-- Reading/writing/editing under `documentation/**`, `generated-docs/**`, `web/**`
-- Globbing those folders and `.claude/**`
-- A specific set of test/build commands: Playwright (`npx playwright …`,
-  `npm run test:e2e`), Vitest (`npx vitest …`, `npm --prefix web test …`), and
-  `node .claude/scripts/*.js`
+**Allowed without asking:** the trusted set of interface building blocks; reading
+and writing inside the project's own folders (`documentation/`, `generated-docs/`,
+`web/`); and a specific set of safe test and build commands.
 
-**Always denied (blocked outright):**
-- `rm -rf /` and `rm -rf /*`
-- Reading SSH keys and secrets (`*.ssh/*`, `id_rsa`, `*.pem`, `credentials`)
-- Shell ways of reading those same secret files (`cat` / `type` / `Get-Content` /
-  `sed` on the sensitive patterns)
+**Blocked outright:** the most destructive delete commands, and reading or printing
+sensitive secret files (private keys, credentials).
 
-**Everything else** prompts for approval when used. The `bash-permission-checker.js`
-hook validates each Bash command against these rules before it runs (and the QA
-suite fuzzes it hard — see TEST-GUIDE §32).
+**Everything else** asks for your approval when it comes up. The "before any command
+runs" hook (section 11) is what enforces this, and the test suite tests it hard —
+one dangerous command slipping through is the failure we most want to catch.
 
 ---
 
-## 13. How the orchestrator works
+## 13. State tracking and recovery
 
-The **orchestrator** is the parent Claude instance running `/start` or
-`/continue`. It's the conductor: it launches agents, manages the conversation,
-asks you for approvals, and tracks phase transitions. The agents do the heavy
-lifting; the orchestrator coordinates.
+The workflow keeps track of where things stand in a small status file for each
+epic, stored on that epic's branch (`state.json`). It records the current stage,
+each story's progress, and any point where Claude stopped to ask you.
 
-A few principles keep it reliable:
+You don't advance stages by hand and neither does a script — the main Claude moves
+the stage forward itself as work completes, following the fixed order of stages.
+Two small, exact operations are handled by dedicated helper scripts because they
+must be perfectly reliable every time: creating a fresh epic's status file, and
+marking an epic finished after it's merged.
 
-- **Keep parent tool calls light.** The orchestrator aims for about three tool
-  calls per response outside natural turn boundaries, and delegates heavy work
-  (long bash sequences, file-by-file work) to subagents. Answering an
-  `AskUserQuestion` starts a fresh turn, which resets that budget. (`playwright-runner`,
-  for example, exists partly so the E2E run happens inside a subagent rather than
-  in the parent.)
-- **Approvals come from the parent.** Because `AskUserQuestion` doesn't work inside
-  subagents (§5), any decision an agent needs is returned to the orchestrator,
-  which shows you the content and asks.
-- **BUILD is synchronous from the orchestrator's view**, so halts surface
-  immediately and in order — no race conditions.
-- **The brief is authoritative**, and the agents already know it, so the
-  orchestrator doesn't need to repeat "the brief wins" on every call.
+**Recovery is simple.** Because the epic's branch name plus its status file tell
+the whole story, there's nothing fragile to lose. If you close and come back, check
+out the epic's branch and type `/continue` — Claude reads the status and carries on
+from the right spot. If its memory gets auto-trimmed mid-session, a hook quietly
+restores its bearings from the same status file. There's no special "repair" step
+to run.
 
 ---
 
-## 14. State tracking and recovery
+## 14. Working on more than one epic at once
 
-### The state file
+Because each epic is built on its own branch, two people can work on two different
+epics at the same time without clashing — there's no shared status file to fight
+over.
 
-`generated-docs/context/workflow-state.json` tracks the current phase (INTAKE /
-PLAN / BUILD / COMPLETE), the current epic and story, per-story status, and
-history.
+When it's time to merge, most overlaps are simple to combine automatically — for
+example, two epics adding different colours to the central style file, or different
+pieces of stand-in data. Claude combines those on its own. But if two epics change
+the *same* code in conflicting ways, or want different versions of the same outside
+tool, Claude stops and shows you both versions so you can decide.
 
-### The scripts behind it
-
-| Script | Purpose |
-|---|---|
-| `transition-phase.js` | Moves between phases with validation; also `--show`, `--init`, `--repair` |
-| `collect-dashboard-data.js` | Gathers the full workflow state (powers `/status` and the dashboard) |
-| `generate-dashboard-html.js` | Regenerates the HTML dashboard |
-| `generate-todo-list.js` | Produces the in-chat progress checklist |
-| `generate-telemetry-report.js` | Builds the timing / tokens / final reports from telemetry |
-| `quality-gates.js` | Runs Gates 2–5 and reports pass/fail as JSON |
-| `journal.js` | Appends and reads the decision journal |
-| `import-prototype.js` | Imports a prototype repo into `documentation/` |
-| `scan-doc.js` | Scans `documentation/` for content and keywords |
-| `migrate-legacy-state.js` | Upgrades an old state file to the current format |
-
-All scripts output JSON with a `status` of `ok` (proceed), `error` (stop and
-report), or `warning` (proceed with care).
-
-### Recovery
-
-If the state file is missing or unclear, `transition-phase.js --repair`
-reconstructs the phase from the artifacts on disk and reports a confidence level:
-**high** (proceed), **medium** (show detected vs assumed, confirm with you), or
-**low** (require your verification).
-
-### Files agents use to talk to each other
-
-| File | Written by | Read by |
-|---|---|---|
-| `project-brief.md` | `intake-agent` | everyone — it's the source of truth |
-| `intake-manifest.json` | `intake-agent` | PLAN and BUILD |
-| `workflow-state.json` | the transition scripts | all agents |
-| `journal.md` | `developer` / orchestrator (via `journal.js`) | the Epic Completion Summary |
-| `telemetry.ndjson` | the telemetry hooks | the telemetry reports |
+If one epic depends on another, that dependency is recorded, and the dependent epic
+is marked as waiting until the one it needs is merged.
 
 ---
 
-## 15. Telemetry
+## 15. How the app is tested
 
-Instead of writing session logs, the template records a stream of events to a
-**telemetry ledger** and derives reports from it.
+Tests check **what a real person would see and do**, not hidden internal details.
+There are three layers, and each behaviour is covered by exactly one of them:
 
-- **The ledger** — `generated-docs/context/telemetry.ndjson`, an append-only list
-  of events (phase entered/exited, agent started/stopped, turn ended). It's
-  written by `.claude/hooks/telemetry.js` and the small library under
-  `.claude/scripts/lib/` (`telemetry.js`, `transcript-tokens.js`).
-- **The reports** — `generate-telemetry-report.js` turns the ledger (plus token
-  data pulled from the transcript) into four views: `--estimate` (a forecast),
-  `--timing` (time per phase/agent, excluding time spent waiting on you),
-  `--tokens` (token usage), and `--final` (estimate-vs-actual per story). COMPLETE
-  generates the timing, tokens, and final reports as HTML under
-  `generated-docs/reports/`.
+- **Quick tests** — for things visible in a single screen: which buttons show for
+  which users, form behaviour, loading and empty and error states.
+- **Browser tests** — for things that only make sense across a real browser session:
+  moving between pages, signing in, redirects, filtering and sorting, and a real
+  accessibility scan.
+- **Hands-on only** — for things a machine can't fairly judge: how something looks,
+  screen-reader wording, how it feels. These become items on your hands-on
+  checklist.
 
-There is **no** `[Logs saved]` marker and **no** `.claude/logs/` folder — those
-belonged to the old logging system.
+A behaviour is never tested twice across layers — that would just recreate the blind
+spot the layering exists to avoid.
+
+A few habits worth knowing:
+
+- **Tests are written before the code** and must fail first, then pass once the code
+  is written.
+- **The browser tests always run against stand-in data**, never a live service — the
+  real end-to-end check is the hands-on one you do yourself.
+- Every part of the app that has its own screen gets a real browser test. Parts that
+  don't have their own screen still get a test file, but with the tests marked as
+  "to be filled in later" and a one-line reason.
+- Tests are kept representative, not exhaustive, and there's a firm ceiling on how
+  many go in one file, so a story that needs more is a sign it should be split.
 
 ---
 
 ## 16. The dashboard
 
-`generated-docs/dashboard.html` is a visual overview — phases, epics, stories, and
-status.
+The dashboard is a simple web page that gives you a bird's-eye view of your
+progress — the epics in progress (one per branch) and the finished ones, and how
+far along each is. It pulls together every branch at once, so it shows the whole
+picture no matter which branch you're on.
 
-- **Auto-refreshes every 10 seconds** via a `<meta http-equiv="refresh">` tag, so
-  it updates itself if you leave the tab open.
-- **Regenerated at milestones** — end of INTAKE, after each PLAN approval, after
-  each BUILD agent returns, after each commit, at each epic summary, and at
-  completion.
-- **Fire-and-forget** — if regenerating it ever fails, the workflow keeps going.
-- **You can open it any time** with `/dashboard`.
+- It **refreshes itself every ten seconds**, so it stays current if you leave it
+  open.
+- Claude **regenerates it at natural moments** — after approvals, after each piece
+  of work is saved, and at the end of each epic.
+- It's **fire-and-forget** — if it ever fails to update, that never stops the actual
+  work.
+- You can open it any time with `/dashboard`.
 
 ---
 
 ## 17. Key files and directories
 
-| Path | Purpose |
+| Where | What it is |
 |---|---|
-| `CLAUDE.md` | The primary instruction file, read at the start of every conversation |
-| `.claude/settings.json` | Hooks and permissions |
-| `.claude/WORKFLOWS.md` | The workflow design overview |
-| `.claude/shared/orchestrator-rules.md` | Rules both `/start` and `/continue` must follow |
-| `.claude/shared/agent-autonomy.md` | The four-tier decision framework (§6) |
-| `.claude/policies/authentication-intake.md` | The "always ask auth explicitly" policy |
-| `.claude/policies/compliance-intake.md` | Compliance question triggers |
-| `.claude/policies/quality-gates.md` | Gate definitions and the binary pass/fail rule |
-| `.claude/agents/` | One file per agent |
-| `.claude/commands/` | One file per slash command |
-| `.claude/hooks/phase-context/` | Per-phase context restored after compaction (`intake.md`, `plan.md`, `build.md`) |
-| `documentation/` | What you provide: specs, API docs, wireframes |
-| `generated-docs/specs/` | The project brief, and any generated API spec / design tokens |
-| `generated-docs/context/` | State, manifest, journal, telemetry |
-| `generated-docs/stories/` | Epic and story files |
-| `generated-docs/qa/` | Manual verification checklists |
-| `generated-docs/reports/` | Telemetry reports |
-| `web/src/lib/api/client.ts` | The API client — every API call goes through this |
-| `web/src/types/api-generated.ts` | Types generated from the OpenAPI spec |
-| `web/src/lib/api/endpoints.ts` | Typed endpoint functions generated from the spec |
-| `web/e2e/` | Playwright specs |
+| `documentation/` | What you provide: specs, requirements, wireframes, data descriptions |
+| `generated-docs/project.md` | The shared project facts, inherited by every epic |
+| `generated-docs/epic-plan.md` | The plan: the list of epics, what depends on what, and coverage of your request |
+| `generated-docs/epics/<epic>/brief.md` | One epic's requirements |
+| `generated-docs/epics/<epic>/state.json` | One epic's live status (stage and per-story progress) |
+| `generated-docs/epics/<epic>/stories/` | One file per story in that epic |
+| `generated-docs/epics/<epic>/journal.md` | The epic's plain-English decision notebook |
+| `generated-docs/architecture.md` | A shared registry of reusable code and project-wide conventions |
+| `generated-docs/dashboard.html` | The visual progress overview |
+| `generated-docs/specs/` | Generated pieces: the data-service description, the app's colours and style, stand-in-data notes |
+| `web/` | The actual application |
+| `.claude/` | Claude's own instructions, helpers, and settings |
 
 ---
 
 ## 18. Technical stack
 
-### Frontend (in `web/`)
+The app is built with a modern, well-supported set of web-building tools, chosen
+for reliability:
 
-| Technology | Role |
-|---|---|
-| Next.js 16 (App Router) | Framework — pages in `app/`, server components by default |
-| React 19 | UI |
-| TypeScript 5 (strict) | Type safety — suppressions forbidden |
-| Tailwind CSS 4 | Styling |
-| Shadcn UI | Component primitives, always via MCP |
-| Vitest + React Testing Library | Unit/integration tests |
-| Playwright | End-to-end tests |
-| MSW (Mock Service Worker) | API mocking when the backend isn't ready |
+- **Next.js and React** — the framework and the interface library.
+- **TypeScript** in strict mode — for catching mistakes early; hiding errors is not
+  allowed.
+- **Tailwind CSS** with a trusted set of interface components — for a consistent
+  look built from ready-made pieces.
+- **Vitest** for the quick tests and **Playwright** for the browser tests.
+- **Stand-in data** that steps in when the real data source isn't ready.
 
-### Conventions
-
-- **Path alias:** `@/` resolves to `web/src/`.
-- **API calls:** never `fetch()` directly in a component — always the API client
-  (`get` / `post` / `put` / `del`). The OpenAPI spec is the source of truth for
-  paths, methods, and types.
-- **Tests:** focus on user-observable behaviour, not implementation. Query
-  priority `getByRole` > `getByLabelText` > `getByText` > `getByTestId`. Every
-  routable story gets a live Playwright spec; non-routable stories get a
-  `test.fixme()` spec with a one-line reason.
+A couple of conventions run throughout: all of the app's data requests go through
+one shared, tidy channel and follow the agreed data-service description exactly
+(never a guess); and the app's colours, fonts, and spacing all come from one central
+place.
 
 ---
 
@@ -614,23 +589,28 @@ status.
 
 | Term | Meaning |
 |---|---|
-| **Project brief** | `project-brief.md` — the single document INTAKE produces; the source of truth for the whole feature |
-| **Intake manifest** | `intake-manifest.json` — the captured configuration (roles, auth, data source, compliance) used by later phases |
-| **Epic** | A group of related stories that together deliver a major piece of functionality |
-| **Story** | A single user-facing behaviour, small enough to build and test in one cycle |
-| **Acceptance criteria (AC)** | Testable statements in a story file that define when it's done |
-| **Role** | Who a story is for; declared in the story file and used for permission-aware behaviour |
-| **Gate** | A quality check; all gates are binary pass/fail |
-| **Autonomy tiers** | The four-tier framework (§6) deciding whether an agent proceeds, journals, surfaces, or halts |
-| **Journal** | `journal.md` — the plain-English record of Tier 2/3 decisions, surfaced at epic boundaries |
-| **Orchestrator** | The parent Claude running `/start` or `/continue`; coordinates agents and handles approvals |
-| **Telemetry ledger** | `telemetry.ndjson` — the append-only event stream the reports are built from |
-| **Data source** | How the app gets data: `existing-api`, `new-api`, `api-in-development`, or `mock-only` |
-| **BFF** | Backend For Frontend — an auth pattern where the backend handles OIDC and sets HTTP-only cookies |
-| **MSW** | Mock Service Worker — intercepts API calls in the browser when the backend isn't ready |
-| **Halt** | A Tier-4 stop where BUILD asks you about an unsafe decision before proceeding |
+| **Epic** | One meaningful chunk of the app, built as a unit. A project is several epics. |
+| **Branch** | A separate copy of the project where one epic is built, kept apart from the finished version until it's merged. |
+| **Main** | The finished, trusted version of the project that epics are merged into. |
+| **Merge** | Folding a finished epic's work into `main`. |
+| **`project.md`** | The shared note of facts that stay the same across the whole project (users, sign-in, data source, rules, look and feel). |
+| **`brief.md`** | The short requirements note for one epic. |
+| **Story** | A single thing a user can see or do, small enough to build and test in one go. |
+| **Acceptance criteria** | The testable statements in a story that say when it's done. |
+| **Checklist** | The plain-language list of things you check by hand when you try an epic yourself. |
+| **Gate (check)** | A pass-or-fail safety check. There are four: does it work, is it safe, is the code sound, do the tests pass. |
+| **Notebook (`journal.md`)** | The plain-English record of the decisions Claude made during an epic; the important ones are read back to you at the end. |
+| **Registry (`architecture.md`)** | A shared list of reusable code and project-wide conventions that future work reads. |
+| **Please-double-check list** | Things Claude couldn't verify about the outside world, floated to the top of your hands-on check before an epic is merged. |
+| **Stand-in data** | Realistic pretend data the app uses while the real data source isn't ready. |
+| **Agent (helper)** | A specialised assistant Claude launches for one job; helpers report back to the main Claude and never talk to you directly. |
+| **Orchestrator** | The main Claude that runs the commands, coordinates the helpers, and handles all approvals. |
+| **Hook** | A small command Claude Code runs automatically at certain moments. |
+| **State file (`state.json`)** | The small file that records an epic's current stage and progress. |
+| **Halt** | A point where Claude stops and asks you about a genuinely risky decision. |
 
 ---
 
-*This document describes the four-phase template (INTAKE → PLAN → BUILD →
-COMPLETE) as of 2026-06-16.*
+*This guide describes the current epic-based workflow, where the app is built one
+epic at a time — each on its own branch, planned and built test-first, checked, and
+merged into the finished project once you're happy with it.*

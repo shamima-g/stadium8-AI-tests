@@ -1,112 +1,211 @@
 /**
- * seedState() — writes a workflow-state.json with sensible defaults plus overrides.
+ * Epic-branch fixtures — seed the files the current workflow reads.
  *
- * Shape matches .claude/scripts/transition-phase.js expectations.
+ * The unit of work is the epic, built on an `epic/<slug>` branch. State lives at
+ * `generated-docs/epics/<slug>/state.json` (shape mirrors
+ * `.claude/scripts/lib/epic-state.js` → defaultEpicState). Shared project facts
+ * live in `generated-docs/project.md` on `main`; the plan in
+ * `generated-docs/epic-plan.md`.
+ *
+ * These write the WORKING-TREE copies. Tests that need real cross-branch behaviour
+ * (collect-dashboard-data reads other epics from their branch tips) pair these with
+ * `gitSandbox()` to commit them onto `main` / an `epic/<slug>` branch.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type Phase =
-  // The 4-phase model: INTAKE → PLAN → BUILD → COMPLETE.
-  // 'NONE' is the initial pre-INTAKE state transition-phase.js writes.
-  | 'NONE'
-  | 'INTAKE'
+// Mirrors epic-state.js EPIC_PHASES (the single source of truth in the template).
+export type EpicPhase =
   | 'PLAN'
   | 'BUILD'
+  | 'EPIC-END'
+  | 'MANUAL-TEST'
+  | 'COMPLETE-ON-BRANCH'
   | 'COMPLETE';
 
-export interface WorkflowState {
-  featureName?: string;
-  currentPhase?: Phase;
-  currentEpic?: number | null;
-  currentStory?: number | null;
-  phaseStatus?: 'ready' | 'in_progress' | 'paused' | 'complete';
-  featureComplete?: boolean;
-  totalEpics?: number;
-  epics?: Record<string, unknown>;
-  lastUpdated?: string;
+export type StoryStatus = 'pending' | 'in-progress' | 'complete' | 'halted';
+export type E2eStatus =
+  | 'deferred'
+  | 'passed'
+  | 'passed-after-fix'
+  | 'failed'
+  | 'auto-skipped:non-routable'
+  | 'auto-skipped:fixme';
+
+export interface StorySeed {
+  status?: StoryStatus;
+  commit?: string | null;
+  e2eStatus?: E2eStatus;
+}
+
+export interface EpicState {
+  schemaVersion: number;
+  epic: {
+    slug: string;
+    name: string;
+    createdAt: string;
+    dependsOn: string[];
+    introducesSharedSurface: boolean;
+    unverifiedAssumptions: string[];
+    manualTestResults: unknown[];
+  };
+  phase: EpicPhase;
+  stories: Record<string, StorySeed>;
+  halt: { reason?: string } | null;
+  lastUpdated: string;
   [k: string]: unknown;
 }
 
-const DEFAULT_STATE: WorkflowState = {
-  featureName: 'Team Task Manager',
-  currentPhase: 'INTAKE',
-  currentEpic: null,
-  currentStory: null,
-  phaseStatus: 'ready',
-  featureComplete: false,
-  totalEpics: 0,
-  epics: {},
-  lastUpdated: '2026-04-21T00:00:00.000Z',
-};
-
-export function seedState(root: string, overrides: Partial<WorkflowState> = {}): string {
-  const stateDir = path.join(root, 'generated-docs', 'context');
-  fs.mkdirSync(stateDir, { recursive: true });
-  const stateFile = path.join(stateDir, 'workflow-state.json');
-  const merged: WorkflowState = { ...DEFAULT_STATE, ...overrides };
-  fs.writeFileSync(stateFile, JSON.stringify(merged, null, 2));
-  return stateFile;
+export interface SeedEpicStateOptions {
+  slug: string;
+  name?: string;
+  phase?: EpicPhase;
+  /** Story index → seed. Bare strings are shorthand for `{ status }`. */
+  stories?: Record<string, StorySeed | StoryStatus>;
+  dependsOn?: string[];
+  halt?: { reason?: string } | null;
+  unverifiedAssumptions?: string[];
+  manualTestResults?: unknown[];
 }
 
-export function readState(root: string): WorkflowState {
-  const stateFile = path.join(root, 'generated-docs', 'context', 'workflow-state.json');
-  return JSON.parse(fs.readFileSync(stateFile, 'utf8')) as WorkflowState;
+const FIXED_TS = '2026-04-21T00:00:00.000Z';
+
+const EPICS_DIR_REL = 'generated-docs/epics';
+
+function statePathRel(slug: string): string {
+  return `${EPICS_DIR_REL}/${slug}/state.json`;
 }
 
-export function seedArtifact(
-  root: string,
-  kind: 'brief' | 'api-spec' | 'intake-manifest' | 'feature-overview' | 'epic-overview' | 'story',
-  content?: string,
-  opts: { epicNum?: number; storyNum?: number; slug?: string } = {}
-): string {
-  const { epicNum = 1, storyNum = 1, slug = 'example' } = opts;
-  let relPath: string;
-  let defaultContent: string;
+/** Writes generated-docs/epics/<slug>/state.json. Returns the absolute path. */
+export function seedEpicState(root: string, opts: SeedEpicStateOptions): string {
+  const {
+    slug,
+    name = `Epic ${slug}`,
+    phase = 'PLAN',
+    stories = {},
+    dependsOn = [],
+    halt = null,
+    unverifiedAssumptions = [],
+    manualTestResults = [],
+  } = opts;
 
-  switch (kind) {
-    case 'brief':
-      // INTAKE's single Gate-1 artifact.
-      relPath = 'generated-docs/specs/project-brief.md';
-      defaultContent = `# Project Brief: Example\n\n## Functional Requirements\n- **R1:** example\n`;
-      break;
-    case 'api-spec':
-      relPath = 'generated-docs/specs/api-spec.yaml';
-      defaultContent = `openapi: 3.0.3\ninfo:\n  title: Example\n  version: 1.0.0\npaths:\n  /api/example:\n    get:\n      responses:\n        '200':\n          description: ok\ncomponents: {}\n`;
-      break;
-    case 'intake-manifest':
-      // Minimal manifest with the top-level keys validate-phase-output.js checks for.
-      // By default it declares an API spec is expected; callers can override via `content`.
-      relPath = 'generated-docs/context/intake-manifest.json';
-      defaultContent = JSON.stringify({
-        context: { featureName: 'Example' },
-        artifacts: {
-          apiSpec: { generate: true },
-          wireframes: { generate: false },
-          designTokensCss: { generate: false },
-          designTokensMd: { generate: false },
-        },
-      }, null, 2);
-      break;
-    case 'feature-overview':
-      relPath = 'generated-docs/stories/_feature-overview.md';
-      defaultContent = `# Feature Overview\n\n## Epics\n- Epic 1: Example\n`;
-      break;
-    case 'epic-overview':
-      relPath = `generated-docs/stories/epic-${epicNum}-${slug}/_epic-overview.md`;
-      defaultContent = `# Epic ${epicNum}\n`;
-      break;
-    case 'story':
-      relPath = `generated-docs/stories/epic-${epicNum}-${slug}/story-${storyNum}-${slug}.md`;
-      defaultContent = `# Story ${storyNum}\n\n**Role:** Admin\n`;
-      break;
-    default:
-      throw new Error(`Unknown artifact kind: ${kind satisfies never}`);
+  const normalisedStories: Record<string, StorySeed> = {};
+  for (const [index, s] of Object.entries(stories)) {
+    const seed: StorySeed = typeof s === 'string' ? { status: s } : s;
+    normalisedStories[index] = {
+      status: seed.status ?? 'pending',
+      commit: seed.commit ?? null,
+      e2eStatus: seed.e2eStatus ?? 'deferred',
+    };
   }
 
-  const abs = path.join(root, relPath);
+  const state: EpicState = {
+    schemaVersion: 1,
+    epic: {
+      slug,
+      name,
+      createdAt: FIXED_TS,
+      dependsOn: [...dependsOn],
+      introducesSharedSurface: false,
+      unverifiedAssumptions: [...unverifiedAssumptions],
+      manualTestResults: [...manualTestResults],
+    },
+    phase,
+    stories: normalisedStories,
+    halt,
+    lastUpdated: FIXED_TS,
+  };
+
+  const abs = path.join(root, statePathRel(slug));
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, content ?? defaultContent);
+  fs.writeFileSync(abs, JSON.stringify(state, null, 2));
+  return abs;
+}
+
+/** Reads generated-docs/epics/<slug>/state.json. */
+export function readEpicState(root: string, slug: string): EpicState {
+  return JSON.parse(fs.readFileSync(path.join(root, statePathRel(slug)), 'utf8')) as EpicState;
+}
+
+export interface SeedProjectMdOptions {
+  name?: string;
+  slug?: string;
+  body?: string;
+}
+
+/**
+ * Writes generated-docs/project.md — the shared project facts. collect-dashboard-data
+ * reads the H1 as the project name and a `Project slug | \`...\`` table row as the slug.
+ */
+export function seedProjectMd(root: string, opts: SeedProjectMdOptions = {}): string {
+  const { name = 'Team Task Manager', slug = 'team-task-manager', body } = opts;
+  const content =
+    body ??
+    `# ${name}\n\n` +
+      `| Field | Value |\n| --- | --- |\n| Project slug | \`${slug}\` |\n\n` +
+      `## Users\nAdmin, Member.\n\n## Authentication\nFrontend-only (next-auth).\n`;
+  const abs = path.join(root, 'generated-docs', 'project.md');
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, content);
+  return abs;
+}
+
+export interface PlanEpic {
+  slug: string;
+  name: string;
+  goal?: string;
+  dependsOn?: string[];
+}
+
+/**
+ * Writes generated-docs/epic-plan.md with a `## Epics` table in the v1 format
+ * collect-dashboard-data's parseEpicPlan expects (slug in a trailing `(\`slug\`)`,
+ * dependencies as backticked slugs in the "Builds on" column).
+ */
+export function seedEpicPlan(root: string, epics: PlanEpic[]): string {
+  const rows = epics
+    .map((e, i) => {
+      const deps = (e.dependsOn ?? []).map((d) => `\`${d}\``).join(', ') || '—';
+      return `| ${i + 1} | ${e.name} (\`${e.slug}\`) | ${e.goal ?? e.name} | ${deps} |`;
+    })
+    .join('\n');
+  const content =
+    `# Epic Plan\n\n## Epics\n\n` +
+    `| # | Epic | Delivers | Builds on |\n| --- | --- | --- | --- |\n${rows}\n`;
+  const abs = path.join(root, 'generated-docs', 'epic-plan.md');
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, content);
+  return abs;
+}
+
+export interface SeedStoryFileOptions {
+  slug: string;
+  index: number;
+  title: string;
+  role?: string;
+  titleSlug?: string;
+}
+
+/** Writes generated-docs/epics/<slug>/stories/story-<index>-<titleSlug>.md. */
+export function seedStoryFile(root: string, opts: SeedStoryFileOptions): string {
+  const { slug, index, title, role = 'Admin' } = opts;
+  const titleSlug = opts.titleSlug ?? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const content = `# Story ${index}: ${title}\n\n**Role:** ${role}\n\n## Manual-test checklist\n- Sign in and confirm the ${title.toLowerCase()} behaves as expected.\n`;
+  const abs = path.join(root, EPICS_DIR_REL, slug, 'stories', `story-${index}-${titleSlug}.md`);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, content);
+  return abs;
+}
+
+/**
+ * Writes the retired top-level workflow-state.json. Used only to exercise the
+ * legacy-detection path (collect-dashboard-data returns `legacy_detected` when
+ * project.md is absent but this file is present).
+ */
+export function seedLegacyState(root: string): string {
+  const abs = path.join(root, 'generated-docs', 'context', 'workflow-state.json');
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, JSON.stringify({ currentPhase: 'BUILD', currentEpic: 1 }, null, 2));
   return abs;
 }

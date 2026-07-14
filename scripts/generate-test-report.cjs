@@ -184,7 +184,6 @@ const AREA_NAMES = {
   'tier-1-unit › hooks': 'Built-in safety checks',
   'tier-1-unit › schemas': 'Saved data has the right shape',
   'tier-1-unit › scripts': 'Helper tools work correctly',
-  'tier-2-log-replay › invariants': 'Workflow records stay trustworthy',
 };
 function friendlyArea(layer) {
   if (AREA_NAMES[layer]) return AREA_NAMES[layer];

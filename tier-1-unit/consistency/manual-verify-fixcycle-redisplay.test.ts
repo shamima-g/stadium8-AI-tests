@@ -1,22 +1,16 @@
 /**
- * S8-80 Phase 5 — Tier 1 wiring lint for fix-cycle checklist re-display.
+ * Manual-test approval — fix-cycle re-display carries ticks forward.
  *
- * After every "Issues found" fix cycle, the orchestrator must re-read the
- * persisted checklist file and re-display its content verbatim to the user.
- * The instruction that enforces this lives in `.claude/shared/orchestrator-rules.md`
- * — both inside the fix-cycle coordinator prompt block (around lines 647–651
- * in the post-S8-80 file) and as a standalone "CRITICAL: Always re-present"
- * sentence further down. If either of those silently disappears, the contract
- * weakens to "the orchestrator may paraphrase or abbreviate after a fix",
- * which is exactly the regression S8-80 fixed.
+ * When the user reports a problem at the manual-test approval, the orchestrator
+ * fixes it, walks back through the epic-end checks, and RE-DISPLAYS the approval —
+ * regenerating `manual-tests.html` from `state.json.epic.manualTestResults` so that
+ * previously-passed tests stay ticked and ONLY the tests the fix affected come back
+ * unchecked for re-verification. The loop is capped at 3 manual-test fix cycles.
  *
- * Specifically checks orchestrator-rules.md for all of:
- *   - the literal phrase `verification-checklist.md`
- *   - the word `verbatim` (case-insensitive)
- *   - the literal phrase `COMPLETE verification checklist`
- *   - the standalone sentence starting `CRITICAL: Always re-present`
- *
- * Pattern source: consistency/cross-doc-references.test.ts, gate-6-wired.test.ts
+ * Canonical source: `.claude/commands/continue.md` § Step B7.1 (and the
+ * check-off page's pre-tick rule in `.claude/shared/approval-pattern.md`).
+ * (The retired S8-80 `verification-checklist.md` / orchestrator-rules mechanism
+ * no longer exists.)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -25,105 +19,57 @@ import path from 'node:path';
 import { REPO_ROOT, createTempProject } from '../../helpers';
 import type { TempProject } from '../../helpers/temp-project';
 
-const ORCH_RULES = path.join(REPO_ROOT, '.claude', 'shared', 'orchestrator-rules.md');
+const CONTINUE = path.join(REPO_ROOT, '.claude', 'commands', 'continue.md');
+const APPROVAL = path.join(REPO_ROOT, '.claude', 'shared', 'approval-pattern.md');
 
-describe('S8-80 — orchestrator-rules.md fix-cycle re-display instructions', () => {
-  it('PASS: orchestrator-rules.md fix-cycle block references verification-checklist.md', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    expect(
-      /verification-checklist\.md/.test(content),
-      'orchestrator-rules.md must reference verification-checklist.md so the fix-cycle coordinator knows which file to re-read',
-    ).toBe(true);
+/**
+ * continue.md re-displays after a fix by regenerating the check-off page from the
+ * persisted results, carrying prior ticks forward (not re-asking the whole list).
+ */
+function carriesTicksForward(continueMd: string): boolean {
+  return (
+    /manualTestResults/.test(continueMd) &&
+    /carry (those )?ticks forward/i.test(continueMd) &&
+    /re-?display/i.test(continueMd)
+  );
+}
+
+describe('manual-test approval — fix-cycle re-display', () => {
+  it('PASS: continue.md re-displays the approval carrying previously-passed ticks forward', () => {
+    expect(carriesTicksForward(fs.readFileSync(CONTINUE, 'utf8'))).toBe(true);
   });
 
-  it('PASS: orchestrator-rules.md mentions "verbatim" in the fix-cycle context', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    expect(
-      /verbatim/i.test(content),
-      'orchestrator-rules.md must use the word "verbatim" to enforce non-paraphrased re-display',
-    ).toBe(true);
+  it('PASS: only the affected tests come back unchecked after a fix', () => {
+    const md = fs.readFileSync(CONTINUE, 'utf8');
+    expect(md).toMatch(/uncheck only the tests the fix affected/i);
   });
 
-  it('PASS: orchestrator-rules.md fix-cycle block contains "COMPLETE verification checklist"', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    expect(
-      /COMPLETE verification checklist/.test(content),
-      'orchestrator-rules.md must require the COMPLETE verification checklist (uppercase COMPLETE) to be copied into the NEEDS_APPROVAL payload',
-    ).toBe(true);
+  it('PASS: the manual-test fix loop is capped at 3 cycles', () => {
+    const md = fs.readFileSync(CONTINUE, 'utf8');
+    expect(md).toMatch(/3 manual-test fix cycles/i);
   });
 
-  it('PASS: orchestrator-rules.md contains the "CRITICAL: Always re-present" sentence', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    expect(
-      /CRITICAL: Always re-present/.test(content),
-      'orchestrator-rules.md must contain the standalone "CRITICAL: Always re-present the full manual verification checklist" instruction — drops here weaken the contract on multi-cycle re-asks',
-    ).toBe(true);
-  });
-
-  it('PASS: the four anchors live within proximity (single fix-cycle block, not scattered)', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    const lines = content.split(/\r?\n/);
-
-    const findAllIdx = (re: RegExp) =>
-      lines.map((l, i) => (re.test(l) ? i : -1)).filter(i => i >= 0);
-
-    // verification-checklist.md is referenced multiple times (Call B prompt
-    // AND fix-cycle block). COMPLETE verification checklist is unique to the
-    // fix-cycle block. The invariant: at least one verification-checklist.md
-    // line must appear within 10 lines of the COMPLETE phrase — that proves
-    // the fix-cycle block has both anchors.
-    const fileIdxs = findAllIdx(/verification-checklist\.md/);
-    const completeIdxs = findAllIdx(/COMPLETE verification checklist/);
-    const criticalIdxs = findAllIdx(/CRITICAL: Always re-present/);
-
-    expect(fileIdxs.length).toBeGreaterThanOrEqual(1);
-    expect(completeIdxs.length).toBeGreaterThanOrEqual(1);
-    expect(criticalIdxs.length).toBeGreaterThanOrEqual(1);
-
-    const fileNearComplete = fileIdxs.some(f =>
-      completeIdxs.some(c => Math.abs(f - c) <= 10),
-    );
-    expect(
-      fileNearComplete,
-      'at least one verification-checklist.md reference must appear within 10 lines of "COMPLETE verification checklist" — that pair lives in the fix-cycle prompt block',
-    ).toBe(true);
-
-    const completeNearCritical = completeIdxs.some(c =>
-      criticalIdxs.some(k => Math.abs(c - k) <= 30),
-    );
-    expect(
-      completeNearCritical,
-      'the CRITICAL: Always re-present sentence must live within 30 lines of the COMPLETE verification checklist phrase — drift here suggests one or the other moved without the matching update',
-    ).toBe(true);
+  it('PASS: the check-off page pre-ticks from prior results (approval-pattern.md)', () => {
+    const md = fs.readFileSync(APPROVAL, 'utf8');
+    expect(md).toMatch(/manualTestResults/);
+    expect(md).toMatch(/pre-?tick/i);
   });
 });
 
-describe('S8-80 — fix-cycle re-display wiring — failure-path coverage', () => {
+describe('manual-test approval — fix-cycle re-display — failure-path coverage', () => {
   let project: TempProject;
   beforeEach(() => { project = createTempProject(); });
   afterEach(() => { project.cleanup(); });
 
-  it('FAIL: tampered orchestrator-rules.md missing "COMPLETE verification checklist" is detected', () => {
+  it('FAIL: a tampered continue.md that re-asks the whole list from scratch is detected', () => {
     project.write(
-      '.claude/shared/orchestrator-rules.md',
-      '# Orchestrator Rules\n\nFix cycle: re-read the checklist and present it.\n',
+      '.claude/commands/continue.md',
+      '# /continue\n\nAfter a fix, show the whole checklist again and ask the user.\n',
     );
-    const content = fs.readFileSync(
-      path.join(project.root, '.claude', 'shared', 'orchestrator-rules.md'),
+    const tampered = fs.readFileSync(
+      path.join(project.root, '.claude', 'commands', 'continue.md'),
       'utf8',
     );
-    expect(/COMPLETE verification checklist/.test(content)).toBe(false);
-  });
-
-  it('FAIL: tampered orchestrator-rules.md without the "CRITICAL: Always re-present" sentence is detected', () => {
-    project.write(
-      '.claude/shared/orchestrator-rules.md',
-      '# Orchestrator Rules\n\nverification-checklist.md verbatim COMPLETE verification checklist.\nNo always-re-present sentence here.\n',
-    );
-    const content = fs.readFileSync(
-      path.join(project.root, '.claude', 'shared', 'orchestrator-rules.md'),
-      'utf8',
-    );
-    expect(/CRITICAL: Always re-present/.test(content)).toBe(false);
+    expect(carriesTicksForward(tampered)).toBe(false);
   });
 });

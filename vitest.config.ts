@@ -16,7 +16,7 @@ export default defineConfig({
     globalSetup: ['./vitest.global-setup.ts'],
     include: [
       'tier-1-unit/**/*.test.ts',
-      'tier-2-log-replay/**/*.test.ts',
+      'tier-2-recorded-run/**/*.test.ts',
     ],
     exclude: [
       'node_modules/**',

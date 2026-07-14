@@ -11,8 +11,22 @@ export { describeTemplate } from './describe-template';
 export { rollback } from './rollback';
 export type { RollbackId, RollbackOptions } from './rollback';
 
-export { seedState, readState, seedArtifact } from './state-fixtures';
-export type { Phase, WorkflowState } from './state-fixtures';
+export {
+  seedEpicState,
+  readEpicState,
+  seedProjectMd,
+  seedEpicPlan,
+  seedStoryFile,
+  seedLegacyState,
+} from './state-fixtures';
+export type {
+  EpicPhase,
+  StoryStatus,
+  E2eStatus,
+  StorySeed,
+  EpicState,
+  PlanEpic,
+} from './state-fixtures';
 
 export { seedManifest, readManifest } from './manifest-fixtures';
 export type { IntakeManifest, ArtifactEntry } from './manifest-fixtures';
@@ -28,3 +42,6 @@ export type { NormaliseOptions } from './snapshot';
 
 export { loadCheckpoint, CHECKPOINT_DESCRIPTIONS } from './checkpoint-fixtures';
 export type { CheckpointId } from './checkpoint-fixtures';
+
+export { loadGoldenRun } from './golden-run';
+export type { GoldenRun } from './golden-run';

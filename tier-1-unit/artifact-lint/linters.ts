@@ -72,11 +72,36 @@ export const JARGON_PATTERNS: RegExp[] = [
   /\bvitest\b/i,
   /\bMSW\b/,
 ];
+// Legacy standalone checklists (retired flat layout). Kept so the detector still
+// recognises an old `*-verification-checklist.md` if one is ever present.
 export const isChecklist = (name: string): boolean => name.endsWith('-verification-checklist.md');
 
 /** Jargon patterns that match the content (empty = plain language). */
 export function findJargon(content: string): RegExp[] {
   return JARGON_PATTERNS.filter((rx) => rx.test(content));
+}
+
+/**
+ * The user-facing manual-test checklist now lives INSIDE each epic story file
+ * (`generated-docs/epics/<slug>/stories/story-*.md`), under a heading that mentions
+ * "manual" + "test"/"check". This pulls just that section — so the plain-language
+ * scan checks the checklist wording without tripping on the dev-facing metadata
+ * (targetFile, requirementIds, routes) elsewhere in the story file. Returns '' when
+ * the file has no such section.
+ */
+export function extractManualChecklist(content: string): string {
+  const lines = content.split(/\r?\n/);
+  const startRe = /^#{1,6}\s.*\bmanual\b.*\b(test|check)/i;
+  const start = lines.findIndex((l) => startRe.test(l));
+  if (start === -1) return '';
+  const headingLevel = lines[start].match(/^#+/)?.[0].length ?? 2;
+  const out: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const h = lines[i].match(/^(#+)\s/);
+    if (h && h[1].length <= headingLevel) break; // next same/higher-level heading ends the section
+    out.push(lines[i]);
+  }
+  return out.join('\n');
 }
 
 // ---------------------------------------------------------------------------

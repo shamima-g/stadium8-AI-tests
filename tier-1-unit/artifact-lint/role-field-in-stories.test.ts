@@ -1,11 +1,11 @@
 /**
  * TG-38 — Every story file declares a non-empty Role.
  *
- * Rule: generated-docs/stories/<epic>/story-*.md must carry a `**Role:**` field
- * with a real value (not blank, "N/A", "TBD", or "unknown").
+ * Rule: generated-docs/epics/<slug>/stories/story-*.md must carry a `**Role:**`
+ * field with a real value (not blank, "N/A", "TBD", or "unknown").
  *
  * The rule is tested against fixtures; a regression scan runs it over the real
- * stories tree when one exists, and is skipped (visibly) otherwise.
+ * epic story tree when one exists, and is skipped (visibly) otherwise.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -39,13 +39,15 @@ describe('TG-38 rule — extractRole / roleViolation', () => {
   });
 });
 
-const STORIES_DIR = path.join(REPO_ROOT, 'generated-docs', 'stories');
-const hasStories = fs.existsSync(STORIES_DIR);
+// Epic-branch layout: story files live under generated-docs/epics/<slug>/stories/.
+// walkFiles recurses, so pointing at the epics root and matching story-*.md finds them.
+const EPICS_DIR = path.join(REPO_ROOT, 'generated-docs', 'epics');
+const hasStories = fs.existsSync(EPICS_DIR);
 
 describe('TG-38 regression — real story files', () => {
   it.skipIf(!hasStories)('every story file has a valid Role', () => {
     const offenders: string[] = [];
-    for (const file of walkFiles(STORIES_DIR, isStoryFile)) {
+    for (const file of walkFiles(EPICS_DIR, isStoryFile)) {
       const problem = roleViolation(fs.readFileSync(file, 'utf8'));
       if (problem) offenders.push(`${path.relative(REPO_ROOT, file)}: ${problem}`);
     }

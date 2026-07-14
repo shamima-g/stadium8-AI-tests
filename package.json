@@ -5,17 +5,20 @@
   "description": "Test suite for the Claude Code workflow template (scripts, hooks, schemas, agents, commands). Three-tier structure per /TEST-STRATEGY.md.",
   "type": "module",
   "scripts": {
-    "test": "node scripts/generate-test-report.cjs --telemetry-root .. --exit-code --no-open",
+    "test": "node scripts/generate-test-report.cjs --exit-code --no-open",
     "posttest": "node scripts/compare-reports.cjs",
     "test:raw": "vitest run",
     "test:watch": "vitest",
     "test:tier1": "vitest run tier-1-unit",
-    "test:tier2": "vitest run tier-2-log-replay",
+    "test:tier2": "vitest run tier-2-recorded-run",
     "test:pester": "pwsh -NoProfile -Command \"Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-1-unit/hooks/powershell -Output Detailed\"",
-    "test:report": "node scripts/generate-test-report.cjs --telemetry-root ..",
-    "test:full": "node scripts/generate-test-report.cjs --telemetry-root .. --with-web --with-e2e --with-gates",
+    "test:tier3-unit": "pwsh -NoProfile -Command \"Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-3-automated/tests -Output Detailed\"",
+    "test:report": "node scripts/generate-test-report.cjs",
+    "test:full": "node scripts/generate-test-report.cjs --with-web --with-e2e --with-gates",
     "compare": "node scripts/compare-reports.cjs",
-    "project-report": "node scripts/generate-test-report.cjs --telemetry-root .. --no-open && node scripts/compare-reports.cjs"
+    "project-report": "node scripts/generate-test-report.cjs --no-open && node scripts/compare-reports.cjs",
+    "reconcile": "node scripts/reconcile-template.cjs",
+    "reconcile:check": "node scripts/reconcile-template.cjs --check"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -86,3 +86,45 @@ describe('agent README consistency', () => {
     expect(phantoms, `README mentions non-existent agents: ${phantoms.join(', ')}`).toEqual([]);
   });
 });
+
+const VALID_MODELS = new Set(['haiku', 'sonnet', 'opus']);
+
+describe('agent frontmatter — model / tools / color are well-formed', () => {
+  const files = listAgentFiles();
+
+  for (const file of files) {
+    it(`PASS: ${file} has a valid model, non-empty tools, and a colour`, () => {
+      const parsed = matter(fs.readFileSync(path.join(AGENTS_DIR, file), 'utf8'));
+      const { model, tools, color } = parsed.data as { model?: unknown; tools?: unknown; color?: unknown };
+
+      // model, when present, must be one of the short model tiers.
+      if (model !== undefined) {
+        expect(VALID_MODELS.has(String(model)), `${file}.model="${String(model)}" must be one of ${[...VALID_MODELS].join(', ')}`).toBe(true);
+      }
+      // tools, when present, must be a non-empty comma-list string or a non-empty array.
+      if (tools !== undefined) {
+        const ok = (typeof tools === 'string' && tools.trim().length > 0) || (Array.isArray(tools) && tools.length > 0);
+        expect(ok, `${file}.tools must be a non-empty string or array`).toBe(true);
+      }
+      // color, when present, must be a non-empty string.
+      if (color !== undefined) {
+        expect(typeof color === 'string' && color.trim().length > 0, `${file}.color must be a non-empty string`).toBe(true);
+      }
+    });
+  }
+});
+
+describe('agent README — referenced scripts exist on disk', () => {
+  it('PASS: every backticked *.js script named in README.md resolves under .claude/scripts/', () => {
+    const readme = fs.readFileSync(AGENTS_README, 'utf8');
+    // Only backticked tokens — avoids false hits on ".js" inside "state.json" in prose.
+    const referenced = new Set<string>();
+    for (const m of readme.matchAll(/`([a-zA-Z0-9_./-]+\.js)`/g)) referenced.add(m[1]);
+    expect(referenced.size, 'expected README to reference at least one script').toBeGreaterThan(0);
+
+    const missing = [...referenced].filter(
+      (rel) => !fs.existsSync(path.join(REPO_ROOT, '.claude', 'scripts', rel)),
+    );
+    expect(missing, `README references scripts that don't exist under .claude/scripts/: ${missing.join(', ')}`).toEqual([]);
+  });
+});

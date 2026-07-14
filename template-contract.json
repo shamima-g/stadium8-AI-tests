@@ -1,0 +1,29 @@
+{
+  "_comment": "THE ONE PLACE that pins the template's shape. When the template changes, edit THIS file and the whole suite lines up again. After any template change run `npm run reconcile` to see, in plain English, exactly what changed and what to update here. Each list below is compared against the template's own live values by the reconcile helper and by the tier-1 drift tests.",
+  "_sources": {
+    "stages / storyStatuses / e2eStatusesCore": ".claude/scripts/lib/epic-state.js (EPIC_PHASES / STORY_STATUS_VALUES / E2E_STATUS_VALUES)",
+    "docNameIds": ".claude/shared/generated-doc-conventions.json (conventions[].id)"
+  },
+
+  "stages": [
+    "PLAN",
+    "BUILD",
+    "EPIC-END",
+    "MANUAL-TEST",
+    "COMPLETE-ON-BRANCH",
+    "COMPLETE"
+  ],
+
+  "storyStatuses": ["pending", "in-progress", "complete", "halted"],
+
+  "e2eStatusesCore": ["deferred", "passed", "passed-after-fix", "failed"],
+
+  "docNameIds": [
+    "project-facts",
+    "epic-brief",
+    "epic-state",
+    "epic-journal",
+    "story-file",
+    "e2e-spec"
+  ]
+}

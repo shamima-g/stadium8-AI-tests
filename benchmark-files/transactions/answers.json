@@ -1,0 +1,47 @@
+{
+  "_comment": "Pre-written answers the Tier 3 live driver feeds to the workflow so no person is needed. The pitch and roles come from frontend/docs/PrototypeBriefV2.md. Two answers are yours to confirm — they are marked NEEDS_CONFIRMATION. Nothing here runs until Part 2 (the live driver) is wired.",
+
+  "benchmark": "transactions",
+
+  "intake": {
+    "pitch": "A Transaction Import & Approval System. Importers upload files of transactions and review them; Approvers review, approve or reject, and export transactions. Files drive ingestion (File Logs); transactions move through Imported / Approved / Rejected.",
+    "roles": [
+      { "name": "Importer", "can": ["upload files", "view transactions", "search/filter", "view file summaries"], "cannot": ["approve/reject"] },
+      { "name": "Approver", "can": ["view transactions", "search/filter", "approve/reject", "export data", "view file summaries"], "cannot": ["upload"] }
+    ],
+    "signIn": {
+      "choice": "your own server (BFF)",
+      "options": ["your own server (BFF)", "a hosted sign-in provider", "no sign-in / stub"],
+      "rationale": "The backend has a real auth API (POST /v1/auth/login, port 10010) issuing a cookie-based JWT session validated server-side. Financial data + cookie sessions + the template's BFF auth policy make BFF the right fit; RBAC (Importer vs Approver) is enforced by the frontend, which the BFF supports."
+    },
+    "dataSource": {
+      "note": "OpenAPI specs are provided (frontend/docs/auth-api.yaml, transactions-api.yaml) and a sample CSV. Backend runs as two services: Auth API http://localhost:10010, Transaction Management API http://localhost:10005/transactions-api. Data service may not be running; build against mock data from the specs unless the backend is up.",
+      "authApiBaseUrl": "http://localhost:10010",
+      "txnApiBaseUrl": "http://localhost:10005/transactions-api",
+      "seededUsers": ["fileimporter@digiata.com / Test123 (File Importer)", "approver@digiata.com / Test123 (Approver)"]
+    },
+    "compliance": {
+      "regulatedData": false,
+      "note": "No regulated/PII compliance domain called out in the brief. Confirm if that's wrong."
+    },
+    "styling": {
+      "source": "frontend/docs/design-system-generic-financial.md",
+      "note": "Use the provided generic-financial design system for colours/fonts/spacing."
+    }
+  },
+
+  "approvals": {
+    "intakeApproval": { "action": "approve", "note": "Approve the project facts + epic plan once shown." },
+    "storyApproval":  { "action": "approve", "note": "Approve the story list once shown." },
+    "handsOnApproval": {
+      "action": "approve",
+      "perPartChecks": [
+        "Importer can upload a file and see its transactions",
+        "Approver can approve a transaction and the status changes to Approved",
+        "Importer cannot see the approve/reject actions"
+      ],
+      "note": "Default trio (editable). These are the user-observable checks ticked at MANUAL-TEST."
+    },
+    "mergeApproval": { "action": "approve", "note": "Approve the merge into main once EPIC-END is green." }
+  }
+}

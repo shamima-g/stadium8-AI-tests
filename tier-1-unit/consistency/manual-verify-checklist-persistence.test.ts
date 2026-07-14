@@ -1,24 +1,17 @@
 /**
- * S8-80 Phase 5 — Tier 1 wiring lint for manual verification checklist persistence.
+ * Manual-test approval — results are persisted so ticks survive a fix cycle.
  *
- * The QA manual-verification-checklist re-display contract (HOW-IT-WORKS §4.9)
- * relies on Call B writing the checklist to a canonical file so subsequent
- * fix-cycle and free-text re-asks can re-read it. If any of the three workflow
- * files silently drops the "MUST persist" instruction, the file disappears,
- * and downstream re-display behaviour degrades to whatever the orchestrator
- * happens to remember in context — which is exactly the regression S8-80 fixed.
+ * Under the epic-branch workflow the manual-test approval (continue.md § Step B7.1)
+ * presents an HTML check-off page (`generated-docs/epics/<slug>/manual-tests.html`)
+ * and, when the user hands results back, PERSISTS them to
+ * `state.json.epic.manualTestResults` — so a later re-display after a fix can
+ * pre-tick the tests that already passed instead of asking the user to re-verify
+ * the whole list.
  *
- * Specifically checks:
- *   - .claude/agents/code-reviewer.md contains a "Persist the checklist to file"
- *     section anchor with `verification-checklist.md` referenced in the
- *     file-write paragraph
- *   - .claude/commands/continue.md Call B launch prompt contains the literal
- *     "You MUST persist the checklist to generated-docs/qa/" instruction
- *   - .claude/shared/orchestrator-rules.md Call B launch prompt contains the
- *     same literal "You MUST persist the checklist to generated-docs/qa/"
- *     instruction (catches drift between the two orchestrator files)
- *
- * Pattern source: consistency/cross-doc-references.test.ts, gate-6-wired.test.ts
+ * Canonical sources: `.claude/commands/continue.md` § B7.1 and
+ * `.claude/shared/approval-pattern.md` § "Manual-Test Check-off Page".
+ * (The retired S8-80 `verification-checklist.md` / `generated-docs/qa/` mechanism
+ * no longer exists.)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -27,93 +20,49 @@ import path from 'node:path';
 import { REPO_ROOT, createTempProject } from '../../helpers';
 import type { TempProject } from '../../helpers/temp-project';
 
-const CODE_REVIEWER = path.join(REPO_ROOT, '.claude', 'agents', 'code-reviewer.md');
-const CONTINUE_CMD = path.join(REPO_ROOT, '.claude', 'commands', 'continue.md');
-const ORCH_RULES = path.join(REPO_ROOT, '.claude', 'shared', 'orchestrator-rules.md');
+const CONTINUE = path.join(REPO_ROOT, '.claude', 'commands', 'continue.md');
+const APPROVAL = path.join(REPO_ROOT, '.claude', 'shared', 'approval-pattern.md');
 
-const PERSIST_INSTRUCTION = /You MUST persist the checklist to generated-docs\/qa\//;
+/** continue.md persists the handed-back results to state.json.epic.manualTestResults. */
+function persistsResults(continueMd: string): boolean {
+  return /manualTestResults/.test(continueMd) && /manual-tests\.html/.test(continueMd);
+}
 
-describe('S8-80 — code-reviewer.md persists the checklist to file', () => {
-  it('PASS: code-reviewer.md has a "Persist the checklist to file" anchor that names verification-checklist.md', () => {
-    const content = fs.readFileSync(CODE_REVIEWER, 'utf8');
+describe('manual-test approval — check-off page is generated', () => {
+  it('PASS: continue.md § B7.1 generates the manual-tests.html check-off page', () => {
+    const md = fs.readFileSync(CONTINUE, 'utf8');
+    expect(md).toMatch(/manual-tests\.html/);
+    expect(md).toMatch(/manual-test approval/i);
+  });
 
-    expect(
-      /Persist the checklist to file/.test(content),
-      'code-reviewer.md must contain the literal "Persist the checklist to file" section anchor',
-    ).toBe(true);
-
-    // The file-write paragraph must reference verification-checklist.md within
-    // proximity of the persist anchor (not just somewhere in the file).
-    const lines = content.split(/\r?\n/);
-    const anchorIdx = lines.findIndex(l => /Persist the checklist to file/.test(l));
-    const checklistRefIdx = lines.findIndex(
-      (l, i) => i >= anchorIdx && /verification-checklist\.md/.test(l),
-    );
-    expect(
-      checklistRefIdx >= 0 && checklistRefIdx - anchorIdx <= 10,
-      'code-reviewer.md must reference verification-checklist.md within 10 lines of the persist anchor',
-    ).toBe(true);
+  it('PASS: approval-pattern.md documents the Manual-Test Check-off Page and its results payload', () => {
+    const md = fs.readFileSync(APPROVAL, 'utf8');
+    expect(md).toMatch(/Manual-Test Check-off Page/i);
+    expect(md).toMatch(/generated-docs\/epics\/<slug>\/manual-tests\.html/);
+    expect(md).toMatch(/manualTestResults/);
   });
 });
 
-describe('S8-80 — continue.md Call B prompt requires checklist persistence', () => {
-  it('PASS: continue.md contains the literal "You MUST persist the checklist to generated-docs/qa/" instruction', () => {
-    const content = fs.readFileSync(CONTINUE_CMD, 'utf8');
-    expect(
-      PERSIST_INSTRUCTION.test(content),
-      'continue.md Call B prompt must include the literal "You MUST persist the checklist to generated-docs/qa/" instruction',
-    ).toBe(true);
-  });
-});
-
-describe('S8-80 — orchestrator-rules.md Call B prompt requires checklist persistence', () => {
-  it('PASS: orchestrator-rules.md contains the same persist instruction as continue.md', () => {
-    const content = fs.readFileSync(ORCH_RULES, 'utf8');
-    expect(
-      PERSIST_INSTRUCTION.test(content),
-      'orchestrator-rules.md Call B prompt must include the literal "You MUST persist the checklist to generated-docs/qa/" instruction (drift between the two orchestrator files breaks the contract)',
-    ).toBe(true);
-  });
-});
-
-describe('S8-80 — checklist persistence wiring — failure-path coverage', () => {
-  let project: TempProject;
-  beforeEach(() => { project = createTempProject(); });
-  afterEach(() => { project.cleanup(); });
-
-  it('FAIL: tampered code-reviewer.md without the persist anchor is detected', () => {
-    project.write(
-      '.claude/agents/code-reviewer.md',
-      '# code-reviewer\n\nCall B runs gates. Returns checklist text.\n',
-    );
-    const content = fs.readFileSync(
-      path.join(project.root, '.claude', 'agents', 'code-reviewer.md'),
-      'utf8',
-    );
-    expect(/Persist the checklist to file/.test(content)).toBe(false);
+describe('manual-test approval — results are persisted', () => {
+  it('PASS: continue.md persists the handed-back results to state.json.epic.manualTestResults', () => {
+    expect(persistsResults(fs.readFileSync(CONTINUE, 'utf8'))).toBe(true);
   });
 
-  it('FAIL: tampered continue.md missing the persist instruction is detected', () => {
-    project.write(
-      '.claude/commands/continue.md',
-      '# /continue\n\nLaunch code-reviewer Call B. Return gate results.\n',
-    );
-    const content = fs.readFileSync(
-      path.join(project.root, '.claude', 'commands', 'continue.md'),
-      'utf8',
-    );
-    expect(PERSIST_INSTRUCTION.test(content)).toBe(false);
-  });
+  describe('failure-path coverage', () => {
+    let project: TempProject;
+    beforeEach(() => { project = createTempProject(); });
+    afterEach(() => { project.cleanup(); });
 
-  it('FAIL: tampered orchestrator-rules.md missing the persist instruction is detected', () => {
-    project.write(
-      '.claude/shared/orchestrator-rules.md',
-      '# Orchestrator Rules\n\nLaunch code-reviewer. Return gate results.\n',
-    );
-    const content = fs.readFileSync(
-      path.join(project.root, '.claude', 'shared', 'orchestrator-rules.md'),
-      'utf8',
-    );
-    expect(PERSIST_INSTRUCTION.test(content)).toBe(false);
+    it('FAIL: a tampered continue.md that never persists results is detected', () => {
+      project.write(
+        '.claude/commands/continue.md',
+        '# /continue\n\nStep B7.1: show the checklist and ask the user. Done.\n',
+      );
+      const tampered = fs.readFileSync(
+        path.join(project.root, '.claude', 'commands', 'continue.md'),
+        'utf8',
+      );
+      expect(persistsResults(tampered)).toBe(false);
+    });
   });
 });

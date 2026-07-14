@@ -1,5 +1,6 @@
 /**
- * Standardised cleanup recipes, matching the RB-0..RB-7 IDs in /TEST-GUIDE.md § Rollback Reference.
+ * Standardised cleanup recipes, matching the RB-0..RB-7 IDs in workflow-tests.md
+ * § "Rollback recipes".
  *
  * Use in afterEach to both clean up AND document what state the test mutated:
  *
@@ -10,11 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export type RollbackId =
-  | 'RB-0'  // Full clean reset
-  | 'RB-1'  // Reset workflow state only
-  | 'RB-2'  // Revert single modified file (requires --file)
+  | 'RB-0'  // Full clean reset (remove generated-docs/ + documentation/)
+  | 'RB-1'  // Reset epic state (remove generated-docs/epics/)
+  | 'RB-2'  // Revert single modified file (requires opts.file)
   | 'RB-3'  // Remove test documentation artifact
-  | 'RB-4'  // Reset the telemetry ledger
+  | 'RB-4'  // Remove the legacy top-level workflow-state.json
   | 'RB-5'  // Restore generated-docs write permissions (Windows)
   | 'RB-6'  // Reinstall node_modules (no-op here — we work in temp dirs)
   | 'RB-7'; // Revert most recently injected error (no-op in temp dirs)
@@ -41,12 +42,13 @@ export function rollback(root: string, id: RollbackId, opts: RollbackOptions = {
       removeIfExists(path.join(root, 'documentation'));
       fs.mkdirSync(path.join(root, 'generated-docs', 'context'), { recursive: true });
       fs.mkdirSync(path.join(root, 'generated-docs', 'specs'), { recursive: true });
-      fs.mkdirSync(path.join(root, 'generated-docs', 'stories'), { recursive: true });
+      fs.mkdirSync(path.join(root, 'generated-docs', 'epics'), { recursive: true });
       fs.mkdirSync(path.join(root, 'documentation'), { recursive: true });
       break;
 
     case 'RB-1':
-      removeIfExists(path.join(root, 'generated-docs', 'context', 'workflow-state.json'));
+      // Reset epic state — drop the per-epic state.json / stories trees.
+      removeIfExists(path.join(root, 'generated-docs', 'epics'));
       break;
 
     case 'RB-2':
@@ -66,13 +68,11 @@ export function rollback(root: string, id: RollbackId, opts: RollbackOptions = {
       }
       break;
 
-    case 'RB-4': {
-      // Reset the telemetry ledger written by the capture layer.
-      const ctx = path.join(root, 'generated-docs', 'context');
-      removeIfExists(path.join(ctx, 'telemetry.ndjson'));
-      removeIfExists(path.join(ctx, 'telemetry-meta.json'));
+    case 'RB-4':
+      // Remove the retired top-level workflow-state.json (seeded only to exercise
+      // the legacy-detection path — see seedLegacyState).
+      removeIfExists(path.join(root, 'generated-docs', 'context', 'workflow-state.json'));
       break;
-    }
 
     case 'RB-5':
       // Windows permissions — no-op in temp dirs (tests never chmod).

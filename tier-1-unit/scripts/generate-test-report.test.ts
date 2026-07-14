@@ -30,7 +30,7 @@ const SAMPLE = {
       ],
     },
     {
-      name: 'C:/repo/QA-TESTS/tier-2-log-replay/invariants/bar.test.ts',
+      name: 'C:/repo/QA-TESTS/tier-1-unit/consistency/bar.test.ts',
       startTime: 1_500,
       endTime: 2_000,
       assertionResults: [
@@ -47,7 +47,7 @@ describe('generate-test-report — buildModel', () => {
     expect(m.counts).toEqual({ total: 4, passed: 2, failed: 1, skipped: 1 });
     // Two layers, derived from tier + first sub-folder.
     const layerNames = m.layers.map((l: any) => l.layer).sort();
-    expect(layerNames).toEqual(['tier-1-unit › scripts', 'tier-2-log-replay › invariants']);
+    expect(layerNames).toEqual(['tier-1-unit › consistency', 'tier-1-unit › scripts']);
     const failing = m.tests.find((t: any) => t.result === 'failed');
     expect(failing.message).toContain('expected 1 to be 0');
   });

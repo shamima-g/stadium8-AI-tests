@@ -1,0 +1,6 @@
+# The recorded run is a local/CI artifact, not committed source. Keep only the
+# capture instructions. Remove these lines if your team decides to commit a small
+# golden bundle.
+*
+!.gitignore
+!README.md
