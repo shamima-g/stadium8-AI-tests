@@ -21,6 +21,48 @@ npm run test:raw     # just the tests, no report
 npm run test:tier1   # the fast unit tests only
 ```
 
+## Heavier checks
+
+By default `npm test` runs only the template checks and reuses the last saved
+result for the slower surfaces (the report says how old each one is). To actually
+re-run those surfaces, use `test:full` or the individual flags:
+
+```bash
+npm run test:full    # everything below, in one go
+```
+
+`test:full` is shorthand for these flags on `generate-test-report.cjs`:
+
+| Flag | What it runs |
+|---|---|
+| `--with-web` | the app's own unit + integration tests in `web/` |
+| `--with-e2e` | the Playwright click-through tests in `web/` |
+| `--with-gates` | the final quality gates (security, code style & build, tests, speed) |
+
+Other flags the report script accepts: `--exit-code` (exit non-zero on failure — on
+by default in `npm test`), `--no-open` (don't pop the report open), and `--out <path>`
+(write to a specific file).
+
+## Test a live AI run against an example app
+
+Tier 3 runs the **whole workflow with a real AI** against an example app under
+`benchmark-files/`, then times and scores it. You choose which app (benchmark set)
+to build with `-Benchmark`:
+
+```powershell
+# From tier-3-automated/ (PowerShell 7):
+./Run-QATests.ps1 -IncludeTier3 -Benchmark transactions
+```
+
+`-Benchmark <name>` is the folder name under `benchmark-files/` (today the only set is
+`transactions`). The choices aren't hard-wired — the runner offers each folder it
+finds, so adding a new app is just dropping in a new folder (plus its `answers.json`).
+Name one that doesn't exist and the run stops and lists the valid options. Results land
+in that set's own folder under `TestResults/<benchmark>/`, never mixed across apps.
+
+See [tier-3-automated/README.md](tier-3-automated/README.md) for the model picker and
+the other options.
+
 ## Test a specific template and version
 
 By default the suite tests the template in the parent folder. To point it at a
