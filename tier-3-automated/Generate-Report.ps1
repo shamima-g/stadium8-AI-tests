@@ -8,10 +8,11 @@
     * report-<version>-<timestamp>.md   — the human-readable report
     * Fail/<timestamp>.md               — only when there is something to report
 
-  Sections: a run summary; a per-group breakdown; (when Tier 3 ran) a §2.1 attempts
-  table and a §2.2 timing table with an ESTIMATE next to the ACTUAL time per phase; the
-  installed tools; and a §3.1 failure diagnosis that names each problem with a plain
-  reason and "possible solutions".
+  Sections: a run summary (with the MACRO estimate — estimated whole-run time next to
+  the actual); a per-group breakdown; (when Tier 3 ran) a §2.1 attempts table and a §2.2
+  timing table with a GRANULAR estimate next to the actual time per phase; the installed
+  tools; and a §3.1 failure diagnosis that names each problem with a plain reason and
+  "possible solutions".
 
   The report never fails the run on the Tier 3 score — a below-par Tier 3 run still gets
   its §2.1 row, its §3.1 block, and a Fail/<stamp>.md; it just doesn't turn anything red.
@@ -118,8 +119,22 @@ function New-Tier3Report {
     & $add "| Run by | $($Run.runBy) on $($Run.machine) |"
     & $add "| When | $dateHuman |"
     if ($Run.ContainsKey('timing') -and $Run.timing) {
+        # Macro estimate: the average whole-run time from comparable past runs (same
+        # model + benchmark), shown next to the actual so you can see at a glance whether
+        # this run took longer or shorter than usual overall. Empty on the first run.
+        $runEst = $null
+        if ($HistoryPath) { $runEst = Get-Tier3RunEstimate -HistoryPath $HistoryPath -Model $Run.model -Benchmark $Run.benchmark }
         & $add "| Active time | $(Format-Duration ([double]$Run.timing.activeSeconds)) |"
+        if ($runEst) {
+            $estActive = [double]$runEst.activeSeconds
+            $diff = [double]$Run.timing.activeSeconds - $estActive
+            $sign = if ($diff -ge 0) { '+' } else { '-' }
+            & $add "| Estimated active time | $(Format-Duration $estActive) (this run $sign$(Format-Duration ([Math]::Abs($diff))) vs estimate) |"
+        }
         & $add "| Claude's own time | $(Format-Duration ([double]$Run.timing.claudeSeconds)) |"
+        if ($runEst -and $null -ne $runEst.claudeSeconds) {
+            & $add "| Estimated Claude time | $(Format-Duration ([double]$runEst.claudeSeconds)) |"
+        }
         & $add "| Paused / excluded | $(Format-Duration ([double]$Run.timing.excludedSeconds)) |"
     }
     if ($Run.ContainsKey('memory') -and $Run.memory -and $Run.memory.available) {

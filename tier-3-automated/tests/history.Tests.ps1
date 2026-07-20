@@ -99,3 +99,44 @@ Describe 'Phase estimates (basis for estimate-vs-actual)' {
         Remove-Item (Split-Path $h) -Recurse -Force
     }
 }
+
+Describe 'Run estimate (basis for the MACRO estimate)' {
+    It 'PASS: averages whole-run active/Claude seconds across matching runs' {
+        $h = New-HistoryPath
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r1'; model = 'opus'; benchmark = 'transactions'; result = 'pass'; activeSeconds = 800;  claudeSeconds = 600 }
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r2'; model = 'opus'; benchmark = 'transactions'; result = 'pass'; activeSeconds = 1000; claudeSeconds = 800 }
+        $est = Get-Tier3RunEstimate -HistoryPath $h -Model 'opus' -Benchmark 'transactions'
+        $est.activeSeconds | Should -Be 900
+        $est.claudeSeconds | Should -Be 700
+        $est.samples       | Should -Be 2
+        Remove-Item (Split-Path $h) -Recurse -Force
+    }
+
+    It 'PASS: filters by model + benchmark (a different model is not averaged in)' {
+        $h = New-HistoryPath
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r1'; model = 'opus';   benchmark = 'transactions'; result = 'pass'; activeSeconds = 800; claudeSeconds = 600 }
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r2'; model = 'sonnet'; benchmark = 'transactions'; result = 'pass'; activeSeconds = 200; claudeSeconds = 100 }
+        $est = Get-Tier3RunEstimate -HistoryPath $h -Model 'opus' -Benchmark 'transactions'
+        $est.activeSeconds | Should -Be 800
+        $est.samples       | Should -Be 1
+        Remove-Item (Split-Path $h) -Recurse -Force
+    }
+
+    It 'FAIL-guard: no comparable history yields $null (first run shows no macro estimate)' {
+        $h = New-HistoryPath
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r1'; model = 'opus'; benchmark = 'transactions'; result = 'pass'; activeSeconds = 800; claudeSeconds = 600 }
+        Get-Tier3RunEstimate -HistoryPath $h -Model 'sonnet' -Benchmark 'transactions' | Should -BeNullOrEmpty
+        Remove-Item (Split-Path $h) -Recurse -Force
+    }
+
+    It 'FAIL-guard: an older line with no activeSeconds is skipped; claude missing => $null claude' {
+        $h = New-HistoryPath
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'old'; model = 'opus'; benchmark = 'transactions'; result = 'pass' }
+        Add-Tier3HistoryLine -HistoryPath $h -Record @{ timestamp = 'r1';  model = 'opus'; benchmark = 'transactions'; result = 'pass'; activeSeconds = 500 }
+        $est = Get-Tier3RunEstimate -HistoryPath $h -Model 'opus' -Benchmark 'transactions'
+        $est.activeSeconds | Should -Be 500
+        $est.samples       | Should -Be 1     # the no-activeSeconds line is not counted
+        $est.claudeSeconds | Should -BeNullOrEmpty
+        Remove-Item (Split-Path $h) -Recurse -Force
+    }
+}

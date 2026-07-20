@@ -274,7 +274,10 @@ The report includes:
   "possible solutions" list — and for the AI's work, each rule it broke is expanded
   into how to fix it.
 
-**1b-plus. Estimated time vs actual time, per phase.** ✅ **Built** (in the report's §2.2).
+**1b-plus. Estimated time vs actual time, per phase (granular) and whole-run (macro).**
+✅ **Built** — the per-phase estimate-vs-actual is in the report's §2.2; the whole-run
+(macro) estimate — estimated total time to build the app, next to the actual, with the
+difference — is in the "The run" summary table (`Get-Tier3RunEstimate` in `history.ps1`).
 
 **1b-memory. Peak memory (minimum RAM).** ✅ **Built** — `memory.ps1` (+ tests). While the
 run works — and especially while the app compiles — it samples whole-system memory every

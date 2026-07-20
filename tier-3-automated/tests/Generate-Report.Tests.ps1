@@ -106,6 +106,35 @@ Describe 'Estimate vs actual (§2.2)' {
     }
 }
 
+Describe 'Macro estimate — estimated whole-run time (The run table)' {
+    It 'PASS: with matching history, shows an estimated active time and the vs-estimate difference' {
+        $out = New-OutDir
+        $hist = Join-Path $out 'tier3-history.jsonl'
+        # a past run of the same model+benchmark: whole run took 800s active, 700s Claude
+        Add-Tier3HistoryLine -HistoryPath $hist -Record @{
+            timestamp = 'past'; model = 'opus'; benchmark = 'transactions'; result = 'pass'
+            activeSeconds = 800; claudeSeconds = 700
+        }
+        # this run's whole-run active is 900s => estimate 800s, diff +100s (1m 40s)
+        $path = New-Tier3Report -Run (Base-Run) -OutDir $out -HistoryPath $hist
+        $md = Get-Content $path -Raw
+        $md | Should -Match 'Estimated active time'
+        $md | Should -Match 'vs estimate'
+        $md | Should -Match '\+1m 40s'                          # 900 actual - 800 estimate
+        $md | Should -Match 'Estimated Claude time'
+        Remove-Item $out -Recurse -Force
+    }
+
+    It 'FAIL-guard: with no history, no macro estimate row appears (actual only)' {
+        $out = New-OutDir
+        $path = New-Tier3Report -Run (Base-Run) -OutDir $out   # no -HistoryPath
+        $md = Get-Content $path -Raw
+        $md | Should -Match 'Active time'
+        $md | Should -Not -Match 'Estimated active time'
+        Remove-Item $out -Recurse -Force
+    }
+}
+
 Describe 'Memory (minimum RAM) section' {
     It 'PASS: reports peak memory and the 16 GB verdict when memory is present' {
         $out = New-OutDir

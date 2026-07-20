@@ -94,3 +94,33 @@ function Get-Tier3PhaseEstimates {
     }
     return $estimates
 }
+
+# Average WHOLE-RUN active/Claude seconds across past runs (same model + benchmark) —
+# the basis for the report's MACRO estimate (estimated total time to build the app),
+# the run-level counterpart to Get-Tier3PhaseEstimates. Returns a hashtable
+# @{ activeSeconds; claudeSeconds; samples } or $null when there is no comparable
+# history yet (so the first run shows no macro estimate). claudeSeconds is $null when
+# no matching run recorded it (older lines).
+function Get-Tier3RunEstimate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$HistoryPath,
+        [Parameter(Mandatory)][string]$Model,
+        [Parameter(Mandatory)][string]$Benchmark
+    )
+    $rows = @(
+        Get-Tier3History -HistoryPath $HistoryPath -Model $Model -Benchmark $Benchmark |
+            Where-Object { $_.PSObject.Properties.Name -contains 'activeSeconds' -and $null -ne $_.activeSeconds }
+    )
+    if ($rows.Count -eq 0) { return $null }
+    $claudeVals = @(
+        $rows |
+            Where-Object { $_.PSObject.Properties.Name -contains 'claudeSeconds' -and $null -ne $_.claudeSeconds } |
+            ForEach-Object { [double]$_.claudeSeconds }
+    )
+    return @{
+        activeSeconds = [Math]::Round((($rows | ForEach-Object { [double]$_.activeSeconds }) | Measure-Object -Average).Average, 2)
+        claudeSeconds = if ($claudeVals.Count -gt 0) { [Math]::Round(($claudeVals | Measure-Object -Average).Average, 2) } else { $null }
+        samples       = $rows.Count
+    }
+}
