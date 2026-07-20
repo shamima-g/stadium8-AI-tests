@@ -80,6 +80,21 @@ side. To check whether dev is safe to promote to release:
 npm run compare:targets -- --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0
 ```
 
+### Keeping a target's contract current (`reconcile`)
+
+Each target is judged against its **own** recipe — `template-contract.dev.json` for
+dev, `template-contract.release.json` for release. Both start pinned to the same
+baseline (currently `v1.1.0`). When one template moves ahead — e.g. dev's `main`
+advances past its last tag — its contract needs updating so it's judged against its
+own shape, not the old baseline. Point `reconcile` at that target to see (and apply)
+what changed:
+
+```bash
+QA_TARGET=dev npm run reconcile          # update the dev contract to match a dev checkout
+QA_TARGET=release npm run reconcile      # same, for release
+npm run reconcile:check                  # report drift without writing changes
+```
+
 ## Good to know
 
 - **Safe to run anywhere.** With no template nearby, template-specific checks skip
