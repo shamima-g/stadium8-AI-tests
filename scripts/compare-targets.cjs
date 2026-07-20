@@ -13,7 +13,7 @@
  *   RED    — a difference has NO changelog entry behind it → UNEXPLAINED drift.
  *            Fails the run (exit 1).
  *
- * (This refines flexibility.md Decision 1 per the agreed "explained → amber" rule.)
+ * (This refines workflow-tests.md area R / Decision 1 per the agreed "explained → amber" rule.)
  *
  * Usage:
  *   node scripts/compare-targets.cjs --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0
