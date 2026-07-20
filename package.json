@@ -2,7 +2,7 @@
   "name": "qa",
   "version": "0.1.0",
   "private": true,
-  "description": "Test suite for the Claude Code workflow template (scripts, hooks, schemas, agents, commands). Three-tier structure per /TEST-STRATEGY.md.",
+  "description": "Test suite for the Claude Code workflow template (scripts, hooks, schemas, agents, commands). Three-tier structure per workflow-tests.md.",
   "type": "module",
   "scripts": {
     "test": "node scripts/generate-test-report.cjs --exit-code --no-open",

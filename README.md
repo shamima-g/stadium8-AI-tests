@@ -6,36 +6,25 @@ test a feature someone builds with the template, and it is **not** the per-story
 that happens *inside* the workflow. It's the safety net around the workflow's own
 plumbing.
 
-For the full strategy, layout, and reconciliation notes, see
-[workflow-tests.md](workflow-tests.md). For what the workflow actually does, see
-[HOW-IT-WORKS.md](HOW-IT-WORKS.md).
+**[workflow-tests.md](workflow-tests.md) is the single source of truth** — the
+strategy, tiers, conventions, multi-version testing, maintenance routine, and
+reconciliation notes all live there. This README is just the entry point for running
+the suite.
 
-> **Historical docs.** `TEST-GUIDE.md`, `TEST-INPUTS.md`, and `TEST-STRATEGY.md`
-> describe the retired 4-phase workflow and are obsolete — kept only for reference.
-> `workflow-tests.md` is the current source of truth.
+For *how a given template version's workflow behaves*, read that version's **own**
+docs (`<template>/.claude/WORKFLOWS.md` and `<template>/.template-docs/`) — the suite
+never hard-codes a version's stages/gates/commands; it reads them live from the
+template under test.
 
 ## Template compatibility
 
-This suite is pinned to the **epic-branch** generation of the template and breaks
-loudly against a different one. It currently targets:
-
-- **Workflow model:** the unit of work is the **epic**, built on its own
-  `epic/<slug>` branch, through **INTAKE → PLAN → BUILD → EPIC-END → MANUAL-TEST →
-  COMPLETE-ON-BRANCH → COMPLETE**.
-- **Requirements files:** shared `generated-docs/project.md` (on `main`) + a per-epic
-  `generated-docs/epics/<slug>/brief.md`. There is no single `project-brief.md`.
-- **State:** per-epic `generated-docs/epics/<slug>/state.json` (schema single-sourced
-  from `epic-state.js` → `EPIC_PHASES`). There is no repo-wide `workflow-state.json`
-  in the current model (only legacy projects have one, which triggers
-  `/migrate-legacy`).
-- **Quality checks:** four — does-it-work (manual) + safe, sound, tests (automatic).
-  No performance gate, no Gate 6, no spec-compliance watchdog.
-- **Removed (not tested):** the telemetry ledger and `.claude/logs/*.md`, the
-  `code-reviewer` agent, `transition-phase.js`/`detect-workflow-state.js`/
-  `validate-phase-output.js`, and the 4-phase `workflow-state` schema.
-
-If a large batch of tests fails at once after a template bump, suspect a
-model/version mismatch before treating it as a regression.
+The suite is **version-independent**: it reads each template's stages, statuses,
+doc-name rules, and commands live from the template it's aimed at, and judges each
+version against its own recipe (`template-contract.<target>.json`). Aim it at any
+template/version with `npm run test:target` — see
+[workflow-tests.md §12](workflow-tests.md#12-testing-any-template-any-version). If a
+large batch of tests fails at once after a template bump, the drift banner and
+`npm run reconcile` tell you what changed before you treat it as a regression.
 
 ## Tiers
 

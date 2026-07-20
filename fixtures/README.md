@@ -1,43 +1,43 @@
 # Fixtures
 
-Deterministic test inputs. Grouped into three categories:
+Deterministic test inputs. See [workflow-tests.md §11](../workflow-tests.md#11-test-inputs-and-fixtures)
+for how the canonical scenario is used.
 
 ## scenarios/
 
-Team Task Manager scenario from `/TEST-INPUTS.md`, plus Variants A–F:
+The **Team Task Manager** scenario and its variants — the canonical inputs, held as
+data so tests read them directly:
 
-- `team-task-manager/` — main scenario (no compliance, frontend-only auth, backend in development)
-- `variant-a-bff/` — BFF auth with real URLs
-- `variant-b-no-backend/` — no backend at all (`mock-only`)
-- `variant-c-user-spec/` — user-provided `task-api.yaml`
-- `variant-d-ts-error/` — TypeScript error injection (for quality-gates tests)
-- `variant-e-frs-override/` — BFF-from-start to test NextAuth removal
-- `variant-f-impacts/` — pre-populated `discovered-impacts.md`
+- `team-task-manager/` — main scenario (no compliance, frontend-only auth, backend in
+  development); `answers.json` + `frs-expected.md`
+- `variant-a-bff/` — sign-in handled by your own server (BFF) with real auth URLs
+- `variant-b-no-backend/` — no data source at all (stand-in data only)
+- `variant-c-user-spec/` — you already provided a data-service description
+  (`task-api.yaml`, OpenAPI using `/api/v2/tasks`) — proves the generated code honours
+  the exact paths
 
-Each folder contains the exact scripted answers, expected outputs, and any source files the variant introduces.
+Each folder contains the exact scripted answers, expected outputs, and any source
+files the variant introduces.
 
 ## checkpoints/
 
-Tarball fixtures for `CP-0` through `CP-6`. Each is a `.tar` of `generated-docs/` and `web/src/` at the corresponding workflow state.
+Tarball fixtures for `CP-0` … `CP-5` (the epic-branch starting states — see
+[workflow-tests.md §10](../workflow-tests.md#10-helpers-checkpoints-and-rollbacks)).
+Each is a `.tar` of `generated-docs/` (and `web/src/`) at the corresponding state.
 
-**These are NOT committed by default** (see `.gitignore`). To harvest:
-
-```bash
-# From a real run that's reached the checkpoint:
-tar -cf QA/fixtures/checkpoints/CP-1.tar generated-docs/
-```
-
-If the tarballs are absent, `loadCheckpoint()` falls back to synthesising a minimum checkpoint — enough for state-machine tests but not for full snapshot tests.
-
-## golden-logs/
-
-Harvested `.claude/logs/*.md` files from full runs. Tier 2 invariant tests replay these.
-
-Re-harvest after changes to `.claude/shared/orchestrator-rules.md`:
+**These are NOT committed by default** (see `.gitignore`). To harvest, from a real run
+that's reached the checkpoint:
 
 ```bash
-# After a full /start → commit live run:
-cp .claude/logs/<latest-session>.md QA/fixtures/golden-logs/
+tar -cf fixtures/checkpoints/CP-1.tar generated-docs/
 ```
 
-A stale-log canary test in Tier 2 warns if these get too far behind the orchestrator rules.
+If the tarballs are absent, `loadCheckpoint()` synthesises a minimum checkpoint —
+enough for state-machine tests but not for full snapshot tests.
+
+## golden-run/
+
+The recorded real run that Tier 2 replays — a `repo.bundle` (git history of the
+`epic/<slug>` branch + merge) and/or a copy of the `generated-docs/` tree. See
+[workflow-tests.md §7](../workflow-tests.md#7-tier-2--invariants-over-a-recorded-run)
+for what's captured and when to re-record.

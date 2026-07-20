@@ -1,6 +1,6 @@
 {
   "scenarioName": "Team Task Manager",
-  "sourcedFrom": "/TEST-INPUTS.md",
+  "sourcedFrom": "workflow-tests.md §11 (Test inputs and fixtures)",
   "elevatorPitch": "A task management tool for small teams. Team members can view tasks assigned to them and mark them complete. Admins can create tasks, assign them to any team member, edit due dates, and delete tasks. Each task has a title, description, due date, an assigned person, and a status of pending or complete. Everyone must be signed in — no public access.",
   "routing": "qa",
   "checklist": {

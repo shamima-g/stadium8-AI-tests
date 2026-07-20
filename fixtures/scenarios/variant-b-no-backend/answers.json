@@ -1,6 +1,6 @@
 {
   "scenarioName": "Variant B — No Backend API",
-  "sourcedFrom": "/TEST-INPUTS.md",
+  "sourcedFrom": "workflow-tests.md §11 (Test inputs and fixtures)",
   "overlay": {
     "checklist": {
       "apiSpec": "N/A"

@@ -45,7 +45,7 @@ function runHook(command: string): { actual: Expected; raw: string; stderr: stri
 }
 
 describe('bash-permission-checker — deny matrix', () => {
-  // Drawn from .claude/settings.json deny rules and /TEST-GUIDE.md test 28.
+  // Drawn from .claude/settings.json deny rules (see workflow-tests.md §6 — permission-hook fuzzing).
   const DENY_CASES: Array<[string, string]> = [
     ['rm -rf /',                                  'deny path'],
     ['rm -rf /*',                                 'deny path with wildcard'],

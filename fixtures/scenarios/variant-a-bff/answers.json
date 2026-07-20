@@ -1,6 +1,6 @@
 {
   "scenarioName": "Variant A — BFF Authentication",
-  "sourcedFrom": "/TEST-INPUTS.md",
+  "sourcedFrom": "workflow-tests.md §11 (Test inputs and fixtures)",
   "overlay": {
     "checklist": {
       "auth": "bff"
