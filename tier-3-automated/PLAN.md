@@ -422,6 +422,18 @@ can add one — but by default nothing is combined.
 > approval gate, so the genuine command-driven workflow runs unattended. (The prose-only
 > prompt is retired.)
 >
+> **Headless background-task ceiling (must-set):** the workflow builds each story through
+> **background subagents** (per-story "developer" and "test-gen" agents) that the
+> orchestrator spawns and then *awaits*. Headless Claude Code terminates the process when
+> background tasks are still running after its default 600-second ceiling — which truncates
+> the build mid-epic (the stream shows the orchestrator repeatedly yielding "I'll await the
+> Story N developer", then the process is killed). The driver therefore sets
+> **`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`** (wait indefinitely) before launching Claude,
+> so those awaited agents finish; the driver's own `$TimeoutSeconds` (`Stop-ProcessTree`)
+> stays the real overall ceiling. Note: **`-Resume` of a session killed mid-epic does not
+> reliably re-enter the epic loop** — prefer a fresh full run over resume for a truncated
+> build.
+>
 > **Part 3 — conformance scoring: ✅ Built.** After the build, the run judges the app with
 > the **real tier-1 artifact-lint rules** (no-suppressions, Shadcn-only, exact API paths,
 > centralised styling, role-per-story, plain-language) by running them with `REPO_ROOT`

@@ -156,6 +156,15 @@ function Invoke-ClaudeHeadless {
     # prompt via stdin also sidesteps all command-line quoting of a long, multi-line, JSON-bearing prompt.
     Set-Content -Path $promptFile -Value $Prompt -Encoding utf8 -NoNewline
 
+    # Let the workflow's background subagents (per-story "developer" and "test-gen" agents that
+    # the orchestrator spawns and then awaits) run to completion. Without this, headless Claude
+    # Code terminates the process when background tasks are still running after its default 600s
+    # ceiling — which truncates the build mid-epic (the orchestrator repeatedly yields with
+    # "I'll await the Story N developer", and the ceiling kills it). '0' = wait indefinitely; the
+    # driver's own $TimeoutSeconds (Stop-ProcessTree, below) stays the real overall ceiling.
+    # Inherited by the cmd.exe child launched below.
+    $env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
+
     $inner = 'claude -p --output-format stream-json --verbose --dangerously-skip-permissions'
     if ($Model) { $inner += " --model `"$Model`"" }
     if ($ResumeSessionId) { $inner += " --resume `"$ResumeSessionId`"" }
