@@ -111,6 +111,14 @@ function New-Tier3Html {
   .chartrow { display:flex; align-items:center; gap:.5rem; margin:.15rem 0; }
   .chartrow .lbl { width: 9rem; font-size:.82rem; }
   caption { text-align:left; color:#8889; font-size:.82rem; margin-bottom:.25rem; }
+  .legend { display:flex; gap:1.25rem; align-items:center; font-size:.82rem; color:#8889; margin:.25rem 0 .75rem; }
+  .legend .swatch { display:inline-block; width:.8rem; height:.8rem; border-radius:2px; margin-right:.35rem; vertical-align:-1px; }
+  .vchart { display:flex; align-items:flex-end; gap:1.1rem; height:17rem; padding-top:1.25rem; border-bottom:1px solid #8883; overflow-x:auto; }
+  .vgroup { display:flex; flex-direction:column; align-items:center; gap:.4rem; min-width:3.25rem; flex:0 0 auto; }
+  .vbars { display:flex; align-items:flex-end; gap:.3rem; height:13rem; }
+  .vbar { width:1.15rem; min-height:2px; border-radius:3px 3px 0 0; position:relative; }
+  .vbar .val { position:absolute; top:-1.15rem; left:50%; transform:translateX(-50%); font-size:.68rem; color:#8889; white-space:nowrap; }
+  .vlbl { font-size:.72rem; line-height:1.2; text-align:center; color:#8889; max-width:5rem; word-break:break-word; }
 </style>
 '@
 
@@ -158,13 +166,13 @@ function New-Tier3Html {
     $newest = @($rows); [array]::Reverse($newest); $newest = @($newest | Select-Object -First 15)
     $maxSecs = 1.0
     foreach ($r in $newest) { foreach ($v in @((Get-Prop $r 'activeSeconds' 0), (Get-Prop $r 'claudeSeconds' 0))) { if ([double]$v -gt $maxSecs) { $maxSecs = [double]$v } } }
-    $H.Add('<div><caption>Blue = active time · Green = Claude''s own time</caption>')
+    $H.Add('<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Active (overall)</span><span><span class="swatch" style="background:#7bc043"></span>Claude''s own</span></div>')
+    $H.Add('<div class="vchart">')
     foreach ($r in $newest) {
         $a = [double](Get-Prop $r 'activeSeconds' 0); $c = [double](Get-Prop $r 'claudeSeconds' 0)
-        $aw = [Math]::Round(($a / $maxSecs) * 100); $cw = [Math]::Round(($c / $maxSecs) * 100)
+        $ah = [Math]::Round(($a / $maxSecs) * 100); $ch = [Math]::Round(($c / $maxSecs) * 100)
         $lbl = ConvertTo-HtmlText ("$(Get-Prop $r 'model' '?') $(Get-Prop $r 'timestamp' '')")
-        $H.Add("<div class=""chartrow""><span class=""lbl"">$lbl</span><span class=""bar bar-active"" style=""width:$aw%""></span><span class=""muted"">$(Format-Secs $a)</span></div>")
-        $H.Add("<div class=""chartrow""><span class=""lbl""></span><span class=""bar bar-claude"" style=""width:$cw%""></span><span class=""muted"">$(Format-Secs $c)</span></div>")
+        $H.Add("<div class=""vgroup""><div class=""vbars""><div class=""vbar bar-active"" style=""height:$ah%"" title=""Active $(Format-Secs $a)""><span class=""val"">$(Format-Secs $a)</span></div><div class=""vbar bar-claude"" style=""height:$ch%"" title=""Claude $(Format-Secs $c)""><span class=""val"">$(Format-Secs $c)</span></div></div><div class=""vlbl"">$lbl</div></div>")
     }
     $H.Add('</div>')
 
@@ -189,18 +197,20 @@ function New-Tier3Html {
         $maxE = 1.0
         foreach ($e in @($latestEpics)) { $v = [double](Get-Prop $e 'seconds' 0); if ($v -gt $maxE) { $maxE = $v } }
         foreach ($slug in $slugSecs.Keys) { $avg = [double]((($slugSecs[$slug]) | Measure-Object -Average).Average); if ($avg -gt $maxE) { $maxE = $avg } }
-        $H.Add('<div><caption>Blue = actual this run · Green = average across recorded runs · one epic per pair</caption>')
+        $H.Add('<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Actual this run</span><span><span class="swatch" style="background:#7bc043"></span>Average across runs</span></div>')
+        $H.Add('<div class="vchart">')
         foreach ($e in @($latestEpics)) {
             $slug = Get-Prop $e 'slug' '?'; $stories = Get-Prop $e 'stories' 0
             $actual = [double](Get-Prop $e 'seconds' 0)
-            $aw = [Math]::Round(($actual / $maxE) * 100)
+            $ah = [Math]::Round(($actual / $maxE) * 100)
             $lbl = ConvertTo-HtmlText "$slug ($stories st.)"
-            $H.Add("<div class=""chartrow""><span class=""lbl"">$lbl</span><span class=""bar bar-active"" style=""width:$aw%""></span><span class=""muted"">$(Format-Secs $actual)</span></div>")
+            $avgBar = ''
             if ($slugSecs.ContainsKey($slug)) {
                 $avg = [double]((($slugSecs[$slug]) | Measure-Object -Average).Average)
-                $ew = [Math]::Round(($avg / $maxE) * 100)
-                $H.Add("<div class=""chartrow""><span class=""lbl""></span><span class=""bar bar-claude"" style=""width:$ew%""></span><span class=""muted"">est $(Format-Secs $avg)</span></div>")
+                $ch = [Math]::Round(($avg / $maxE) * 100)
+                $avgBar = "<div class=""vbar bar-claude"" style=""height:$ch%"" title=""Average $(Format-Secs $avg)""><span class=""val"">$(Format-Secs $avg)</span></div>"
             }
+            $H.Add("<div class=""vgroup""><div class=""vbars""><div class=""vbar bar-active"" style=""height:$ah%"" title=""Actual $(Format-Secs $actual)""><span class=""val"">$(Format-Secs $actual)</span></div>$avgBar</div><div class=""vlbl"">$lbl</div></div>")
         }
         $H.Add('</div>')
     }

@@ -14,26 +14,47 @@
   .chartrow { display:flex; align-items:center; gap:.5rem; margin:.15rem 0; }
   .chartrow .lbl { width: 9rem; font-size:.82rem; }
   caption { text-align:left; color:#8889; font-size:.82rem; margin-bottom:.25rem; }
+  .legend { display:flex; gap:1.25rem; align-items:center; font-size:.82rem; color:#8889; margin:.25rem 0 .75rem; }
+  .legend .swatch { display:inline-block; width:.8rem; height:.8rem; border-radius:2px; margin-right:.35rem; vertical-align:-1px; }
+  .vchart { display:flex; align-items:flex-end; gap:1.1rem; height:17rem; padding-top:1.25rem; border-bottom:1px solid #8883; overflow-x:auto; }
+  .vgroup { display:flex; flex-direction:column; align-items:center; gap:.4rem; min-width:3.25rem; flex:0 0 auto; }
+  .vbars { display:flex; align-items:flex-end; gap:.3rem; height:13rem; }
+  .vbar { width:1.15rem; min-height:2px; border-radius:3px 3px 0 0; position:relative; }
+  .vbar .val { position:absolute; top:-1.15rem; left:50%; transform:translateX(-50%); font-size:.68rem; color:#8889; white-space:nowrap; }
+  .vlbl { font-size:.72rem; line-height:1.2; text-align:center; color:#8889; max-width:5rem; word-break:break-word; }
 </style>
 </head><body>
 <h1>Tier 3 — transactions@dev-v1.1.0</h1>
-<p class="muted">1 run(s) recorded. Newest first.</p>
+<p class="muted">2 run(s) recorded. Newest first.</p>
 <h2>Last 10 runs per model</h2>
 <h3>opus</h3>
 <table><tr><th>When</th><th>Result</th><th>Active</th><th>Claude</th><th>Peak RAM</th><th>Tokens</th><th>Pass-rate</th><th>Rules missed</th></tr>
+<tr><td>20260721-0417</td><td class="pass">pass</td><td class="num">372m 55s</td><td class="num">371m 30s</td><td class="num">9 GB</td><td class="num">775,233</td><td class="num">0%</td><td>role-per-story</td></tr>
 <tr><td>20260720-0804</td><td class="pass">pass</td><td class="num">121m 41s</td><td class="num">1m 58s</td><td class="num">8.5 GB</td><td class="num">1,498,474</td><td class="num">0%</td><td>role-per-story</td></tr>
 </table>
 <h2>Time taken — overall (active) vs Claude's own</h2>
-<div><caption>Blue = active time · Green = Claude's own time</caption>
-<div class="chartrow"><span class="lbl">opus 20260720-0804</span><span class="bar bar-active" style="width:100%"></span><span class="muted">121m 41s</span></div>
-<div class="chartrow"><span class="lbl"></span><span class="bar bar-claude" style="width:2%"></span><span class="muted">1m 58s</span></div>
+<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Active (overall)</span><span><span class="swatch" style="background:#7bc043"></span>Claude's own</span></div>
+<div class="vchart">
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:100%" title="Active 372m 55s"><span class="val">372m 55s</span></div><div class="vbar bar-claude" style="height:100%" title="Claude 371m 30s"><span class="val">371m 30s</span></div></div><div class="vlbl">opus 20260721-0417</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:33%" title="Active 121m 41s"><span class="val">121m 41s</span></div><div class="vbar bar-claude" style="height:1%" title="Claude 1m 58s"><span class="val">1m 58s</span></div></div><div class="vlbl">opus 20260720-0804</div></div>
+</div>
+<h2>Epics — time to build each one (latest run)</h2>
+<p class="muted">Latest run created <strong>6</strong> epic(s) and <strong>22</strong> story(ies).</p>
+<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Actual this run</span><span><span class="swatch" style="background:#7bc043"></span>Average across runs</span></div>
+<div class="vchart">
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:22%" title="Actual 33m 59s"><span class="val">33m 59s</span></div><div class="vbar bar-claude" style="height:22%" title="Average 33m 59s"><span class="val">33m 59s</span></div></div><div class="vlbl">approve-reject-actions (3 st.)</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:100%" title="Actual 153m 56s"><span class="val">153m 56s</span></div><div class="vbar bar-claude" style="height:100%" title="Average 153m 56s"><span class="val">153m 56s</span></div></div><div class="vlbl">auth-and-app-shell (5 st.)</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:24%" title="Actual 37m 42s"><span class="val">37m 42s</span></div><div class="vbar bar-claude" style="height:24%" title="Average 37m 42s"><span class="val">37m 42s</span></div></div><div class="vlbl">export-transactions-csv (1 st.)</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:31%" title="Actual 47m 24s"><span class="val">47m 24s</span></div><div class="vbar bar-claude" style="height:31%" title="Average 47m 24s"><span class="val">47m 24s</span></div></div><div class="vlbl">file-log-dashboard (4 st.)</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:42%" title="Actual 64m 20s"><span class="val">64m 20s</span></div><div class="vbar bar-claude" style="height:42%" title="Average 64m 20s"><span class="val">64m 20s</span></div></div><div class="vlbl">file-upload-and-processing (5 st.)</div></div>
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:25%" title="Actual 37m 48s"><span class="val">37m 48s</span></div><div class="vbar bar-claude" style="height:25%" title="Average 37m 48s"><span class="val">37m 48s</span></div></div><div class="vlbl">transactions-review-table (4 st.)</div></div>
 </div>
 <h2>Most-flagged rules (what to make clearer)</h2>
 <table><tr><th>Rule</th><th>Times flagged</th></tr>
-<tr><td>role-per-story</td><td class="num">1</td></tr>
+<tr><td>role-per-story</td><td class="num">2</td></tr>
 </table>
 <h2>By version</h2>
 <table><tr><th>Version</th><th>Runs</th><th>Avg active</th><th>Avg Claude</th></tr>
-<tr><td>v1.1.0</td><td class="num">1</td><td class="num">121m 41s</td><td class="num">1m 58s</td></tr>
+<tr><td>v1.1.0</td><td class="num">2</td><td class="num">247m 18s</td><td class="num">186m 44s</td></tr>
 </table>
 </body></html>
