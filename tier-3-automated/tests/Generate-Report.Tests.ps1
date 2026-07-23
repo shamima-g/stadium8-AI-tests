@@ -79,6 +79,31 @@ Describe 'A Tier 3 run that fell short (recorded, not failed)' {
     }
 }
 
+Describe 'A Tier 3 run that stopped before finishing the plan (incomplete)' {
+    It 'PASS: surfaces "N of M epics", an incomplete verdict, a completeness pass-rate, and a fix hint' {
+        $out = New-OutDir
+        $run = Base-Run
+        $run.result = 'pass'   # Tier 3 never turns the run red
+        $run.epicsCreated = 7; $run.epicsBuilt = 1; $run.storiesCreated = 6
+        $run.tier3 = @{
+            ran = $true; verdict = 'incomplete'; passRate = 0.1429; tokensTotal = 123456
+            epicsPlanned = 7; epicsBuilt = 1; complete = $false
+            builds = @(
+                @{ attempt = 1; result = 'incomplete'; compiled = $true; tokens = 60000; turns = 22; reason = 'incomplete — built 1 of 7 planned epics before the run ended' }
+            )
+            rulesMissed = @('incomplete-build')
+        }
+        $path = New-Tier3Report -Run $run -OutDir $out
+        $md = Get-Content $path -Raw
+        $md | Should -Match 'Epics built \| ⚠️ 1 of 7 \(14%\)'    # honest completeness headline
+        $md | Should -Match 'incomplete — built 1 of 7 planned epics'  # verdict text
+        $md | Should -Match 'Build pass-rate \| 14%'              # not 100%
+        $md | Should -Match 'resume it'                            # the incomplete-build fix hint
+        Test-Path (Join-Path $out 'Fail\20260710-0630.md') | Should -BeTrue   # flagged for attention
+        Remove-Item $out -Recurse -Force
+    }
+}
+
 Describe 'Estimate vs actual (§2.2)' {
     It 'PASS: with matching history, shows an estimate and a difference' {
         $out = New-OutDir

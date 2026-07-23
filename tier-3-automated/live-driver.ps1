@@ -525,7 +525,11 @@ function Get-Tier3EpicStats {
     catch { }
     $perEpic = @(Measure-Tier3Epics -Epics $epics -Commits $commits)
     $stories = 0; foreach ($e in $epics) { $stories += [int]$e.stories }
-    return @{ epicsCreated = @($epics).Count; storiesCreated = $stories; epics = $perEpic }
+    # "Built" epics are those that actually produced stories (code). "Created" is every epic
+    # the plan wrote a brief folder for. A run that plans 7 but builds 1 (e.g. it stalled at
+    # the first epic-end gate) has epicsBuilt=1, epicsCreated=7 — the completeness signal.
+    $builtEpics = @($perEpic | Where-Object { [int]$_.stories -gt 0 }).Count
+    return @{ epicsCreated = @($epics).Count; epicsBuilt = $builtEpics; storiesCreated = $stories; epics = $perEpic }
 }
 
 # Parse a vitest JSON report (a run of tier-1 + tier-2) into per-tier group summaries for the
@@ -860,13 +864,37 @@ function Invoke-Tier3LiveRun {
     # Epics/stories created + per-epic build time (from the app's git history).
     $epicStats = Get-Tier3EpicStats -Scaffold $WorkingDir
 
-    # Fold build + lint into the verdict. Conforming = built AND no rules missed AND not timed out.
+    # Completeness: did the build finish the WHOLE plan, or stop partway (e.g. it stalled at an
+    # epic-end gate and ended after epic 1 of 7)? "Planned" = every epic the plan created a brief
+    # for; "built" = every epic that actually produced stories. A partial build must never score
+    # as a clean pass — it gets its own 'incomplete' verdict and a completeness-weighted pass-rate.
+    $epicsPlanned = [int]$epicStats.epicsCreated
+    $epicsBuilt   = [int]$epicStats.epicsBuilt
+    $complete     = ($epicsPlanned -gt 0 -and $epicsBuilt -ge $epicsPlanned)
+    $completeness = if ($epicsPlanned -gt 0) { [Math]::Round([double]$epicsBuilt / $epicsPlanned, 4) } else { 0.0 }
+
+    # Fold build + lint + completeness into the verdict. Conforming = built AND no rules missed
+    # AND not timed out AND the whole plan is built. 'incomplete-build' is a missed rule, so a
+    # partial run can never be 'conformed'.
     $rulesMissed = @()
     if (-not $built.ok) { $rulesMissed += 'did-not-build' }
+    if (-not $complete) { $rulesMissed += 'incomplete-build' }
     $rulesMissed += $lintMissed
-    $conformed = ($built.ok -and -not $res.timedOut -and $rulesMissed.Count -eq 0)
-    $buildResult = if ($res.timedOut) { 'timed-out' } elseif (-not $built.ok) { 'did-not-build' } elseif ($conformed) { 'passed' } else { 'non-conforming' }
-    $verdict = if ($conformed) { 'pass' } else { 'recorded-fail' }
+    $conformed = ($built.ok -and -not $res.timedOut -and $complete -and $rulesMissed.Count -eq 0)
+    $buildResult = if ($res.timedOut) { 'timed-out' } elseif (-not $built.ok) { 'did-not-build' } elseif (-not $complete) { 'incomplete' } elseif ($conformed) { 'passed' } else { 'non-conforming' }
+    # 'incomplete' is distinct from 'pass' and 'recorded-fail': what the run DID build may be
+    # clean, but the app isn't finished — surfaced plainly instead of hidden under a green score.
+    $verdict = if ($conformed) { 'pass' }
+        elseif (-not $complete -and $built.ok -and -not $res.timedOut -and @($lintMissed).Count -eq 0) { 'incomplete' }
+        else { 'recorded-fail' }
+    # Pass-rate: 1.0 only for a complete, conforming build; the honest epics-built/planned fraction
+    # for an incomplete run (so 1-of-7 reads as 14%, not 100%); 0.0 for other failures.
+    $passRate = if ($conformed) { 1.0 } elseif ($verdict -eq 'incomplete') { $completeness } else { 0.0 }
+    $buildReason = if ($res.timedOut) { 'timed out' }
+        elseif (-not $built.ok) { $built.detail }
+        elseif (-not $complete) { "incomplete — built $epicsBuilt of $epicsPlanned planned epics before the run ended" }
+        elseif ($conformed) { 'built and passed all rules' }
+        else { 'built, but missed: ' + ($lintMissed -join ', ') }
 
     return @{
         version = $Version; timestamp = $RunId; model = $res.model; benchmark = $Benchmark
@@ -880,15 +908,19 @@ function Invoke-Tier3LiveRun {
         }
         memory = $memSummary
         epicsCreated = $epicStats.epicsCreated
+        epicsBuilt = $epicStats.epicsBuilt
         storiesCreated = $epicStats.storiesCreated
         epics = $epicStats.epics
         tier3 = @{
             ran = $true; verdict = $verdict
-            passRate = if ($conformed) { 1.0 } else { 0.0 }
+            passRate = $passRate
+            epicsPlanned = $epicsPlanned
+            epicsBuilt = $epicsBuilt
+            complete = $complete
             conformanceScored = $conf.ran
             tokensTotal = $combined.tokens
             segments = $combined.segments
-            builds = @(@{ attempt = 1; result = $buildResult; compiled = $built.ok; tokens = $combined.tokens; turns = $combined.turns; reason = $(if ($res.timedOut) { 'timed out' } elseif (-not $built.ok) { $built.detail } elseif ($conformed) { 'built and passed all rules' } else { 'built, but missed: ' + ($lintMissed -join ', ') }) })
+            builds = @(@{ attempt = 1; result = $buildResult; compiled = $built.ok; tokens = $combined.tokens; turns = $combined.turns; reason = $buildReason })
             rulesMissed = @($rulesMissed)
         }
         _scaffold = $WorkingDir

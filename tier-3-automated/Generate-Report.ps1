@@ -24,10 +24,12 @@
     groups   = @( @{ name; tests; passed; failed; skipped; durationSeconds; tokens } , … )
     tools    = @( 'node v20.x', 'pwsh 7.5', … )
     timing   = <Summary() from timing.ps1: activeSeconds, excludedSeconds, claudeSeconds, phases[] >
+    epicsCreated; epicsBuilt; storiesCreated   # completeness: epics planned vs actually built
     tier3    = @{                # present only when the live run happened
-        ran; verdict ('pass'|'recorded-fail'); passRate; tokensTotal;
+        ran; verdict ('pass'|'incomplete'|'recorded-fail'); passRate; tokensTotal;
+        epicsPlanned; epicsBuilt; complete;   # 'incomplete' = built < planned (partial build)
         builds = @( @{ attempt; result; compiled; tokens; turns; reason } , … );
-        rulesMissed = @( 'shadcn-only', … )
+        rulesMissed = @( 'shadcn-only', 'incomplete-build', … )
     }
 #>
 
@@ -47,6 +49,8 @@ $script:Tier3FixHints = @{
     'timed-out'           = 'The build ran past the time limit — re-run, or raise the limit, and check for an endless retry loop.'
     'did-not-build'       = "The app didn't compile — open the build log in this run folder and fix the reported build error."
     'setup'               = 'Setup failed before the run — check the setup log and install the prerequisite it named.'
+    'incomplete-build'    = 'The build stopped before finishing every planned epic — resume it (Run-QATests.ps1 -Resume -Timestamp <run>) so the remaining epics build, and check why the run ended early (e.g. a stalled epic-end gate).'
+    'incomplete'          = 'The build stopped before finishing every planned epic — resume it (Run-QATests.ps1 -Resume -Timestamp <run>) so the remaining epics build, and check why the run ended early (e.g. a stalled epic-end gate).'
 }
 
 function Format-Duration {
@@ -122,6 +126,15 @@ function New-Tier3Report {
     if ($Run.ContainsKey('epicsCreated') -and $null -ne $Run.epicsCreated) {
         & $add "| Epics created | $($Run.epicsCreated) |"
     }
+    # Completeness headline: how many planned epics actually got built. A partial build (e.g.
+    # 1 of 7, because the run stalled at an epic gate) shows ⚠️ here rather than hiding behind
+    # a green pass-rate. See the completeness logic in live-driver.ps1 (Invoke-Tier3LiveRun).
+    if ($Run.ContainsKey('epicsBuilt') -and $null -ne $Run.epicsBuilt -and $Run.ContainsKey('epicsCreated') -and $null -ne $Run.epicsCreated) {
+        $eb = [int]$Run.epicsBuilt; $ep = [int]$Run.epicsCreated
+        $ebPct = if ($ep -gt 0) { [Math]::Round(100 * $eb / $ep) } else { 0 }
+        $ebIcon = if ($ep -gt 0 -and $eb -ge $ep) { '✅' } else { '⚠️' }
+        & $add "| Epics built | $ebIcon $eb of $ep ($ebPct%) |"
+    }
     if ($Run.ContainsKey('storiesCreated') -and $null -ne $Run.storiesCreated) {
         & $add "| Stories created | $($Run.storiesCreated) |"
     }
@@ -157,7 +170,13 @@ function New-Tier3Report {
     $tier3Ran = ($Run.ContainsKey('tier3') -and $Run.tier3 -and $Run.tier3.ran)
     if ($tier3Ran) {
         & $add "| Total AI tokens | $(Format-Tokens $Run.tier3.tokensTotal) |"
-        $verdictText = if ($Run.tier3.verdict -eq 'pass') { '✅ met the rules' } else { '⚠️ fell short (recorded, not failed)' }
+        $verdictText = if ($Run.tier3.verdict -eq 'pass') { '✅ met the rules' }
+            elseif ($Run.tier3.verdict -eq 'incomplete') {
+                $veb = if ($Run.tier3.ContainsKey('epicsBuilt')) { $Run.tier3.epicsBuilt } else { '?' }
+                $vep = if ($Run.tier3.ContainsKey('epicsPlanned')) { $Run.tier3.epicsPlanned } else { '?' }
+                "⚠️ incomplete — built $veb of $vep planned epics (recorded, not failed)"
+            }
+            else { '⚠️ fell short (recorded, not failed)' }
         & $add "| Tier 3 verdict | $verdictText |"
         if ($Run.tier3.ContainsKey('passRate')) { & $add "| Build pass-rate | $([Math]::Round([double]$Run.tier3.passRate * 100))% |" }
     }
