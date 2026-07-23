@@ -39,12 +39,23 @@ Describe 'Playwright browser detection + lock clearing (hardened)' {
         Get-PlaywrightChromiumExe    | Should -BeNullOrEmpty
     }
 
-    It 'PASS: a chromium-* build WITH the executable is detected' {
-        $exe = Join-Path (Join-Path $script:cache 'chromium-1217') (Get-PlaywrightChromiumExeRelativePath)
+    It 'PASS: a chromium-* build WITH the executable is detected (across layout names)' {
+        foreach ($rel in (Get-PlaywrightChromiumExeRelativePaths)) {
+            $c = Join-Path $script:cache ("chromium-1217-" + [Guid]::NewGuid().ToString('N').Substring(0,6))
+            $exe = Join-Path $c $rel
+            New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
+            Set-Content -Path $exe -Value 'binary' -Encoding utf8
+            Test-PlaywrightChromium    | Should -BeTrue
+            (Get-PlaywrightChromiumExe) | Should -Not -BeNullOrEmpty
+            Remove-Item $c -Recurse -Force
+        }
+    }
+
+    It 'PASS: the newer chrome-win64 layout is detected (regression for the chrome-win bug)' -Skip:(-not $IsWindows) {
+        $exe = Join-Path (Join-Path $script:cache 'chromium-1217') 'chrome-win64\chrome.exe'
         New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
         Set-Content -Path $exe -Value 'binary' -Encoding utf8
-        Test-PlaywrightChromium    | Should -BeTrue
-        (Get-PlaywrightChromiumExe) | Should -Be $exe
+        Test-PlaywrightChromium | Should -BeTrue
     }
 
     It 'PASS: Clear-PlaywrightInstallLock removes a stale __dirlock and orphan zips' {

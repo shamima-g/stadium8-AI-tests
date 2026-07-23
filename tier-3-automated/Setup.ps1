@@ -46,25 +46,29 @@ function Get-PlaywrightCacheDir {
     else              { return (Join-Path $HOME '.cache/ms-playwright') }
 }
 
-# The relative path to the Chromium executable inside a `chromium-<rev>` build dir, per OS.
-function Get-PlaywrightChromiumExeRelativePath {
-    if ($IsWindows)   { return 'chrome-win\chrome.exe' }
-    elseif ($IsMacOS) { return 'chrome-mac/Chromium.app/Contents/MacOS/Chromium' }
-    else              { return 'chrome-linux/chrome' }
+# The candidate relative paths to the Chromium executable inside a `chromium-<rev>` build dir,
+# per OS. Windows Playwright builds vary by version: newer ones extract to `chrome-win64`,
+# older ones to `chrome-win` — we check both so detection doesn't break on a version bump.
+function Get-PlaywrightChromiumExeRelativePaths {
+    if ($IsWindows)   { return @('chrome-win64\chrome.exe', 'chrome-win\chrome.exe') }
+    elseif ($IsMacOS) { return @('chrome-mac/Chromium.app/Contents/MacOS/Chromium') }
+    else              { return @('chrome-linux/chrome') }
 }
 
 # The actual Chromium executable in the cache (newest `chromium-<rev>` build that has one), or
 # $null. This is the ground truth: a `chromium-*` FOLDER can exist from a half-extracted or
 # lock-interrupted install with no runnable binary inside — which is exactly what let a
 # browserless machine pass the old "a folder is there" check and then stall the run at the
-# first e2e gate. We look for the binary, not the folder.
+# first e2e gate. We look for the binary (across known layout names), not the folder.
 function Get-PlaywrightChromiumExe {
     $dir = Get-PlaywrightCacheDir
     if (-not (Test-Path $dir)) { return $null }
-    $rel = Get-PlaywrightChromiumExeRelativePath
+    $rels = Get-PlaywrightChromiumExeRelativePaths
     foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter 'chromium-*' -ErrorAction SilentlyContinue | Sort-Object Name -Descending)) {
-        $exe = Join-Path $d.FullName $rel
-        if (Test-Path -LiteralPath $exe -PathType Leaf) { return $exe }
+        foreach ($rel in $rels) {
+            $exe = Join-Path $d.FullName $rel
+            if (Test-Path -LiteralPath $exe -PathType Leaf) { return $exe }
+        }
     }
     return $null
 }
