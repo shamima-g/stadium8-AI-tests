@@ -105,25 +105,84 @@ function Clear-PlaywrightInstallLock {
 }
 
 # The semver RANGE the template's generated app declares for @playwright/test (v1.1.0 generates
-# apps on ^1.59.1). The range — not a fixed version — is the source of truth, because that's what
-# the app's `npm install` resolves against. Override with $env:TIER3_PLAYWRIGHT_RANGE if the
-# template changes what it declares.
+# apps on ^1.59.1). A FALLBACK only: when the app ships a lockfile the lock decides, because that's
+# what `npm install` honours (see Get-Tier3PlaywrightVersionFromLock). The range is what we resolve
+# against when there is no lockfile. Override with $env:TIER3_PLAYWRIGHT_RANGE if the template
+# changes what it declares.
 function Get-Tier3PlaywrightRange {
     if ($env:TIER3_PLAYWRIGHT_RANGE) { return $env:TIER3_PLAYWRIGHT_RANGE }
     return '^1.59.1'
 }
 
-# Resolve that range to the concrete version the app's `npm install` will actually pick — i.e. the
-# highest published version satisfying it. This MUST be resolved, never assumed: `^1.59.1` allows
-# 1.60/1.61/1.62..., and each minor ships a DIFFERENT Chromium build (1.59.1 → chromium-1217,
-# 1.62.0 → chromium-1234). Warming the range's floor would cache a browser the app never launches
-# and leave it to download its own mid-run — the exact stall this prerequisite exists to prevent.
-# $env:TIER3_PLAYWRIGHT_VERSION pins an exact version and skips the lookup (offline/CI friendly).
-# If npm can't be reached we fall back to the floor of the range and say so in the log.
+# The template whose lockfile decides the version. Set once by Invoke-Tier3Setup so the probes
+# below stay argument-less; switching it drops the memoised version/component answers, since a
+# different template can pin a different browser.
 $script:Tier3PlaywrightVersion = $null
+$script:Tier3TemplateRoot      = $null
+function Set-Tier3TemplateRoot {
+    param([string]$Path)
+    $script:Tier3TemplateRoot      = $Path
+    $script:Tier3PlaywrightVersion = $null
+    $script:Tier3BrowserComponents = $null
+}
+
+# The EXACT @playwright/test version the app's `npm install` will land, read from the lockfile the
+# app ships — the ground truth, and it OUTRANKS the range. npm honours package-lock.json over the
+# caret in package.json, so a template declaring `^1.59.1` while locking 1.59.1 installs 1.59.1,
+# NOT the newest match. That distinction is the whole point of this function: each minor ships a
+# DIFFERENT Chromium build (1.59.1 → chromium-1217, 1.62.0 → chromium-1234), so resolving the range
+# to its newest warmed chromium-1234 while the app launched 1217, and the epic-end gate stalled
+# downloading its own browser mid-run — the exact stall this prerequisite exists to prevent.
+# Returns $null when there's no readable lockfile, leaving the range to decide as before.
+function Get-Tier3PlaywrightVersionFromLock {
+    param([string]$TemplateRoot)
+    if (-not $TemplateRoot) { return $null }
+    # The generated app lives in web/; a flat template keeps its lockfile at the root.
+    foreach ($lock in @([System.IO.Path]::Combine($TemplateRoot, 'web', 'package-lock.json'),
+                        [System.IO.Path]::Combine($TemplateRoot, 'package-lock.json'))) {
+        if (-not (Test-Path -LiteralPath $lock -PathType Leaf)) { continue }
+        try {
+            # -AsHashtable is REQUIRED, not a convenience: a real npm v2/v3 lockfile carries a ""
+            # key for the root package, and ConvertFrom-Json without it fails outright on an empty
+            # property name ("only supported using the -AsHashTable switch") — which would send
+            # every genuine lockfile down the catch below and quietly restore the very bug this
+            # function exists to fix. PowerShell 7 is a hard prerequisite, so the switch is always
+            # available. Dictionaries also keep this StrictMode-safe: ContainsKey, not property probes.
+            $json = Get-Content -LiteralPath $lock -Raw | ConvertFrom-Json -AsHashtable
+            if (-not ($json -is [System.Collections.IDictionary])) { continue }
+            # Lockfile v2/v3 record resolved versions under `packages`, v1 under `dependencies`.
+            foreach ($probe in @(@{ section = 'packages';     key = 'node_modules/@playwright/test' },
+                                 @{ section = 'dependencies'; key = '@playwright/test' })) {
+                if (-not $json.ContainsKey($probe.section)) { continue }
+                $section = $json[$probe.section]
+                if (-not ($section -is [System.Collections.IDictionary]) -or -not $section.ContainsKey($probe.key)) { continue }
+                $entry = $section[$probe.key]
+                if ($entry -is [System.Collections.IDictionary] -and $entry.ContainsKey('version') -and $entry['version']) {
+                    return [string]$entry['version']
+                }
+            }
+        }
+        catch { }   # unreadable or not-JSON lockfile — fall through to the range
+    }
+    return $null
+}
+
+# The concrete version to warm, in order of authority:
+#   1. $env:TIER3_PLAYWRIGHT_VERSION      — an explicit pin (offline/CI friendly), trusted outright.
+#   2. the app's lockfile                 — what `npm install` will really land: the ground truth.
+#   3. the range's newest published match — for a template that ships no lockfile.
+#   4. the range's floor                  — when npm can't be reached at all.
+# An explicitly-passed -TemplateRoot always answers for itself, never from another template's memo.
 function Get-Tier3PlaywrightVersion {
+    param([string]$TemplateRoot)
     if ($env:TIER3_PLAYWRIGHT_VERSION) { return $env:TIER3_PLAYWRIGHT_VERSION }
+    if ($TemplateRoot) {
+        $pinned = Get-Tier3PlaywrightVersionFromLock -TemplateRoot $TemplateRoot
+        if ($pinned) { $script:Tier3PlaywrightVersion = $pinned; return $pinned }
+    }
     if ($script:Tier3PlaywrightVersion) { return $script:Tier3PlaywrightVersion }
+    $locked = Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:Tier3TemplateRoot
+    if ($locked) { $script:Tier3PlaywrightVersion = $locked; return $locked }
     $range = Get-Tier3PlaywrightRange
     $floor = ($range -replace '^[^0-9]*', '')
     try {
@@ -267,9 +326,13 @@ function Install-PlaywrightChromium {
 }
 
 # Probe every prerequisite and report its status. Pure — never installs anything.
+# -TemplateRoot is the template this run builds against: it decides WHICH Playwright browser must
+# be cached, read from that app's lockfile. Omit it and the range decides, as before.
 function Get-Tier3Prerequisites {
     [CmdletBinding()]
-    param([bool]$IncludeTier3 = $true)
+    param([bool]$IncludeTier3 = $true, [string]$TemplateRoot)
+
+    if ($TemplateRoot) { Set-Tier3TemplateRoot -Path $TemplateRoot }
 
     $items = [System.Collections.Generic.List[hashtable]]::new()
 
@@ -298,7 +361,9 @@ function Get-Tier3Prerequisites {
         # holds a real executable, so the gate launches from the cache instead of fetching.
         $pwMissing = @(Get-MissingPlaywrightComponents)
         $chromium  = Test-PlaywrightChromium
-        $pwVer     = if ($chromium) { "cached: $((Get-Tier3BrowserComponents) -join ', ')" } else { $null }
+        # Name the @playwright/test version the build resolved to, not just the cached dirs: when a
+        # warm targets the wrong version this line is what shows it at a glance in setup.log.
+        $pwVer     = if ($chromium) { "for @playwright/test $(Get-Tier3PlaywrightVersion) — cached: $((Get-Tier3BrowserComponents) -join ', ')" } else { $null }
         $items.Add(@{ name = 'Playwright browser (Chromium)'; present = $chromium; version = $pwVer; requiredFor = 'the epic-end Playwright (e2e) gate in Tier 3 live runs'; installable = $true; hint = "npx --yes @playwright/test@$(Get-Tier3PlaywrightVersion) install --with-deps chromium  (missing: $($pwMissing -join ', '))"; install = { Install-PlaywrightChromium }; verify = { Test-PlaywrightChromium } })
     }
 
@@ -315,10 +380,15 @@ function Invoke-Tier3Setup {
     param(
         [bool]$IncludeTier3 = $true,
         [switch]$CheckOnly,
-        [string]$LogPath
+        [string]$LogPath,
+        [string]$TemplateRoot
     )
     $log = [System.Collections.Generic.List[string]]::new()
     $add = { param($m) $log.Add($m); Write-Verbose $m }
+
+    # Aim the Playwright check at the template we're about to build, so the browser we warm is the
+    # one THAT app's lockfile pins. Without it we'd warm whatever the range resolves to newest.
+    if ($TemplateRoot) { Set-Tier3TemplateRoot -Path $TemplateRoot }
 
     $prereqs = Get-Tier3Prerequisites -IncludeTier3 $IncludeTier3
     $blocking = [System.Collections.Generic.List[string]]::new()

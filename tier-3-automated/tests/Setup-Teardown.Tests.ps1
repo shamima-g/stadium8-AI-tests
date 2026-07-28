@@ -25,6 +25,21 @@ BeforeAll {
         }
     }
 
+    # A template whose app pins $Version for @playwright/test. -V1 writes the old `dependencies`
+    # lockfile shape, else v2/v3 `packages`; -Sub '' puts the lockfile at the root (flat template).
+    function Write-Lock {
+        param([string]$Root, [string]$Version, [switch]$V1, [string]$Sub = 'web')
+        $body = if ($V1) {
+            @{ lockfileVersion = 1; dependencies = @{ '@playwright/test' = @{ version = $Version } } }
+        }
+        else {
+            @{ lockfileVersion = 3; packages = @{ '' = @{ name = 'web' }; 'node_modules/@playwright/test' = @{ version = $Version } } }
+        }
+        $dir = if ($Sub) { Join-Path $Root $Sub } else { $Root }
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        Set-Content -Path (Join-Path $dir 'package-lock.json') -Value ($body | ConvertTo-Json -Depth 8) -Encoding utf8
+    }
+
     function New-FakeWorkingTree {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-work-" + [Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path (Join-Path $root 'web\src\app') -Force | Out-Null
@@ -261,6 +276,111 @@ Describe 'Setup — probing (never installs)' {
         Test-Path $logPath | Should -BeTrue
         (Get-Content $logPath -Raw) | Should -Match '\[ok\]'
         Remove-Item $logDir -Recurse -Force
+    }
+}
+
+Describe 'Playwright version — the app lockfile decides, not the newest in range' {
+    # The regression this guards: the template declares ^1.59.1 but LOCKS 1.59.1, and npm honours
+    # the lock. Resolving the range to its newest (1.62.0) warmed chromium-1234 while the app
+    # launched chromium-1217, so the epic-end gate died on "Executable doesn't exist" and the run
+    # stalled downloading a browser mid-flight — after building only 1 of 3 epics.
+    BeforeEach {
+        $script:tmpl = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tmpl-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path (Join-Path $script:tmpl 'web') -Force | Out-Null
+        Set-Tier3TemplateRoot -Path $script:tmpl      # also clears any version memoised earlier
+    }
+    AfterEach {
+        Set-Tier3TemplateRoot -Path $null             # don't leak a root into the next test
+        Remove-Item $script:tmpl -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'PASS: reads the exact version a v3 lockfile pins (1.59.1, not the range newest)' {
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -Be '1.59.1'
+        Get-Tier3PlaywrightVersion -TemplateRoot $script:tmpl         | Should -Be '1.59.1'
+    }
+
+    It 'PASS: a v1 lockfile (dependencies shape) is read too' {
+        Write-Lock -Root $script:tmpl -Version '1.60.2' -V1
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -Be '1.60.2'
+    }
+
+    It 'PASS: a flat template with the lockfile at its root is read' {
+        Write-Lock -Root $script:tmpl -Version '1.59.1' -Sub ''
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -Be '1.59.1'
+    }
+
+    It 'FAIL-guard: the lock wins even when the declared range allows something newer' {
+        # The lock is BELOW the newest the caret admits — the old code picked the newest and warmed
+        # the wrong Chromium. The pinned answer must come back untouched by the range.
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        $range = Get-Tier3PlaywrightRange
+        $range | Should -Be '^1.59.1'                              # range still admits 1.6x
+        Get-Tier3PlaywrightVersion -TemplateRoot $script:tmpl | Should -Be '1.59.1'
+    }
+
+    It 'PASS: the resolved version is what the argument-less probes see (browser follows the app)' {
+        # Get-Tier3BrowserComponents/Install-PlaywrightChromium take no arguments — they must pick
+        # up the template root set by setup, or they'd warm a different build than the app launches.
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        Get-Tier3PlaywrightVersion | Should -Be '1.59.1'
+    }
+
+    It 'PASS: Get-Tier3Prerequisites -TemplateRoot aims the check at that template' {
+        # -IncludeTier3:$false keeps this offline (no Playwright dry-run probe); we assert the root
+        # was plumbed through by what the version resolver answers afterwards.
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        Set-Tier3TemplateRoot -Path $null
+        Get-Tier3Prerequisites -IncludeTier3 $false -TemplateRoot $script:tmpl | Out-Null
+        Get-Tier3PlaywrightVersion | Should -Be '1.59.1'
+    }
+
+    It 'PASS: switching template drops the memoised answer instead of reusing the old pin' {
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        Get-Tier3PlaywrightVersion | Should -Be '1.59.1'
+        $other = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tmpl-" + [Guid]::NewGuid().ToString('N'))
+        try {
+            Write-Lock -Root $other -Version '1.62.0'
+            Set-Tier3TemplateRoot -Path $other
+            Get-Tier3PlaywrightVersion | Should -Be '1.62.0'       # re-resolved, not the 1.59.1 memo
+        }
+        finally { Remove-Item $other -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    It 'PASS: $env:TIER3_PLAYWRIGHT_VERSION still outranks the lockfile' {
+        Write-Lock -Root $script:tmpl -Version '1.59.1'
+        $prev = $env:TIER3_PLAYWRIGHT_VERSION
+        try {
+            $env:TIER3_PLAYWRIGHT_VERSION = '1.61.0'
+            Get-Tier3PlaywrightVersion -TemplateRoot $script:tmpl | Should -Be '1.61.0'
+        }
+        finally { $env:TIER3_PLAYWRIGHT_VERSION = $prev }
+    }
+
+    It 'FAIL-guard: no lockfile falls back to the range, never to nothing' {
+        # A template that ships no lockfile keeps the old behaviour: resolve the declared range.
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -BeNullOrEmpty
+        $floor = [version]((Get-Tier3PlaywrightRange) -replace '^[^0-9]*', '')
+        $got   = [version](Get-Tier3PlaywrightVersion -TemplateRoot $script:tmpl)
+        $got       | Should -BeGreaterOrEqual $floor
+        $got.Major | Should -Be $floor.Major
+    }
+
+    It 'FAIL-guard: a corrupt lockfile falls back quietly instead of throwing' {
+        Set-Content -Path (Join-Path (Join-Path $script:tmpl 'web') 'package-lock.json') -Value '{ not json' -Encoding utf8
+        { Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl } | Should -Not -Throw
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -BeNullOrEmpty
+    }
+
+    It 'FAIL-guard: a lockfile without @playwright/test is not mistaken for a pin' {
+        $body = @{ lockfileVersion = 3; packages = @{ 'node_modules/react' = @{ version = '19.0.0' } } }
+        Set-Content -Path (Join-Path (Join-Path $script:tmpl 'web') 'package-lock.json') -Value ($body | ConvertTo-Json -Depth 8) -Encoding utf8
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $script:tmpl | Should -BeNullOrEmpty
+    }
+
+    It 'FAIL-guard: no template root is a no-op, not an error' {
+        { Get-Tier3PlaywrightVersionFromLock -TemplateRoot $null } | Should -Not -Throw
+        Get-Tier3PlaywrightVersionFromLock -TemplateRoot $null | Should -BeNullOrEmpty
     }
 }
 

@@ -154,6 +154,11 @@ function Resolve-Tier3Template {
     if (-not $Cloner) {
         $Cloner = {
             param($repoUrl, $gitRef, $destPath)
+            # This runs before setup's prerequisite sweep (the template has to be known first), so
+            # name the missing tool here rather than failing with a bare "git is not recognized".
+            if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+                throw "Git is required to check out $repoUrl but isn't on PATH — install Git from git-scm.com."
+            }
             if (Test-Path $destPath) { Remove-Item $destPath -Recurse -Force }
             New-Item -ItemType Directory -Path (Split-Path $destPath -Parent) -Force | Out-Null
             $cloneArgs = @('clone', '--depth', '1')
@@ -241,11 +246,23 @@ function Invoke-RunQATests {
         $resumeSessionId = (Get-Content $sf -Raw).Trim()
     }
 
+    # 0) resolve the template BEFORE setup. Setup warms the exact Playwright browser the app pins
+    #    in its lockfile, so it has to know which checkout it's warming for — warming from the
+    #    declared range instead is what cached the wrong Chromium and stalled the epic-end gate
+    #    mid-run. A replay builds nothing, so it needs no template.
+    $qaRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $tmpl = $null
+    if (-not $ReplayResult -and ($IncludeTier3 -or $Resume)) {
+        $tmpl = Resolve-Tier3Template -Target $Target -Ref $Ref -QaRoot $qaRoot
+    }
+
     # 1) setup — every prerequisite is mandatory. If setup couldn't make the machine fully
     #    ready (anything missing, failed to install, or failed to verify), the tests do NOT
     #    run: abort here with the exact list so nothing starts on a half-ready machine.
     if (-not $SkipSetup) {
-        $setup = Invoke-Tier3Setup -IncludeTier3 $IncludeTier3 -LogPath (Join-Path $runFolder 'setup.log')
+        $setupArgs = @{ IncludeTier3 = $IncludeTier3; LogPath = (Join-Path $runFolder 'setup.log') }
+        if ($tmpl) { $setupArgs.TemplateRoot = $tmpl.root }
+        $setup = Invoke-Tier3Setup @setupArgs
         if (-not $setup.ok) {
             throw "Setup can't continue — these prerequisites are missing or not working: $($setup.blocking -join ', '). Tests will not run until every prerequisite is present. See $($runFolder)\setup.log."
         }
@@ -256,10 +273,8 @@ function Invoke-RunQATests {
         $run = ConvertTo-HashtableDeep (Get-Content $ReplayResult -Raw | ConvertFrom-Json)
     }
     elseif ($IncludeTier3 -or $Resume) {
-        # Default: build against the template the suite is nested in. With -Target, clone
-        # that channel@ref and build against it instead (see Resolve-Tier3Template).
-        $qaRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-        $tmpl = Resolve-Tier3Template -Target $Target -Ref $Ref -QaRoot $qaRoot
+        # Resolved in step 0 (before setup, so setup could warm this app's browser). Default: the
+        # template the suite is nested in; with -Target, that channel@ref's checkout.
         $templateRoot = $tmpl.root
         $versionLabel = if ($Target) { if ($Ref) { $Ref } else { 'default' } } else { '0.1.0' }
         $benchmarkDir = (Join-Path (Join-Path $PSScriptRoot '..' 'benchmark-files') $Benchmark)
@@ -282,7 +297,6 @@ function Invoke-RunQATests {
 
     # 2b) run the cheap tiers (Tier 1 + Tier 2) so one report covers the whole suite.
     if (-not $SkipLowerTiers -and -not $ReplayResult) {
-        $qaRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
         $lower = Get-Tier3LowerTierGroups -QaRoot $qaRoot
         if (@($lower).Count -gt 0) { $run.groups = @($lower) }
     }
