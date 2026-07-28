@@ -2,6 +2,14 @@
 
 Every automated Tier 3 run, newest first, grouped by app. This page is rebuilt after each run.
 
+## e-commerce@dev-v1.1.0
+
+[charts & trends](e-commerce@dev-v1.1.0/tier3-metrics.html)
+
+| When | Model | Result | Verdict | Active | Claude | Peak RAM | Tokens | Report |
+|---|---|:--:|---|--:|--:|--:|--:|---|
+| 20260728-0722 | opus | ✅ | incomplete | 96m 42s | 55m 34s | 7.7 GB | 33,165,220 | [open](e-commerce@dev-v1.1.0/opus/20260728-0722/report-v1.1.0-20260728-0722.md) |
+
 ## transactions@dev-v1.1.0
 
 [charts & trends](transactions@dev-v1.1.0/tier3-metrics.html)
