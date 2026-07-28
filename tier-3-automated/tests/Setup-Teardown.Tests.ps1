@@ -7,6 +7,24 @@ BeforeAll {
     . (Join-Path $PSScriptRoot '..' 'Setup.ps1')
     . (Join-Path $PSScriptRoot '..' 'Teardown.ps1')
 
+    # A fake Playwright cache entry. $Complete writes the INSTALLATION_COMPLETE marker Playwright
+    # itself uses to decide "reuse this" vs "re-download"; without it the dir is half-extracted.
+    # $WithExe also lays down the browser binary, so a `chromium-*` entry looks like a real install
+    # (marker AND executable) — the two independent things Test-PlaywrightChromium requires.
+    function New-PwComponent {
+        param([string]$Cache, [string]$Name, [bool]$Complete, [bool]$WithExe = $true)
+        $d = Join-Path $Cache $Name
+        New-Item -ItemType Directory -Path $d -Force | Out-Null
+        $marker = Join-Path $d 'INSTALLATION_COMPLETE'
+        if ($Complete) { Set-Content -Path $marker -Value '' -Encoding utf8 }
+        elseif (Test-Path $marker) { Remove-Item $marker -Force }
+        if ($WithExe -and $Name -like 'chromium-*') {
+            $exe = Join-Path $d (Get-PlaywrightChromiumExeRelativePaths)[0]
+            New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
+            if (-not (Test-Path $exe)) { Set-Content -Path $exe -Value 'binary' -Encoding utf8 }
+        }
+    }
+
     function New-FakeWorkingTree {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-work-" + [Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path (Join-Path $root 'web\src\app') -Force | Out-Null
@@ -45,7 +63,6 @@ Describe 'Playwright browser detection + lock clearing (hardened)' {
             $exe = Join-Path $c $rel
             New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
             Set-Content -Path $exe -Value 'binary' -Encoding utf8
-            Test-PlaywrightChromium    | Should -BeTrue
             (Get-PlaywrightChromiumExe) | Should -Not -BeNullOrEmpty
             Remove-Item $c -Recurse -Force
         }
@@ -55,7 +72,31 @@ Describe 'Playwright browser detection + lock clearing (hardened)' {
         $exe = Join-Path (Join-Path $script:cache 'chromium-1217') 'chrome-win64\chrome.exe'
         New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
         Set-Content -Path $exe -Value 'binary' -Encoding utf8
-        Test-PlaywrightChromium | Should -BeTrue
+        (Get-PlaywrightChromiumExe) | Should -Match 'chrome-win64'
+    }
+
+    It 'PASS: exe + completion marker + headless shell together read as ready to use' {
+        # The full-stack check: the two conditions (component set complete, executable real) met.
+        $prevComp = $env:TIER3_BROWSER_COMPONENTS
+        try {
+            $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217,chromium_headless_shell-1217'
+            New-PwComponent $script:cache 'chromium-1217' $true
+            New-PwComponent $script:cache 'chromium_headless_shell-1217' $true
+            Test-PlaywrightChromium | Should -BeTrue
+        }
+        finally { $env:TIER3_BROWSER_COMPONENTS = $prevComp }
+    }
+
+    It 'FAIL-guard: the completion marker alone is not enough without the executable' {
+        # Marker present but no binary — Playwright would reuse the dir and the launch would fail.
+        $prevComp = $env:TIER3_BROWSER_COMPONENTS
+        try {
+            $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217'
+            New-PwComponent $script:cache 'chromium-1217' $true $false
+            @(Get-MissingPlaywrightComponents).Count | Should -Be 0     # marker says complete...
+            Test-PlaywrightChromium | Should -BeFalse                   # ...but no exe → not ready
+        }
+        finally { $env:TIER3_BROWSER_COMPONENTS = $prevComp }
     }
 
     It 'PASS: Clear-PlaywrightInstallLock removes a stale __dirlock and orphan zips' {
@@ -97,6 +138,71 @@ Describe 'Setup — probing (never installs)' {
         $pw = Get-Tier3Prerequisites -IncludeTier3 $true | Where-Object { $_.name -like 'Playwright*' }
         $pw.installable | Should -BeTrue
         ($pw.ContainsKey('optional') -and $pw.optional) | Should -BeFalse   # must be present to run
+    }
+
+    It 'PASS: the browser check demands the pinned build, both halves, each marked complete' {
+        # The gate must LAUNCH from the cache, never fetch: a different build, a missing headless
+        # shell, or a half-extracted dir all mean a mid-run download, so all three read as absent.
+        $cache = Join-Path ([System.IO.Path]::GetTempPath()) ("pw-cache-" + [Guid]::NewGuid().ToString('N'))
+        $oldPath = $env:PLAYWRIGHT_BROWSERS_PATH
+        $oldComp = $env:TIER3_BROWSER_COMPONENTS
+        try {
+            $env:PLAYWRIGHT_BROWSERS_PATH = $cache
+            $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217,chromium_headless_shell-1217'
+            New-PwComponent $cache 'chromium-9999' $true
+            Test-PlaywrightChromium | Should -BeFalse                       # wrong build only
+
+            New-PwComponent $cache 'chromium-1217' $true
+            Get-MissingPlaywrightComponents | Should -Be @('chromium_headless_shell-1217')
+            Test-PlaywrightChromium | Should -BeFalse                       # headless shell absent
+
+            New-PwComponent $cache 'chromium_headless_shell-1217' $false    # no completion marker
+            Test-PlaywrightChromium | Should -BeFalse                       # half-extracted → refetch
+
+            New-PwComponent $cache 'chromium_headless_shell-1217' $true
+            @(Get-MissingPlaywrightComponents).Count | Should -Be 0
+            Test-PlaywrightChromium | Should -BeTrue                        # complete → will be used
+        }
+        finally {
+            $env:PLAYWRIGHT_BROWSERS_PATH = $oldPath
+            $env:TIER3_BROWSER_COMPONENTS = $oldComp
+            Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'FAIL-guard: an empty browser cache reads as absent' {
+        $cache = Join-Path ([System.IO.Path]::GetTempPath()) ("pw-cache-" + [Guid]::NewGuid().ToString('N'))
+        $oldPath = $env:PLAYWRIGHT_BROWSERS_PATH
+        $oldComp = $env:TIER3_BROWSER_COMPONENTS
+        try {
+            $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217,chromium_headless_shell-1217'
+            $env:PLAYWRIGHT_BROWSERS_PATH = $cache          # does not exist at all
+            Test-PlaywrightChromium | Should -BeFalse
+            New-Item -ItemType Directory -Path $cache -Force | Out-Null
+            Test-PlaywrightChromium | Should -BeFalse       # exists but holds no browser
+        }
+        finally {
+            $env:PLAYWRIGHT_BROWSERS_PATH = $oldPath
+            $env:TIER3_BROWSER_COMPONENTS = $oldComp
+            Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'PASS: the resolved Playwright version satisfies the range the generated app declares' {
+        # `^1.59.1` allows 1.60/1.61/1.62..., each shipping a DIFFERENT Chromium build. Warming the
+        # floor when npm resolves higher is precisely how the gate ends up fetching mid-run.
+        $range = Get-Tier3PlaywrightRange
+        $range | Should -Match '^\^?\d+\.\d+\.\d+$'
+        $floor = [version]($range -replace '^[^0-9]*', '')
+        $got   = [version](Get-Tier3PlaywrightVersion)
+        $got   | Should -BeGreaterOrEqual $floor                    # never below the declared floor
+        $got.Major | Should -Be $floor.Major                        # and inside the caret range
+    }
+
+    It 'PASS: the required component list covers the browser AND its headless shell' {
+        $comp = Get-Tier3BrowserComponents
+        @($comp | Where-Object { $_ -like 'chromium-*' }).Count               | Should -BeGreaterThan 0
+        @($comp | Where-Object { $_ -like 'chromium_headless_shell-*' }).Count | Should -BeGreaterThan 0
     }
 
     It 'PASS: no prerequisite is optional — every item is must-have' {

@@ -744,34 +744,58 @@ function Get-Tier3SegmentRecord {
 
 # ---- the live run: scaffold -> prompt -> headless claude -> checks -> run-result -------------
 
-# Best-effort: make sure Playwright's Chromium is in the (machine-global) browser cache BEFORE
-# the AI reaches its epic-end e2e gate. Without it the workflow discovers a missing browser
-# mid-run and downloads it under time pressure — and a headless session can end before that
-# download finishes, stalling the whole run at the first epic (exactly what truncated the
-# release build). Setup.ps1 also warms it, but this covers -SkipSetup and resumed runs too.
-# Idempotent (a no-op when already cached) and never throws — on failure the AI still installs
-# it itself, as before. Writes a small log next to the run for diagnosis.
+# Best-effort: make sure every Chromium component the e2e gate launches is in the (machine-global)
+# browser cache BEFORE the AI reaches its epic-end gate — the exact build the app's own Playwright
+# resolves, complete with its headless shell, so the gate REUSES the cache. Without that the
+# workflow discovers a missing browser mid-run and downloads it under time pressure, and a headless
+# session can end before the download finishes, stalling the run at the first epic (exactly what
+# truncated the release build). Setup.ps1 also warms it; this covers -SkipSetup and resumed runs.
+# Idempotent (a no-op when the cache is already complete) and never throws — on failure the AI
+# still installs it itself, as before. Writes a small log next to the run for diagnosis.
 function Install-Tier3Browser {
     [CmdletBinding()]
     param([string]$LogPath)
-    # Pin to the version the template's app uses (see Get-Tier3PlaywrightVersion in Setup.ps1) so
-    # we warm the SAME Chromium build the app pins, not a mismatched 'latest'. Duplicated here as a
-    # fallback so the driver stays runnable standalone (e.g. under its own Pester tests).
-    $ver = if ($env:TIER3_PLAYWRIGHT_VERSION) { $env:TIER3_PLAYWRIGHT_VERSION } else { '1.59.1' }
-    try {
-        # Drop a stale __dirlock/orphan zip first (a killed install leaves one behind and it blocks
-        # every later install). Uses Setup.ps1's helper when it's loaded at runtime; a no-op in
-        # standalone tests where Setup isn't dot-sourced.
-        if (Get-Command Clear-PlaywrightInstallLock -ErrorAction SilentlyContinue) { Clear-PlaywrightInstallLock }
-        if ($IsWindows) { $out = & cmd.exe /c "npx --yes @playwright/test@$ver install chromium 2>&1" }
-        else            { $out = & npx --yes "@playwright/test@$ver" install chromium 2>&1 }
-        if ($LogPath) { Set-Content -Path $LogPath -Value (($out | Out-String).Trim()) -Encoding utf8 }
-        return ($LASTEXITCODE -eq 0)
+    $log = [System.Collections.Generic.List[string]]::new()
+    $ok  = $false
+    # Delegate to Setup.ps1 when it's in scope (Run-QATests dot-sources both) so the driver warms
+    # EXACTLY the version and components setup verifies — one source of truth. Duplicating a pinned
+    # version here is what would let the two drift and hand the gate a build it never launches.
+    # Setup's installer already clears a stale __dirlock and re-verifies the executable itself.
+    if (Get-Command Install-PlaywrightChromium -ErrorAction SilentlyContinue) {
+        try {
+            $log.Add("resolved @playwright/test $(Get-Tier3PlaywrightVersion); needs $((Get-Tier3BrowserComponents) -join ', ')")
+            if (Test-PlaywrightChromium) {
+                $log.Add('cache already complete — the e2e gate will launch from it, nothing to fetch')
+                $ok = $true
+            }
+            else {
+                $log.Add("missing: $(@(Get-MissingPlaywrightComponents) -join ', ') — installing")
+                Install-PlaywrightChromium
+                $ok = Test-PlaywrightChromium
+                $log.Add($(if ($ok) { 'cache complete after install' } else { "still missing after install: $(@(Get-MissingPlaywrightComponents) -join ', ')" }))
+            }
+        }
+        catch { $log.Add("playwright install failed: $($_.Exception.Message)") }
     }
-    catch {
-        if ($LogPath) { Set-Content -Path $LogPath -Value "playwright install failed: $($_.Exception.Message)" -Encoding utf8 }
-        return $false
+    else {
+        # Standalone fallback (driver loaded without Setup.ps1, e.g. its own Pester tests): install
+        # the floor of the template's range, asking for the OS deps too and retrying without them.
+        $ver = if ($env:TIER3_PLAYWRIGHT_VERSION) { $env:TIER3_PLAYWRIGHT_VERSION } else { '1.59.1' }
+        $log.Add("Setup.ps1 not loaded — falling back to @playwright/test@$ver")
+        foreach ($argList in @(@('install', '--with-deps', 'chromium'), @('install', 'chromium'))) {
+            $joined = $argList -join ' '
+            try {
+                if ($IsWindows) { $out = & cmd.exe /c "npx --yes @playwright/test@$ver $joined 2>&1" }
+                else            { $out = & npx --yes "@playwright/test@$ver" @argList 2>&1 }
+                $log.Add("`$ npx --yes @playwright/test@$ver $joined (exit $LASTEXITCODE)")
+                $log.Add((($out | Out-String).Trim()))
+                if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            }
+            catch { $log.Add("npx --yes @playwright/test@$ver $joined failed: $($_.Exception.Message)") }
+        }
     }
+    if ($LogPath) { Set-Content -Path $LogPath -Value (($log -join [Environment]::NewLine).Trim()) -Encoding utf8 }
+    return $ok
 }
 
 function Invoke-Tier3LiveRun {
