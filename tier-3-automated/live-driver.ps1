@@ -752,11 +752,25 @@ function Get-Tier3SegmentRecord {
 # truncated the release build). Setup.ps1 also warms it; this covers -SkipSetup and resumed runs.
 # Idempotent (a no-op when the cache is already complete) and never throws — on failure the AI
 # still installs it itself, as before. Writes a small log next to the run for diagnosis.
+#
+# -TemplateRoot is the checkout this run builds against, and it must be passed: the version to warm
+# comes from THAT app's lockfile. Without it the resolver falls back to the declared range's newest
+# published match (^1.59.1 -> 1.62.0 -> chromium-1234) while the app's own `npm install` lands the
+# locked 1.59.1 -> chromium-1217 — so the pre-warm reports a complete cache for a build the e2e gate
+# never launches, and the gate downloads its browser mid-epic. That is the precise failure this
+# function exists to prevent, and the paths it is meant to cover (-SkipSetup, a resumed run, the
+# driver loaded on its own) are exactly the ones where setup has NOT already aimed the resolver.
 function Install-Tier3Browser {
     [CmdletBinding()]
-    param([string]$LogPath)
+    param([string]$LogPath, [string]$TemplateRoot)
     $log = [System.Collections.Generic.List[string]]::new()
     $ok  = $false
+    # Aim the version resolver at this run's template before anything reads it. Re-aiming also drops
+    # any version memoised for another template (e.g. a dev run following a release one).
+    if ($TemplateRoot -and (Get-Command Set-Tier3TemplateRoot -ErrorAction SilentlyContinue)) {
+        Set-Tier3TemplateRoot -Path $TemplateRoot
+        $log.Add("aimed at the template this run builds: $TemplateRoot")
+    }
     # Delegate to Setup.ps1 when it's in scope (Run-QATests dot-sources both) so the driver warms
     # EXACTLY the version and components setup verifies — one source of truth. Duplicating a pinned
     # version here is what would let the two drift and hand the gate a build it never launches.
@@ -779,20 +793,18 @@ function Install-Tier3Browser {
     }
     else {
         # Standalone fallback (driver loaded without Setup.ps1, e.g. its own Pester tests): install
-        # the floor of the template's range, asking for the OS deps too and retrying without them.
+        # the floor of the template's range. Browser binary only — never `--with-deps` (see
+        # Install-PlaywrightChromium in Setup.ps1: it needs root and hangs on a sudo prompt).
         $ver = if ($env:TIER3_PLAYWRIGHT_VERSION) { $env:TIER3_PLAYWRIGHT_VERSION } else { '1.59.1' }
         $log.Add("Setup.ps1 not loaded — falling back to @playwright/test@$ver")
-        foreach ($argList in @(@('install', '--with-deps', 'chromium'), @('install', 'chromium'))) {
-            $joined = $argList -join ' '
-            try {
-                if ($IsWindows) { $out = & cmd.exe /c "npx --yes @playwright/test@$ver $joined 2>&1" }
-                else            { $out = & npx --yes "@playwright/test@$ver" @argList 2>&1 }
-                $log.Add("`$ npx --yes @playwright/test@$ver $joined (exit $LASTEXITCODE)")
-                $log.Add((($out | Out-String).Trim()))
-                if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-            }
-            catch { $log.Add("npx --yes @playwright/test@$ver $joined failed: $($_.Exception.Message)") }
+        try {
+            if ($IsWindows) { $out = & cmd.exe /c "npx --yes @playwright/test@$ver install chromium 2>&1" }
+            else            { $out = & npx --yes "@playwright/test@$ver" install chromium 2>&1 }
+            $log.Add("`$ npx --yes @playwright/test@$ver install chromium (exit $LASTEXITCODE)")
+            $log.Add((($out | Out-String).Trim()))
+            if ($LASTEXITCODE -eq 0) { $ok = $true }
         }
+        catch { $log.Add("npx --yes @playwright/test@$ver install chromium failed: $($_.Exception.Message)") }
     }
     if ($LogPath) { Set-Content -Path $LogPath -Value (($log -join [Environment]::NewLine).Trim()) -Encoding utf8 }
     return $ok
@@ -830,7 +842,9 @@ function Invoke-Tier3LiveRun {
 
     # Warm the Playwright browser cache before driving the AI (see Install-Tier3Browser). Done
     # before the run timer starts so this one-off download is never charged to build time.
-    Install-Tier3Browser -LogPath (Join-Path $LiveDir 'playwright-install.log') | Out-Null
+    # -TemplateRoot is mandatory in spirit: it's what pins the version warmed to the one THIS app
+    # installs, on the -SkipSetup / resume paths where setup hasn't already aimed the resolver.
+    Install-Tier3Browser -LogPath (Join-Path $LiveDir 'playwright-install.log') -TemplateRoot $TemplateRoot | Out-Null
 
     $timer = New-Tier3Timer -LiveDir $LiveDir -RunId $RunId
     $timer.Start('run', 'run')    | Out-Null

@@ -155,6 +155,31 @@ Describe 'Setup — probing (never installs)' {
         ($pw.ContainsKey('optional') -and $pw.optional) | Should -BeFalse   # must be present to run
     }
 
+    It 'FAIL-guard: the browser install asks for browser binaries only, never the OS deps' {
+        # `--with-deps` needs root, and in this non-interactive install a Linux/macOS runner stops on
+        # a sudo password prompt nothing can answer — setup HANGS rather than fails, with no timeout
+        # around it. The template dropped the same flag for the same reason (stadium-8 d643097) and
+        # its `test:e2e:install` is now a plain `playwright install chromium`; the hint we print, and
+        # the command we run, must both match what the app itself runs.
+        $prevV = $env:TIER3_PLAYWRIGHT_VERSION
+        $prevC = $env:TIER3_BROWSER_COMPONENTS
+        try {
+            $env:TIER3_PLAYWRIGHT_VERSION = '1.59.1'          # keeps resolution offline
+            $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217'   # stands in for the dry-run probe
+            $pw = Get-Tier3Prerequisites -IncludeTier3 $true | Where-Object { $_.name -like 'Playwright*' }
+            $pw.hint | Should -Match 'install chromium'
+            $pw.hint | Should -Not -Match 'with-deps'
+            # Comment lines dropped: prose explaining why the flag is absent must not satisfy — or
+            # break — an assertion about what the installer actually runs.
+            $code = ((Get-Command Install-PlaywrightChromium).Definition -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+            $code | Should -Not -Match 'with-deps'
+        }
+        finally {
+            $env:TIER3_PLAYWRIGHT_VERSION = $prevV
+            $env:TIER3_BROWSER_COMPONENTS = $prevC
+        }
+    }
+
     It 'PASS: the browser check demands the pinned build, both halves, each marked complete' {
         # The gate must LAUNCH from the cache, never fetch: a different build, a missing headless
         # shell, or a half-extracted dir all mean a mid-run download, so all three read as absent.

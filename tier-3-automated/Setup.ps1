@@ -269,10 +269,13 @@ function Test-PlaywrightChromium {
 # RESOLVED version above. Always an exact version, never the range: `cmd.exe /c` strips a bare `^`,
 # so a range spec would silently degrade to the range's floor here (which is why resolution happens
 # via `npm view` from PowerShell, where `^` survives quoting).
-# `--with-deps` also pulls the OS-level libraries the browser needs, on every platform including
-# Windows. That step can exit non-zero on its own (it wants elevation to touch system packages),
-# which would block a run over deps the machine may well already have — so we retry the plain
-# install: a browser without the extra OS deps still satisfies the gate, no browser does not.
+# Browser binaries ONLY — never `--with-deps`. Pulling the OS-level libraries needs root, and in a
+# non-interactive install like this one a Linux/macOS runner stops on a `sudo` password prompt
+# nothing can answer: setup hangs instead of failing, with no timeout to rescue it. The template
+# dropped the same flag for the same reason (stadium-8 `d643097`), and its `test:e2e:install` is now
+# a plain `playwright install chromium` — so this matches what the app itself runs. A browser that
+# installs but won't LAUNCH for want of system libs is the one-time manual
+# `sudo npx playwright install-deps chromium` documented in the template's Troubleshooting guide.
 # Hardened against the failure that silently truncated release runs at epic 1:
 #   * clears a stale __dirlock + orphan zips first (Clear-PlaywrightInstallLock), so a previous
 #     killed install can't block this one;
@@ -292,20 +295,13 @@ function Install-PlaywrightChromium {
             catch [System.Threading.AbandonedMutexException] { $owned = $true }   # prior holder died; we own it now
         }
 
-        # Ask for the OS deps first, then retry without them if that step is refused.
-        $err = $null
-        foreach ($argList in @(@('install', '--with-deps', 'chromium'), @('install', 'chromium'))) {
-            $cmd = "npx --yes @playwright/test@$ver $($argList -join ' ')"
-            Clear-PlaywrightInstallLock                   # drop any stale lock/zip before we start
-            if ($IsWindows) { & cmd.exe /c "$cmd" 2>&1 | Out-Null }
-            else            { & npx --yes "@playwright/test@$ver" @argList 2>&1 | Out-Null }
-            $exit = $LASTEXITCODE
-            Clear-PlaywrightInstallLock                   # don't leave a lock behind for the next run
-            if ($exit -eq 0) { $err = $null; break }
-            $err = "``$cmd`` exited $exit"
-        }
-
-        if ($err) { throw $err }
+        $cmd = "npx --yes @playwright/test@$ver install chromium"
+        Clear-PlaywrightInstallLock                   # drop any stale lock/zip before we start
+        if ($IsWindows) { & cmd.exe /c "$cmd" 2>&1 | Out-Null }
+        else            { & npx --yes "@playwright/test@$ver" install chromium 2>&1 | Out-Null }
+        $exit = $LASTEXITCODE
+        Clear-PlaywrightInstallLock                   # don't leave a lock behind for the next run
+        if ($exit -ne 0) { throw "``$cmd`` exited $exit" }
         $missing = @(Get-MissingPlaywrightComponents)
         if ($missing.Count) {
             throw "the install reported success but these components are still missing under $(Get-PlaywrightCacheDir): $($missing -join ', ')"
@@ -364,7 +360,7 @@ function Get-Tier3Prerequisites {
         # Name the @playwright/test version the build resolved to, not just the cached dirs: when a
         # warm targets the wrong version this line is what shows it at a glance in setup.log.
         $pwVer     = if ($chromium) { "for @playwright/test $(Get-Tier3PlaywrightVersion) — cached: $((Get-Tier3BrowserComponents) -join ', ')" } else { $null }
-        $items.Add(@{ name = 'Playwright browser (Chromium)'; present = $chromium; version = $pwVer; requiredFor = 'the epic-end Playwright (e2e) gate in Tier 3 live runs'; installable = $true; hint = "npx --yes @playwright/test@$(Get-Tier3PlaywrightVersion) install --with-deps chromium  (missing: $($pwMissing -join ', '))"; install = { Install-PlaywrightChromium }; verify = { Test-PlaywrightChromium } })
+        $items.Add(@{ name = 'Playwright browser (Chromium)'; present = $chromium; version = $pwVer; requiredFor = 'the epic-end Playwright (e2e) gate in Tier 3 live runs'; installable = $true; hint = "npx --yes @playwright/test@$(Get-Tier3PlaywrightVersion) install chromium  (missing: $($pwMissing -join ', '))"; install = { Install-PlaywrightChromium }; verify = { Test-PlaywrightChromium } })
     }
 
     return $items

@@ -350,3 +350,109 @@ Describe 'Build check — recorded, never gating' {
         Remove-Item $work -Recurse -Force
     }
 }
+
+Describe 'Browser pre-warm — aimed at the template THIS run builds' {
+    # The regression this guards: the driver's pre-warm resolved the Playwright version from the
+    # DECLARED RANGE whenever setup hadn't already aimed it — which is exactly the set of paths the
+    # pre-warm exists to cover (-SkipSetup, a resumed run, the driver loaded on its own). It then
+    # warmed the range's newest Chromium (^1.59.1 -> 1.62.0 -> chromium-1234), reported a complete
+    # cache, and the app installed its LOCKED 1.59.1 -> chromium-1217: a browser download mid-epic,
+    # under time pressure, in a headless session that can end before it finishes.
+    #
+    # Every test here is offline: the cache is faked and complete (so the pre-warm takes its
+    # "nothing to fetch" branch and never installs), and TIER3_BROWSER_COMPONENTS stands in for the
+    # `--dry-run` component probe. What's asserted is the VERSION the pre-warm resolved, read back
+    # from the log it writes.
+    BeforeAll {
+        # Setup.ps1 supplies Set-Tier3TemplateRoot / the resolver the pre-warm delegates to; loading
+        # it here is what puts the driver on its real (delegating) path rather than the fallback.
+        . (Join-Path $PSScriptRoot '..' 'Setup.ps1')
+
+        # A function's source with comment lines dropped — so an assertion about what a function RUNS
+        # isn't satisfied (or broken) by prose explaining why it doesn't run it.
+        function Get-FunctionCode {
+            param([string]$Name)
+            return (((Get-Command $Name).Definition -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
+        }
+    }
+
+    BeforeEach {
+        $script:cache = Join-Path ([System.IO.Path]::GetTempPath()) ("pw-cache-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:cache -Force | Out-Null
+        # A complete chromium-1217: the INSTALLATION_COMPLETE marker Playwright reuses on, plus a
+        # real executable — the two things Test-PlaywrightChromium demands before it says "ready".
+        $exe = Join-Path (Join-Path $script:cache 'chromium-1217') (Get-PlaywrightChromiumExeRelativePaths)[0]
+        New-Item -ItemType Directory -Path (Split-Path $exe -Parent) -Force | Out-Null
+        Set-Content -Path $exe -Value 'binary' -Encoding utf8
+        Set-Content -Path (Join-Path (Join-Path $script:cache 'chromium-1217') 'INSTALLATION_COMPLETE') -Value '' -Encoding utf8
+
+        $script:prevCache = $env:PLAYWRIGHT_BROWSERS_PATH
+        $script:prevComp  = $env:TIER3_BROWSER_COMPONENTS
+        $script:prevVer   = $env:TIER3_PLAYWRIGHT_VERSION
+        $env:PLAYWRIGHT_BROWSERS_PATH = $script:cache
+        $env:TIER3_BROWSER_COMPONENTS = 'chromium-1217'
+        $env:TIER3_PLAYWRIGHT_VERSION = $null
+        Set-Tier3TemplateRoot -Path $null      # start unaimed, like a -SkipSetup run
+
+        $script:logDir = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-pwlog-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:logDir -Force | Out-Null
+        $script:logPath = Join-Path $script:logDir 'playwright-install.log'
+
+        # A template whose app LOCKS 1.60.2 — inside the declared ^1.59.1 range but not its newest,
+        # so resolving the range instead of the lock gives a visibly different answer.
+        $script:tmpl = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tmpl-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path (Join-Path $script:tmpl 'web') -Force | Out-Null
+        $lock = @{ lockfileVersion = 3; packages = @{ '' = @{ name = 'web' }; 'node_modules/@playwright/test' = @{ version = '1.60.2' } } }
+        Set-Content -Path (Join-Path (Join-Path $script:tmpl 'web') 'package-lock.json') -Value ($lock | ConvertTo-Json -Depth 8) -Encoding utf8
+    }
+    AfterEach {
+        Set-Tier3TemplateRoot -Path $null      # don't leak a root into the next test
+        $env:PLAYWRIGHT_BROWSERS_PATH = $script:prevCache
+        $env:TIER3_BROWSER_COMPONENTS = $script:prevComp
+        $env:TIER3_PLAYWRIGHT_VERSION = $script:prevVer
+        Remove-Item $script:cache  -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $script:logDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item $script:tmpl   -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'PASS: -TemplateRoot pins the pre-warm to the version that template LOCKS' {
+        Install-Tier3Browser -LogPath $script:logPath -TemplateRoot $script:tmpl | Out-Null
+        (Get-Content $script:logPath -Raw) | Should -Match 'resolved @playwright/test 1\.60\.2'
+        Get-Tier3PlaywrightVersion | Should -Be '1.60.2'      # and it stays aimed for the run
+    }
+
+    It 'FAIL-guard: the run''s template overrides a version memoised for a DIFFERENT one' {
+        # A dev run following a release one (or vice versa) must not inherit the previous pin —
+        # that would warm the other channel's browser and stall this run's gate.
+        $other = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tmpl-" + [Guid]::NewGuid().ToString('N'))
+        try {
+            New-Item -ItemType Directory -Path (Join-Path $other 'web') -Force | Out-Null
+            $lock = @{ lockfileVersion = 3; packages = @{ '' = @{ name = 'web' }; 'node_modules/@playwright/test' = @{ version = '1.59.1' } } }
+            Set-Content -Path (Join-Path (Join-Path $other 'web') 'package-lock.json') -Value ($lock | ConvertTo-Json -Depth 8) -Encoding utf8
+            Set-Tier3TemplateRoot -Path $other
+            Get-Tier3PlaywrightVersion | Should -Be '1.59.1'          # the stale pin is live...
+
+            Install-Tier3Browser -LogPath $script:logPath -TemplateRoot $script:tmpl | Out-Null
+            (Get-Content $script:logPath -Raw) | Should -Match 'resolved @playwright/test 1\.60\.2'
+            Get-Tier3PlaywrightVersion | Should -Be '1.60.2'          # ...and this run re-aimed it
+        }
+        finally { Remove-Item $other -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    It 'PASS: the pre-warm still runs (and logs) when no template root is given' {
+        # Backwards-compatible: an explicit env pin keeps the old argument-less behaviour working.
+        $env:TIER3_PLAYWRIGHT_VERSION = '1.60.2'
+        { Install-Tier3Browser -LogPath $script:logPath | Out-Null } | Should -Not -Throw
+        (Get-Content $script:logPath -Raw) | Should -Match 'resolved @playwright/test 1\.60\.2'
+    }
+
+    It 'FAIL-guard: the pre-warm never asks for OS-level deps (the silent sudo hang)' {
+        # `--with-deps` needs root: in this non-interactive install a Linux/macOS runner stops on a
+        # sudo password prompt nothing can answer, so setup HANGS rather than fails — and there is no
+        # timeout around it. The template dropped the same flag for the same reason (stadium-8
+        # d643097); neither install path here may reintroduce it.
+        Get-FunctionCode 'Install-Tier3Browser'       | Should -Not -Match 'with-deps'
+        Get-FunctionCode 'Install-PlaywrightChromium' | Should -Not -Match 'with-deps'
+        Get-FunctionCode 'Install-PlaywrightChromium' | Should -Match 'install chromium'
+    }
+}
