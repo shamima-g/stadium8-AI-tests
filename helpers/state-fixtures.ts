@@ -18,6 +18,7 @@ import path from 'node:path';
 // Mirrors epic-state.js EPIC_PHASES (the single source of truth in the template).
 export type EpicPhase =
   | 'PLAN'
+  | 'READY-TO-BUILD'
   | 'BUILD'
   | 'EPIC-END'
   | 'MANUAL-TEST'

@@ -12,6 +12,30 @@ const path = require('path');
 
 const QA_ROOT = path.resolve(__dirname, '..');
 const TARGETS_PATH = path.join(QA_ROOT, 'targets.json');
+const TARGETS_DIR = path.join(QA_ROOT, '.targets');
+
+/**
+ * Ensure the throwaway-checkout dir exists AND is marked CommonJS.
+ *
+ * `.targets/` lives inside this suite, whose own package.json declares
+ * `"type": "module"`. Without a boundary, Node resolves that field when it loads
+ * a cloned template's CommonJS script (`.claude/scripts/**.js`, which use
+ * `require`/`module.exports`) — walking up past `.targets/` to the suite root — and
+ * treats the script as ESM, so it throws `require is not defined` at load. Dropping
+ * a `{"type":"commonjs"}` marker at `.targets/` stops that walk-up at the checkout
+ * boundary, so template scripts load as the CommonJS they are. Vitest's own `.ts`
+ * tests are transformed by Vite regardless, so this marker never affects them.
+ *
+ * Idempotent: safe to call before every clone. Returns the dir.
+ */
+function ensureTargetsDir(dir = TARGETS_DIR) {
+  fs.mkdirSync(dir, { recursive: true });
+  const marker = path.join(dir, 'package.json');
+  if (!fs.existsSync(marker)) {
+    fs.writeFileSync(marker, JSON.stringify({ type: 'commonjs' }, null, 2) + '\n');
+  }
+  return dir;
+}
 
 /** @typedef {{ repo: string, contract: string, description?: string }} Target */
 
@@ -49,4 +73,4 @@ function resolveTarget(name, file = TARGETS_PATH) {
   return { name, ...t };
 }
 
-module.exports = { loadTargets, targetNames, resolveTarget, TARGETS_PATH, QA_ROOT };
+module.exports = { loadTargets, targetNames, resolveTarget, ensureTargetsDir, TARGETS_PATH, TARGETS_DIR, QA_ROOT };

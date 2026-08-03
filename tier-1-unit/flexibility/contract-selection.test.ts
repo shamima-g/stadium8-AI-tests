@@ -41,8 +41,10 @@ describe('the per-target contracts exist and are well-formed', () => {
     });
   }
 
-  it('PASS: the release contract matches the documented six-stage order', () => {
+  it('PASS: the release contract matches the documented seven-stage order', () => {
     const c = JSON.parse(fs.readFileSync(contractPathFor('release'), 'utf8'));
-    expect(c.stages).toEqual(['PLAN', 'BUILD', 'EPIC-END', 'MANUAL-TEST', 'COMPLETE-ON-BRANCH', 'COMPLETE']);
+    // Independent hand-pinned oracle (v1.2.0 added READY-TO-BUILD) — deliberately a
+    // literal, not a re-read of the file under test, so it can still go red on drift.
+    expect(c.stages).toEqual(['PLAN', 'READY-TO-BUILD', 'BUILD', 'EPIC-END', 'MANUAL-TEST', 'COMPLETE-ON-BRANCH', 'COMPLETE']);
   });
 });

@@ -121,9 +121,14 @@ describe('state.json — transition graph is well-formed', () => {
 });
 
 describe('state.json — enums match the documented epic-branch contract (drift guard)', () => {
-  it('PASS: EPIC_PHASES equals the documented six-stage list', () => {
+  it('PASS: EPIC_PHASES equals the documented seven-stage list', () => {
+    // Hand-pinned literal, NOT read from the contract — this is the human tripwire
+    // (workflow-tests.md §13.1/§13.3). A phase change must fail here and force a
+    // deliberate hand-edit + triage. v1.2.0 added READY-TO-BUILD (the /plan
+    // plan-ahead park, between PLAN and BUILD) — see CHANGELOG.md [1.2.0].
     expect(EPIC_PHASES).toEqual([
       'PLAN',
+      'READY-TO-BUILD',
       'BUILD',
       'EPIC-END',
       'MANUAL-TEST',
