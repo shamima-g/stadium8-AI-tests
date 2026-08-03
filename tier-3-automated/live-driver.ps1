@@ -114,6 +114,56 @@ without stopping. The app must build (npm run build passes).
 "@
 }
 
+# Compose the PLAN-A entry prompt (Scenario = 'plan'). Same autonomous, non-interactive
+# contract as Get-Tier3Prompt, but it drives the plan-ahead command (/plan) through its full
+# choreography so its live behaviours can be checked: build the FIRST epic, then PLAN — not
+# build — the next epics (one already outlined at setup, one brand-new, one that depends on an
+# as-yet-unbuilt epic), parking each ready to build; then build a parked epic to prove the
+# READY-TO-BUILD → BUILD handoff resumes straight into BUILD with no re-planning.
+function Get-Tier3PlanPrompt {
+    [CmdletBinding()]
+    param([string]$AnswersFileName = 'TIER3-ANSWERS.json')
+    return @"
+You are in a freshly scaffolded Stadium 8 workflow project. Follow CLAUDE.md and .claude/
+exactly, use the project's conventions (Shadcn UI, the shared API client, centralised styling,
+a role on every story, plain-language checklists), and work test-first.
+
+This is an AUTOMATED, NON-INTERACTIVE run. There is NO human at the approval gates. Whenever
+the workflow asks you to approve something or make a choice (project facts, sign-in, a story
+list, a brief, the hands-on checklist, a merge), read the pre-planned answers in
+``$AnswersFileName`` at the repo root and proceed with them WITHOUT stopping. Never wait for
+input. Sign-in uses the BFF pattern; build against mock data derived from the OpenAPI specs.
+
+Do these steps IN ORDER. Do NOT skip ahead, and do NOT build any epic you were not told to build:
+
+1. Run ``/start``. Set up the project from the documents in documentation/ (project facts +
+   the epic plan), then build ONLY THE FIRST epic all the way through EPIC-END. When the first
+   epic is done, STOP building — do NOT ``/continue`` into the next epic.
+
+2. Run ``/plan`` and plan the NEXT epic that is already outlined in the epic plan. Break its
+   stories down, approve them from the answers file, and PARK it ready to build. Do not build it.
+
+3. Run ``/plan`` again and plan a BRAND-NEW epic that is NOT in the original epic plan: a
+   "User Settings" epic — a settings page where a signed-in user can view and change their own
+   display name. Approve its brief and its story list from the answers file, and PARK it ready
+   to build. Do not build it.
+
+4. Run ``/plan`` again and plan an epic that DEPENDS ON the epic you parked in step 2 (it builds
+   on that epic and must not merge before it): a "Saved Views" epic that lets a user save and
+   reuse a named filter over the parked epic's screen. Record the dependency, and PARK it ready
+   to build. Do not build it.
+
+5. Run ``/status``, then regenerate the dashboard: ``node .claude/scripts/generate-dashboard-html.js``.
+
+6. Run ``/start`` again, pick the epic you PARKED in step 2, and build it. It should resume
+   straight into BUILD from where planning left off, with NO re-planning. Build it through
+   EPIC-END, then STOP.
+
+Carry straight on from one step to the next without waiting. Anything that must build should
+build (npm run build passes).
+"@
+}
+
 # ---- headless Claude, ported from ClaudeCli.Run -------------------------------------------
 
 # Kill a process tree (claude spawns a node child) on Windows/Unix.
@@ -742,6 +792,408 @@ function Get-Tier3SegmentRecord {
     }
 }
 
+# ---- PLAN-A scenario: plan an epic ahead, park it ready to build (record-only) --------------
+#
+# The plan-ahead command's live behaviours (worktree planning, parking on `main` at
+# READY-TO-BUILD, creating NO epic branch, resuming straight into BUILD) are read from the
+# traces a PLAN-A run leaves in git + generated-docs. The PURE functions below get the
+# good/broken Pester coverage; the IO gatherer is best-effort like Get-Tier3EpicStats. Every
+# rule id is recorded in the run's rulesMissed, never used to fail the run.
+
+# Pure: the epic slugs in an epic-plan.md's "## Epics" table (the first backticked `<slug>`
+# per row). Diffing this set between the setup commit and HEAD tells an epic OUTLINED at
+# project setup from a BRAND-NEW one introduced later by /plan.
+function Get-Tier3PlanEpicSlugs {
+    [CmdletBinding()]
+    param([string]$Markdown)
+    $slugs = [System.Collections.Generic.List[string]]::new()
+    if ([string]::IsNullOrWhiteSpace($Markdown)) { return @() }
+    $inEpics = $false
+    foreach ($line in ($Markdown -split "`r?`n")) {
+        if ($line -match '^\s*##\s+Epics\b') { $inEpics = $true; continue }
+        elseif ($line -match '^\s*##\s') { $inEpics = $false; continue }   # the next section ends the table
+        if (-not $inEpics -or $line -notmatch '^\s*\|') { continue }        # table rows only
+        $m = [regex]::Match($line, '`([a-z0-9]+(?:-[a-z0-9]+)*)`')          # the row's OWN slug is first
+        if ($m.Success -and -not $slugs.Contains($m.Groups[1].Value)) { $slugs.Add($m.Groups[1].Value) }
+    }
+    return @($slugs)
+}
+
+# Pure + testable: given the facts a PLAN-A run left behind, the plan rule ids it violated.
+# Facts shape (see Get-Tier3PlanFacts):
+#   parkedEpics          @({ slug; storyCount; dependsOn=@(); onMain; hasEpicBranch; hasBuildCommits })
+#   leftoverPlanBranches @()  leftoverWorktrees @()  projectFactsChanged bool
+#   plannedNewEpic bool  resumedToBuild bool  expectNewEpic/expectBlocked/expectResume bool
+function Get-Tier3PlanRulesMissed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Facts)
+    $missed = [System.Collections.Generic.List[string]]::new()
+    $parked = @($Facts.parkedEpics)
+
+    if ($parked.Count -eq 0) { $missed.Add('plan-no-parked-epic') }         # AC4 — nothing parked
+
+    foreach ($e in $parked) {
+        if ($e.hasEpicBranch)         { $missed.Add('plan-created-epic-branch') }  # AC1 — build branch cut
+        if ($e.hasBuildCommits)       { $missed.Add('plan-build-committed') }      # AC1 — story code committed
+        if ([int]$e.storyCount -le 0) { $missed.Add('plan-stories-missing') }      # AC2 — no story breakdown
+        if (-not $e.onMain)           { $missed.Add('plan-not-on-main') }          # AC4 — not parked on main
+    }
+
+    if (@($Facts.leftoverPlanBranches).Count -gt 0 -or @($Facts.leftoverWorktrees).Count -gt 0) {
+        $missed.Add('plan-worktree-leftover')                                       # AC4 — throwaway not torn down
+    }
+    if ($Facts.projectFactsChanged) { $missed.Add('plan-facts-changed') }           # AC11 — /plan touched project.md
+
+    # Optional behaviours the scenario asked for — flag only when it drove them.
+    if ($Facts.expectNewEpic -and -not $Facts.plannedNewEpic) { $missed.Add('plan-new-epic-missing') }   # AC3b
+    if ($Facts.expectBlocked -and -not (@($parked | Where-Object { @($_.dependsOn).Count -gt 0 }).Count -gt 0)) {
+        $missed.Add('plan-blocked-ahead-missing')                                   # AC13 — depends-on-unbuilt path
+    }
+    if ($Facts.expectResume -and -not $Facts.resumedToBuild) { $missed.Add('plan-resume-missing') }      # AC5
+
+    return @($missed | Select-Object -Unique)
+}
+
+# Best-effort: read a parsed state.json for one epic (or $null).
+function Get-Tier3EpicState {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Scaffold, [Parameter(Mandatory)][string]$Slug)
+    $p = Join-Path $Scaffold "generated-docs/epics/$Slug/state.json"
+    if (-not (Test-Path $p)) { return $null }
+    try { return (Get-Content -Raw -Path $p | ConvertFrom-Json) } catch { return $null }
+}
+
+# Best-effort: is a path present on a git ref (e.g. 'main')? Used for "parked on main".
+function Test-Tier3OnRef {
+    [CmdletBinding()]
+    param([string]$Scaffold, [string]$Ref, [string]$RelPath)
+    try { & git -C $Scaffold cat-file -e "${Ref}:${RelPath}" 2>$null; return ($LASTEXITCODE -eq 0) } catch { return $false }
+}
+
+# Best-effort: gather the facts a PLAN-A run leaves (git refs + generated-docs). Never throws
+# — missing git/epics yield empty facts, exactly like Get-Tier3EpicStats. -Expect selects
+# which optional behaviours the scenario drove (default: all three, as PLAN-A drives them).
+function Get-Tier3PlanFacts {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Scaffold,
+        [string]$WorktreeParent,
+        [hashtable]$Expect
+    )
+    $expect = if ($Expect) { $Expect } else { @{ expectNewEpic = $true; expectBlocked = $true; expectResume = $true } }
+
+    # Branches: an epic/<slug> means build started; a plan/<slug> left behind means teardown missed.
+    $branches = @(); try { $branches = @(& git -C $Scaffold branch "--format=%(refname:short)" 2>$null) } catch { }
+    $epicBranches = @($branches | Where-Object { $_ -match '^epic/' })
+    $leftoverPlanBranches = @($branches | Where-Object { $_ -match '^plan/' })
+
+    # Build commits: feat(<slug>[/story-N]) subjects tell which epics produced story code.
+    $subjects = @(); try { $subjects = @(& git -C $Scaffold log "--format=%s" 2>$null) } catch { }
+    $buildSlugs = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($s in $subjects) { if ($s -match '^\s*feat\(([^)/]+)(?:/[^)]*)?\)') { [void]$buildSlugs.Add($Matches[1]) } }
+
+    # Leftover throwaway worktrees: git's own list, plus sibling ../<project>-plan-* directories.
+    $leftoverWorktrees = @()
+    try {
+        $wt = @(& git -C $Scaffold worktree list --porcelain 2>$null | Where-Object { $_ -match '^worktree ' } | ForEach-Object { ($_ -replace '^worktree ', '').Trim() })
+        $leftoverWorktrees += @($wt | Where-Object { $_ -match '-plan-[a-z0-9-]+/?$' })
+    } catch { }
+    if ($WorktreeParent -and (Test-Path $WorktreeParent)) {
+        $base = Split-Path -Leaf $Scaffold
+        foreach ($d in (Get-ChildItem -Path $WorktreeParent -Directory -ErrorAction SilentlyContinue)) {
+            if ($d.Name -like "$base-plan-*") { $leftoverWorktrees += $d.FullName }
+        }
+    }
+    $leftoverWorktrees = @($leftoverWorktrees | Select-Object -Unique)
+
+    # The setup commit (docs(project)) anchors "outlined at setup" and "project.md unchanged".
+    $setupCommit = $null
+    try {
+        $line = @(& git -C $Scaffold log "--format=%H|%s" 2>$null | Where-Object { $_ -match '\|\s*docs\(project\)' } | Select-Object -Last 1)
+        if ($line) { $setupCommit = ($line -split '\|', 2)[0] }
+    } catch { }
+
+    $projectFactsChanged = $false
+    if ($setupCommit) {
+        try { & git -C $Scaffold diff --quiet $setupCommit HEAD -- generated-docs/project.md 2>$null; $projectFactsChanged = ($LASTEXITCODE -ne 0) } catch { }
+    }
+
+    # New-vs-outlined: an epic present in the plan at HEAD but absent at the setup commit.
+    $setupSlugs = @(); $currentSlugs = @()
+    if ($setupCommit) {
+        try { $setupSlugs = @(Get-Tier3PlanEpicSlugs -Markdown ((& git -C $Scaffold show "${setupCommit}:generated-docs/epic-plan.md" 2>$null) -join "`n")) } catch { }
+    }
+    $planPath = Join-Path $Scaffold 'generated-docs/epic-plan.md'
+    if (Test-Path $planPath) { $currentSlugs = @(Get-Tier3PlanEpicSlugs -Markdown (Get-Content -Raw -Path $planPath)) }
+    $newEpicSlugs = @($currentSlugs | Where-Object { $setupSlugs -notcontains $_ })
+
+    # Prefer the 'main' ref for the parked-on-main check; fall back to HEAD when there's no main.
+    $hasMain = $false
+    try { & git -C $Scaffold rev-parse --verify --quiet main 2>$null | Out-Null; $hasMain = ($LASTEXITCODE -eq 0) } catch { }
+    $parkedRef = if ($hasMain) { 'main' } else { 'HEAD' }
+
+    $parked = [System.Collections.Generic.List[hashtable]]::new()
+    $resumedToBuild = $false
+    $epicsRoot = Join-Path $Scaffold 'generated-docs/epics'
+    if (Test-Path $epicsRoot) {
+        foreach ($d in (Get-ChildItem -Path $epicsRoot -Directory -ErrorAction SilentlyContinue)) {
+            $st = Get-Tier3EpicState -Scaffold $Scaffold -Slug $d.Name
+            if (-not $st) { continue }
+            $phase = [string](Get-JsonProp $st 'phase')
+            $storyCount = @(Get-ChildItem -Path (Join-Path $d.FullName 'stories') -Filter 'story-*.md' -File -ErrorAction SilentlyContinue).Count
+            $epicObj = Get-JsonProp $st 'epic'
+            $dependsOn = if ($epicObj) { @(Get-JsonProp $epicObj 'dependsOn' @()) } else { @() }
+            $hasBuild = $buildSlugs.Contains($d.Name)
+            if ($phase -eq 'READY-TO-BUILD') {
+                $onMain = Test-Tier3OnRef -Scaffold $Scaffold -Ref $parkedRef -RelPath "generated-docs/epics/$($d.Name)/state.json"
+                $parked.Add(@{
+                    slug = $d.Name; storyCount = $storyCount; dependsOn = @($dependsOn)
+                    onMain = $onMain
+                    hasEpicBranch = (@($epicBranches | Where-Object { $_ -eq "epic/$($d.Name)" }).Count -gt 0)
+                    hasBuildCommits = $hasBuild
+                })
+            }
+            # AC5 handoff: an epic that was planned (has stories) later produced build commits.
+            if ($hasBuild -and $storyCount -gt 0) { $resumedToBuild = $true }
+        }
+    }
+
+    return @{
+        parkedEpics          = @($parked)
+        leftoverPlanBranches = @($leftoverPlanBranches)
+        leftoverWorktrees    = @($leftoverWorktrees)
+        projectFactsChanged  = $projectFactsChanged
+        plannedNewEpic       = (@($newEpicSlugs).Count -gt 0)
+        newEpicSlugs         = @($newEpicSlugs)
+        resumedToBuild       = $resumedToBuild
+        expectNewEpic        = [bool]$expect.expectNewEpic
+        expectBlocked        = [bool]$expect.expectBlocked
+        expectResume         = [bool]$expect.expectResume
+    }
+}
+
+# ---- PLAN-B scenario: build one epic while planning the next, concurrently (record-only) ----
+#
+# The plan-ahead command's HEADLINE promise — plan the next epic in one session WHILE another
+# session builds an epic, neither disturbing the other, main staying consistent — needs two
+# live Claude sessions at once and a SHARED remote (that's the concurrency model: both talk
+# only through origin/main; without a remote /plan drops to its single-session fallback, which
+# is what PLAN-A covers). This section adds the bare-remote scaffold, the two prompts, the
+# concurrent launcher, and the deterministic (record-only) scoring. As with PLAN-A, the PURE
+# functions get good/broken Pester coverage; the live two-process orchestration is proven only
+# in a real run.
+
+# Real-git: turn a scaffolded working tree into a repo with a BARE origin it has pushed main to.
+# The AI never creates a remote (it only `git push origin HEAD` best-effort), so the harness must
+# stand origin up before the sessions run. Idempotent; best-effort — returns ok=$false, never throws.
+function New-Tier3BareRemote {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$WorkingDir, [Parameter(Mandatory)][string]$RemoteDir)
+    try {
+        & git -C $WorkingDir init -q 2>$null
+        & git -C $WorkingDir config user.email 'tier3@local' 2>$null
+        & git -C $WorkingDir config user.name  'Tier3 Harness' 2>$null
+        & git -C $WorkingDir add -A 2>$null
+        & git -C $WorkingDir commit -q -m 'chore: scaffold' 2>$null
+        & git -C $WorkingDir branch -M main 2>$null
+        if (-not (Test-Path $RemoteDir)) { New-Item -ItemType Directory -Path $RemoteDir -Force | Out-Null }
+        & git init --bare -q $RemoteDir 2>$null
+        & git -C $WorkingDir remote remove origin 2>$null
+        & git -C $WorkingDir remote add origin $RemoteDir 2>$null
+        & git -C $WorkingDir push -u origin main -q 2>$null
+        return @{ ok = (Test-Path (Join-Path $RemoteDir 'HEAD')); remote = $RemoteDir }
+    }
+    catch { return @{ ok = $false; remote = $RemoteDir; detail = $_.Exception.Message } }
+}
+
+# Real-git: a SECOND working tree for the planner, cloned from the shared bare remote — its own
+# tree, branch, and state, so "neither session disturbs the other" is genuinely observable.
+function New-Tier3PlannerClone {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$RemoteDir, [Parameter(Mandatory)][string]$PlannerDir)
+    try {
+        if (Test-Path $PlannerDir) { Remove-Item $PlannerDir -Recurse -Force }
+        & git clone -q $RemoteDir $PlannerDir 2>$null
+        & git -C $PlannerDir config user.email 'tier3-planner@local' 2>$null
+        & git -C $PlannerDir config user.name  'Tier3 Planner' 2>$null
+        return (Test-Path (Join-Path $PlannerDir '.git'))
+    }
+    catch { return $false }
+}
+
+# The bootstrap prompt (single session, before the concurrent pair): set the project up and
+# build ONLY the first epic through merge, so main carries the project + epic plan + one merged
+# epic and both concurrent sessions have a stable origin/main to branch from.
+function Get-Tier3ConcurrentBootstrapPrompt {
+    [CmdletBinding()]
+    param([string]$AnswersFileName = 'TIER3-ANSWERS.json')
+    return @"
+You are in a freshly scaffolded Stadium 8 workflow project with a git remote already set up
+(origin). Run ``/start`` and set the project up from the documents in documentation/ (project
+facts + the epic plan), then build ONLY THE FIRST epic all the way through EPIC-END and merge it
+to main. When the first epic is merged, STOP — do not build or plan any further epic.
+
+This is AUTOMATED and NON-INTERACTIVE: for every approval or choice (project facts, sign-in, the
+story list, the hands-on checklist, the merge) read the pre-planned answers in ``$AnswersFileName``
+at the repo root and proceed WITHOUT stopping. Push your work to origin as the workflow does.
+"@
+}
+
+# The BUILDER prompt (concurrent session A): build the next epic. Runs at the SAME TIME as the
+# planner. It must stay in its own lane — its epic branch — and never plan.
+function Get-Tier3ConcurrentBuilderPrompt {
+    [CmdletBinding()]
+    param([string]$AnswersFileName = 'TIER3-ANSWERS.json')
+    return @"
+You are in a Stadium 8 project on main, with a git remote (origin). ANOTHER session is planning
+the next epic AT THE SAME TIME as you — stay entirely in your own lane and do not disturb it.
+
+Run ``/start``, pick the NEXT epic that is ready to build, and build it fully through EPIC-END,
+then merge it to main. Do all your work on that epic's own ``epic/<slug>`` branch. Do NOT run
+``/plan``. Do NOT edit another epic's files. This is AUTOMATED and NON-INTERACTIVE: for every
+approval or choice, read the pre-planned answers in ``$AnswersFileName`` at the repo root and
+proceed WITHOUT stopping. When your epic is merged, STOP.
+"@
+}
+
+# The PLANNER prompt (concurrent session B): plan the next epic ahead and park it — WHILE the
+# builder builds. This is the session whose non-interference we are proving.
+function Get-Tier3ConcurrentPlannerPrompt {
+    [CmdletBinding()]
+    param([string]$AnswersFileName = 'TIER3-ANSWERS.json')
+    return @"
+You are in a Stadium 8 project on main, with a git remote (origin). ANOTHER session is BUILDING
+an epic AT THE SAME TIME as you. Run ``/plan`` to plan a BRAND-NEW epic ahead and PARK it ready
+to build, without building it: a "User Settings" epic — a settings page where a signed-in user
+can view and change their own display name. Approve its brief and story list from the answers
+file, and land the parked plan on main through the remote (origin), exactly as ``/plan`` does.
+
+Do NOT build anything. Do NOT run ``/start``. Do NOT touch the epic the other session is building.
+This is AUTOMATED and NON-INTERACTIVE: for every approval or choice, read the pre-planned answers
+in ``$AnswersFileName`` at the repo root and proceed WITHOUT stopping. When the epic is parked on
+main, STOP.
+"@
+}
+
+# Pure + testable: given the facts a PLAN-B run left, the concurrent rule ids it violated.
+# Facts shape (see Get-Tier3ConcurrentFacts):
+#   builtEpicSlug plannedEpicSlug (strings)  overlapSeconds (double)
+#   plannerTouchedBuildBranch fsckClean projectFactsChangedByPlanner builderCommitsPreserved
+#   plannerPlanOnMain (bools)  epicPlanRowsOnMain (@slugs)  blockedMergeRefused ($true/$false/$null)
+#   expectBlocked (bool)
+function Get-Tier3ConcurrentRulesMissed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Facts)
+    $missed = [System.Collections.Generic.List[string]]::new()
+
+    # AC7 — both sessions ran AND their wall-clock windows overlapped.
+    $bothRan = -not [string]::IsNullOrWhiteSpace([string]$Facts.builtEpicSlug) `
+        -and -not [string]::IsNullOrWhiteSpace([string]$Facts.plannedEpicSlug)
+    if (-not $bothRan -or [double]$Facts.overlapSeconds -le 0) { $missed.Add('plan-concurrent-ran') }
+
+    # AC8 — the planner never touched the builder's epic branch.
+    if ($Facts.plannerTouchedBuildBranch) { $missed.Add('plan-cross-disturb') }
+
+    # AC10 — main is intact and carries BOTH epics' records.
+    $rows = @($Facts.epicPlanRowsOnMain)
+    $hasBuilt   = ($Facts.builtEpicSlug   -and $rows -contains $Facts.builtEpicSlug)
+    $hasPlanned = ($Facts.plannedEpicSlug -and $rows -contains $Facts.plannedEpicSlug)
+    if (-not $Facts.fsckClean -or -not $hasBuilt -or -not $hasPlanned) { $missed.Add('plan-main-inconsistent') }
+
+    # AC11 — the planner did not change project-level facts.
+    if ($Facts.projectFactsChangedByPlanner) { $missed.Add('plan-facts-changed') }
+
+    # AC12 — no session lost committed work.
+    if (-not $Facts.builderCommitsPreserved -or -not $Facts.plannerPlanOnMain) { $missed.Add('plan-lost-work') }
+
+    # AC14 — a dependent epic couldn't merge before its dependency (only when the run tested it;
+    # $null means "not exercised" and never flags).
+    if ($Facts.expectBlocked -and ($Facts.blockedMergeRefused -eq $false)) { $missed.Add('plan-blocked-until-dep') }
+
+    return @($missed | Select-Object -Unique)
+}
+
+# Best-effort: gather PLAN-B facts from the shared remote + the builder tree after both sessions
+# finish. Session-known values (slugs, overlap) are passed in; git supplies main's final state.
+# Never throws — missing git yields empty/false facts.
+function Get-Tier3ConcurrentFacts {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RemoteDir,
+        [Parameter(Mandatory)][string]$BuilderDir,
+        [string]$BuiltEpicSlug,
+        [string]$PlannedEpicSlug,
+        [double]$OverlapSeconds = 0,
+        [hashtable]$Expect
+    )
+    $expect = if ($Expect) { $Expect } else { @{ expectBlocked = $false } }
+
+    # Refresh the builder tree's view of the remote so origin/main is the post-run truth.
+    try { & git -C $BuilderDir fetch origin -q 2>$null } catch { }
+
+    # Read a path as it stands on origin/main.
+    function Show-OnMain([string]$RelPath) {
+        try { return ((& git -C $BuilderDir show "origin/main:$RelPath" 2>$null) -join "`n") } catch { return $null }
+    }
+
+    $epicPlanRowsOnMain = @(Get-Tier3PlanEpicSlugs -Markdown (Show-OnMain 'generated-docs/epic-plan.md'))
+
+    # The planned epic is parked (READY-TO-BUILD) on main.
+    $plannerPlanOnMain = $false
+    if ($PlannedEpicSlug) {
+        $stateRaw = Show-OnMain "generated-docs/epics/$PlannedEpicSlug/state.json"
+        if ($stateRaw) { try { $plannerPlanOnMain = ([string]((($stateRaw | ConvertFrom-Json)).phase) -eq 'READY-TO-BUILD') } catch { } }
+    }
+
+    # The built epic's story code survived onto main (its feat commits are reachable from main).
+    $builderCommitsPreserved = $false
+    if ($BuiltEpicSlug) {
+        try {
+            $subjects = @(& git -C $BuilderDir log origin/main "--format=%s" 2>$null)
+            $builderCommitsPreserved = (@($subjects | Where-Object { $_ -match "^\s*feat\($([regex]::Escape($BuiltEpicSlug))(/|\))" }).Count -gt 0)
+        } catch { }
+    }
+
+    # The planner's work never leaked onto the builder's epic branch (a docs(plan) commit there
+    # would be cross-contamination). Absence is the clean signal.
+    $plannerTouchedBuildBranch = $false
+    if ($BuiltEpicSlug) {
+        try {
+            $branchSubjects = @(& git -C $BuilderDir log "origin/epic/$BuiltEpicSlug" "--format=%s" 2>$null)
+            $plannerTouchedBuildBranch = (@($branchSubjects | Where-Object { $_ -match '^\s*docs\(plan\)' }).Count -gt 0)
+        } catch { }
+    }
+
+    # project.md on main is unchanged from the bootstrap (the planner must not edit project facts).
+    $projectFactsChangedByPlanner = $false
+    try {
+        $setupLine = @(& git -C $BuilderDir log origin/main "--format=%H|%s" 2>$null | Where-Object { $_ -match '\|\s*docs\(project\)' } | Select-Object -Last 1)
+        if ($setupLine) {
+            $setupCommit = ($setupLine -split '\|', 2)[0]
+            & git -C $BuilderDir diff --quiet $setupCommit origin/main -- generated-docs/project.md 2>$null
+            $projectFactsChangedByPlanner = ($LASTEXITCODE -ne 0)
+        }
+    } catch { }
+
+    # The shared remote's object store is intact.
+    $fsckClean = $false
+    try { & git -C $RemoteDir fsck --no-progress 2>$null | Out-Null; $fsckClean = ($LASTEXITCODE -eq 0) } catch { }
+
+    return @{
+        builtEpicSlug                = $BuiltEpicSlug
+        plannedEpicSlug              = $PlannedEpicSlug
+        overlapSeconds               = [double]$OverlapSeconds
+        epicPlanRowsOnMain           = @($epicPlanRowsOnMain)
+        plannerPlanOnMain            = $plannerPlanOnMain
+        builderCommitsPreserved      = $builderCommitsPreserved
+        plannerTouchedBuildBranch    = $plannerTouchedBuildBranch
+        projectFactsChangedByPlanner = $projectFactsChangedByPlanner
+        fsckClean                    = $fsckClean
+        blockedMergeRefused          = $null
+        expectBlocked                = [bool]$expect.expectBlocked
+    }
+}
+
 # ---- the live run: scaffold -> prompt -> headless claude -> checks -> run-result -------------
 
 # Best-effort: make sure every Chromium component the e2e gate launches is in the (machine-global)
@@ -822,16 +1274,26 @@ function Invoke-Tier3LiveRun {
         [Parameter(Mandatory)][string]$RunId,
         [string]$Version = '0.1.0',
         [int]$TimeoutSeconds = 86400,
-        [string]$ResumeSessionId
+        [string]$ResumeSessionId,
+        [ValidateSet('build', 'plan', 'concurrent')][string]$Scenario = 'build'
     )
     $resuming = [bool]$ResumeSessionId
+
+    # PLAN-B is a two-session, shared-remote run with its own orchestration — delegate wholesale.
+    if ($Scenario -eq 'concurrent' -and -not $resuming) {
+        return (Invoke-Tier3ConcurrentRun -Model $Model -Benchmark $Benchmark -WorkingDir $WorkingDir `
+                -TemplateRoot $TemplateRoot -BenchmarkDir $BenchmarkDir -LiveDir $LiveDir -RunId $RunId `
+                -Version $Version -TimeoutSeconds $TimeoutSeconds)
+    }
+
     if ($resuming) {
         # Resume an interrupted run: reuse the existing scaffold, continue the same session.
         $prompt = Get-Tier3ResumePrompt
     }
     else {
         New-Tier3Scaffold -TemplateRoot $TemplateRoot -WorkingDir $WorkingDir -BenchmarkDir $BenchmarkDir | Out-Null
-        $prompt = Get-Tier3Prompt
+        # PLAN-A drives /plan through its park-ahead choreography; the default drives the straight build.
+        $prompt = if ($Scenario -eq 'plan') { Get-Tier3PlanPrompt } else { Get-Tier3Prompt }
     }
 
     if (-not (Test-Path $LiveDir)) { New-Item -ItemType Directory -Path $LiveDir -Force | Out-Null }
@@ -903,6 +1365,13 @@ function Invoke-Tier3LiveRun {
     $conf = Get-Tier3Conformance -Scaffold $WorkingDir -QaRoot $qaRoot
     $lintMissed = if ($conf.ran) { @($conf.rulesMissed) } else { @() }
 
+    # PLAN-A: score /plan's live behaviours from the traces it left (record-only).
+    $planMissed = @()
+    if ($Scenario -eq 'plan') {
+        $planFacts = Get-Tier3PlanFacts -Scaffold $WorkingDir -WorktreeParent (Split-Path -Parent $WorkingDir)
+        $planMissed = @(Get-Tier3PlanRulesMissed -Facts $planFacts)
+    }
+
     # Epics/stories created + per-epic build time (from the app's git history).
     $epicStats = Get-Tier3EpicStats -Scaffold $WorkingDir
 
@@ -920,20 +1389,28 @@ function Invoke-Tier3LiveRun {
     # partial run can never be 'conformed'.
     $rulesMissed = @()
     if (-not $built.ok) { $rulesMissed += 'did-not-build' }
-    if (-not $complete) { $rulesMissed += 'incomplete-build' }
+    # A PLAN-A run builds only some epics on purpose (it parks the rest), so partial ≠ defect there.
+    if (-not $complete -and $Scenario -ne 'plan') { $rulesMissed += 'incomplete-build' }
     $rulesMissed += $lintMissed
-    $conformed = ($built.ok -and -not $res.timedOut -and $complete -and $rulesMissed.Count -eq 0)
-    $buildResult = if ($res.timedOut) { 'timed-out' } elseif (-not $built.ok) { 'did-not-build' } elseif (-not $complete) { 'incomplete' } elseif ($conformed) { 'passed' } else { 'non-conforming' }
+    $rulesMissed += $planMissed
+    $rulesMissed = @($rulesMissed | Select-Object -Unique)
+    $conformed = ($built.ok -and -not $res.timedOut -and $rulesMissed.Count -eq 0 -and ($complete -or $Scenario -eq 'plan'))
+    # A PLAN-A run parks epics on purpose, so its partial build is expected — the 'incomplete'
+    # verdict/label (meant for a straight build that stalled) must not apply to it.
+    $isPlan = ($Scenario -eq 'plan')
+    $buildResult = if ($res.timedOut) { 'timed-out' } elseif (-not $built.ok) { 'did-not-build' } elseif (-not $complete -and -not $isPlan) { 'incomplete' } elseif ($conformed) { 'passed' } else { 'non-conforming' }
     # 'incomplete' is distinct from 'pass' and 'recorded-fail': what the run DID build may be
     # clean, but the app isn't finished — surfaced plainly instead of hidden under a green score.
     $verdict = if ($conformed) { 'pass' }
-        elseif (-not $complete -and $built.ok -and -not $res.timedOut -and @($lintMissed).Count -eq 0) { 'incomplete' }
+        elseif (-not $complete -and -not $isPlan -and $built.ok -and -not $res.timedOut -and @($lintMissed).Count -eq 0) { 'incomplete' }
         else { 'recorded-fail' }
     # Pass-rate: 1.0 only for a complete, conforming build; the honest epics-built/planned fraction
     # for an incomplete run (so 1-of-7 reads as 14%, not 100%); 0.0 for other failures.
     $passRate = if ($conformed) { 1.0 } elseif ($verdict -eq 'incomplete') { $completeness } else { 0.0 }
     $buildReason = if ($res.timedOut) { 'timed out' }
         elseif (-not $built.ok) { $built.detail }
+        elseif ($isPlan -and $conformed) { 'planned and parked epic(s) cleanly, all /plan checks passed' }
+        elseif ($isPlan) { 'plan checks missed: ' + (@($planMissed) -join ', ') }
         elseif (-not $complete) { "incomplete — built $epicsBuilt of $epicsPlanned planned epics before the run ended" }
         elseif ($conformed) { 'built and passed all rules' }
         else { 'built, but missed: ' + ($lintMissed -join ', ') }
@@ -955,6 +1432,7 @@ function Invoke-Tier3LiveRun {
         epics = $epicStats.epics
         tier3 = @{
             ran = $true; verdict = $verdict
+            scenario = $Scenario
             passRate = $passRate
             epicsPlanned = $epicsPlanned
             epicsBuilt = $epicsBuilt
@@ -966,5 +1444,238 @@ function Invoke-Tier3LiveRun {
             rulesMissed = @($rulesMissed)
         }
         _scaffold = $WorkingDir
+    }
+}
+
+# ---- PLAN-B live orchestration (validated only in a real run) --------------------------------
+
+# The per-session state hashtable Read-ClaudeEvent updates (same shape as Invoke-ClaudeHeadless).
+function New-Tier3ClaudeState {
+    param([string]$Model)
+    return @{ turns = 0; sessionId = $null; model = $Model; sawResult = $false; isError = $false; durationMs = 0.0; costUsd = 0.0; tokens = 0; partialTokens = 0; lastType = $null; prevGate = 'spec' }
+}
+
+# Launch one headless claude (non-blocking): prompt via stdin file, stream redirected to $OutFile
+# (the only reliable capture on Windows). Returns a tracking hashtable for the poll loop.
+function Start-Tier3ClaudeProc {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Prompt, [Parameter(Mandatory)][string]$WorkingDir, [string]$Model, [Parameter(Mandatory)][string]$OutFile)
+    $promptFile = "$OutFile.prompt.txt"; $errFile = "$OutFile.err"
+    Set-Content -Path $promptFile -Value $Prompt -Encoding utf8 -NoNewline
+    $inner = 'claude -p --output-format stream-json --verbose --dangerously-skip-permissions'
+    if ($Model) { $inner += " --model `"$Model`"" }
+    $inner += " < `"$promptFile`" > `"$OutFile`" 2> `"$errFile`""
+    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList "/s /c `"$inner`"" -WorkingDirectory $WorkingDir -NoNewWindow -PassThru
+    return @{ proc = $p; outFile = $OutFile; promptFile = $promptFile; pos = 0L; state = (New-Tier3ClaudeState -Model $Model); startUtc = $null; endUtc = $null; timedOut = $false }
+}
+
+# Run the builder and planner headless sessions AT THE SAME TIME, tailing both in one poll loop
+# and stamping each session's wall-clock window so their overlap can be measured. Returns each
+# session's totals plus overlapSeconds. (Uses the same background-wait ceiling as the single
+# launcher so awaited sub-agents finish rather than being killed at 600s.)
+function Invoke-Tier3ConcurrentClaude {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][hashtable]$Builder,   # @{ prompt; workingDir; outFile }
+        [Parameter(Mandatory)][hashtable]$Planner,
+        [string]$Model,
+        [int]$TimeoutSeconds = 86400,
+        [hashtable]$MemoryPeak,
+        [int]$HeartbeatMs = 1000
+    )
+    $env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
+    $sessions = [ordered]@{
+        builder = (Start-Tier3ClaudeProc -Prompt $Builder.prompt -WorkingDir $Builder.workingDir -Model $Model -OutFile $Builder.outFile)
+        planner = (Start-Tier3ClaudeProc -Prompt $Planner.prompt -WorkingDir $Planner.workingDir -Model $Model -OutFile $Planner.outFile)
+    }
+    foreach ($k in @($sessions.Keys)) { $sessions[$k].startUtc = (Get-Date).ToUniversalTime() }
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        Start-Sleep -Milliseconds $HeartbeatMs
+        if ($MemoryPeak) { Update-MemoryPeak -Tracker $MemoryPeak }
+        $allExited = $true
+        foreach ($k in @($sessions.Keys)) {
+            $s = $sessions[$k]
+            if (Test-Path $s.outFile) {
+                try {
+                    $fs = [System.IO.File]::Open($s.outFile, 'Open', 'Read', 'ReadWrite,Delete')
+                    $fs.Seek($s.pos, 'Begin') | Out-Null
+                    $sr = New-Object System.IO.StreamReader($fs)
+                    $chunk = $sr.ReadToEnd(); $s.pos = $fs.Position
+                    $sr.Dispose(); $fs.Dispose()
+                    if ($chunk) { foreach ($line in ($chunk -split "`n")) { if (-not [string]::IsNullOrWhiteSpace($line)) { Read-ClaudeEvent -Line $line -State $s.state -OnTurn $null } } }
+                }
+                catch { }
+            }
+            if ($s.proc.HasExited) { if (-not $s.endUtc) { $s.endUtc = (Get-Date).ToUniversalTime() } }
+            else { $allExited = $false }
+        }
+        if ($allExited) { break }
+        if ($sw.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
+            foreach ($k in @($sessions.Keys)) { if (-not $sessions[$k].proc.HasExited) { Stop-ProcessTree -ProcessId $sessions[$k].proc.Id; $sessions[$k].timedOut = $true } }
+            break
+        }
+    }
+
+    $out = @{}
+    foreach ($k in @($sessions.Keys)) {
+        $s = $sessions[$k]
+        if (-not $s.endUtc) { $s.endUtc = (Get-Date).ToUniversalTime() }
+        try { if (Test-Path $s.promptFile) { Remove-Item $s.promptFile -Force } } catch { }
+        $out[$k] = @{
+            turns = $s.state.turns
+            tokens = if ($s.state.sawResult) { $s.state.tokens } else { $s.state.partialTokens }
+            sessionId = $s.state.sessionId
+            claudeSeconds = if ($s.state.durationMs -gt 0) { $s.state.durationMs / 1000.0 } else { 0.0 }
+            startUtc = $s.startUtc; endUtc = $s.endUtc
+            timedOut = [bool]$s.timedOut; sawResult = $s.state.sawResult
+        }
+    }
+    $b = $out.builder; $p = $out.planner
+    $overlapStart = if ($b.startUtc -gt $p.startUtc) { $b.startUtc } else { $p.startUtc }
+    $overlapEnd = if ($b.endUtc -lt $p.endUtc) { $b.endUtc } else { $p.endUtc }
+    $overlap = [Math]::Max(0.0, ($overlapEnd - $overlapStart).TotalSeconds)
+    return @{ builder = $b; planner = $p; overlapSeconds = $overlap }
+}
+
+# Pure + testable: from the epics on main after bootstrap vs after the concurrent phase, work out
+# which epic the BUILDER built (newly complete) and which the PLANNER parked (newly ready-to-build).
+# $Before/$After are @( @{ slug; phase } ). Returns @{ builtEpicSlug; plannedEpicSlug }.
+function Resolve-Tier3ConcurrentSlugs {
+    [CmdletBinding()]
+    param([array]$Before, [array]$After)
+    $beforePhase = @{}
+    foreach ($e in @($Before)) { $beforePhase[[string]$e.slug] = [string]$e.phase }
+    $built = $null; $planned = $null
+    foreach ($e in @($After)) {
+        $slug = [string]$e.slug; $phase = [string]$e.phase
+        $was = if ($beforePhase.ContainsKey($slug)) { $beforePhase[$slug] } else { $null }
+        if ($phase -eq 'READY-TO-BUILD' -and $was -ne 'READY-TO-BUILD' -and -not $planned) { $planned = $slug }
+        if ($phase -in @('COMPLETE', 'COMPLETE-ON-BRANCH', 'MANUAL-TEST', 'EPIC-END') -and $was -notin @('COMPLETE', 'COMPLETE-ON-BRANCH', 'MANUAL-TEST', 'EPIC-END') -and -not $built) { $built = $slug }
+    }
+    return @{ builtEpicSlug = $built; plannedEpicSlug = $planned }
+}
+
+# Read @( @{ slug; phase } ) for every epic on a given git ref, from a working tree. Best-effort.
+function Get-Tier3EpicPhasesOnRef {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$WorkingDir, [string]$Ref = 'origin/main')
+    $out = [System.Collections.Generic.List[hashtable]]::new()
+    try {
+        $files = @(& git -C $WorkingDir ls-tree -r --name-only $Ref 2>$null | Where-Object { $_ -match '^generated-docs/epics/[^/]+/state\.json$' })
+        foreach ($f in $files) {
+            $slug = ($f -split '/')[2]
+            $raw = ((& git -C $WorkingDir show "${Ref}:$f" 2>$null) -join "`n")
+            $phase = $null; if ($raw) { try { $phase = [string](($raw | ConvertFrom-Json).phase) } catch { } }
+            $out.Add(@{ slug = $slug; phase = $phase })
+        }
+    }
+    catch { }
+    return @($out)
+}
+
+# The PLAN-B live run: bare remote -> bootstrap (build epic 1) -> build epic 2 || plan epic 3 ->
+# score concurrency from git (record-only). Best-effort; produces the standard run-result shape so
+# the report/history/charts render it. Validated end to end only in a real run.
+function Invoke-Tier3ConcurrentRun {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Model,
+        [Parameter(Mandatory)][string]$Benchmark,
+        [Parameter(Mandatory)][string]$WorkingDir,
+        [Parameter(Mandatory)][string]$TemplateRoot,
+        [Parameter(Mandatory)][string]$BenchmarkDir,
+        [Parameter(Mandatory)][string]$LiveDir,
+        [Parameter(Mandatory)][string]$RunId,
+        [string]$Version = '0.1.0',
+        [int]$TimeoutSeconds = 86400
+    )
+    if (-not (Test-Path $LiveDir)) { New-Item -ItemType Directory -Path $LiveDir -Force | Out-Null }
+    New-Tier3Scaffold -TemplateRoot $TemplateRoot -WorkingDir $WorkingDir -BenchmarkDir $BenchmarkDir | Out-Null
+
+    # Warm the browser cache once, before any timing starts (same rationale as the single run).
+    Install-Tier3Browser -LogPath (Join-Path $LiveDir 'playwright-install.log') -TemplateRoot $TemplateRoot | Out-Null
+
+    # Stand up the shared remote the concurrency model needs.
+    $remoteDir = Join-Path $LiveDir 'origin.git'
+    $remote = New-Tier3BareRemote -WorkingDir $WorkingDir -RemoteDir $remoteDir
+
+    $mem = New-MemoryPeak
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+    # 1) Bootstrap: build epic 1 through merge so both concurrent sessions branch from a stable main.
+    $bootRes = Invoke-ClaudeHeadless -Prompt (Get-Tier3ConcurrentBootstrapPrompt) -WorkingDir $WorkingDir -Model $Model `
+        -TimeoutSeconds $TimeoutSeconds -OutFile (Join-Path $LiveDir "$RunId-bootstrap.jsonl") -MemoryPeak $mem `
+        -SessionIdFile (Join-Path $LiveDir 'session.id')
+    $beforeEpics = Get-Tier3EpicPhasesOnRef -WorkingDir $WorkingDir -Ref 'origin/main'
+
+    # 2) Planner gets its own clone of the remote; then build epic 2 || plan epic 3, together.
+    $plannerDir = "$WorkingDir-planner"
+    $cloneOk = New-Tier3PlannerClone -RemoteDir $remoteDir -PlannerDir $plannerDir
+    $conc = Invoke-Tier3ConcurrentClaude `
+        -Builder @{ prompt = (Get-Tier3ConcurrentBuilderPrompt); workingDir = $WorkingDir; outFile = (Join-Path $LiveDir "$RunId-builder.jsonl") } `
+        -Planner @{ prompt = (Get-Tier3ConcurrentPlannerPrompt); workingDir = $plannerDir;  outFile = (Join-Path $LiveDir "$RunId-planner.jsonl") } `
+        -Model $Model -TimeoutSeconds $TimeoutSeconds -MemoryPeak $mem
+    $sw.Stop()
+
+    # 3) Work out which epic each session touched, then score concurrency from git (record-only).
+    $afterEpics = Get-Tier3EpicPhasesOnRef -WorkingDir $WorkingDir -Ref 'origin/main'
+    $slugs = Resolve-Tier3ConcurrentSlugs -Before $beforeEpics -After $afterEpics
+    $facts = Get-Tier3ConcurrentFacts -RemoteDir $remoteDir -BuilderDir $WorkingDir `
+        -BuiltEpicSlug $slugs.builtEpicSlug -PlannedEpicSlug $slugs.plannedEpicSlug -OverlapSeconds $conc.overlapSeconds
+    $concurrentMissed = @(Get-Tier3ConcurrentRulesMissed -Facts $facts)
+
+    $built = Test-Tier3Build -WorkingDir $WorkingDir -MemoryPeak $mem
+    $epicStats = Get-Tier3EpicStats -Scaffold $WorkingDir
+
+    $rulesMissed = @()
+    if (-not $remote.ok) { $rulesMissed += 'no-shared-remote' }
+    if (-not $built.ok)  { $rulesMissed += 'did-not-build' }
+    $rulesMissed += $concurrentMissed
+    $rulesMissed = @($rulesMissed | Select-Object -Unique)
+
+    $anyTimedOut = ($bootRes.timedOut -or $conc.builder.timedOut -or $conc.planner.timedOut)
+    $conformed = ($built.ok -and -not $anyTimedOut -and $remote.ok -and $rulesMissed.Count -eq 0)
+    $verdict = if ($conformed) { 'pass' } else { 'recorded-fail' }
+    $tokensTotal = [long]$bootRes.tokens + [long]$conc.builder.tokens + [long]$conc.planner.tokens
+    $turnsTotal  = [int]$bootRes.turns + [int]$conc.builder.turns + [int]$conc.planner.turns
+    $claudeSecs  = [double]$bootRes.claudeSeconds + [double]$conc.builder.claudeSeconds + [double]$conc.planner.claudeSeconds
+    $buildReason = if ($conformed) { 'built epic while planning the next, concurrently, with main consistent' }
+        elseif (-not $remote.ok) { 'could not stand up the shared remote' }
+        elseif (-not $built.ok) { $built.detail }
+        else { 'concurrency checks missed: ' + (@($concurrentMissed) -join ', ') }
+
+    $memSummary = Get-MemorySummaryFromProgress -P @{
+        memPeakUsedMB = [int]$mem.peakUsedMB; memBaselineUsedMB = [int]$mem.baselineUsedMB
+        memMinAvailableMB = [int]$mem.minAvailableMB; memTotalMB = [int]$mem.totalMB
+    }
+
+    return @{
+        version = $Version; timestamp = $RunId; model = $Model; benchmark = $Benchmark
+        runBy = $env:USERNAME; machine = $env:COMPUTERNAME
+        result = 'pass'   # the Tier 3 score never fails the run
+        groups = @()
+        tools = @(Get-Tier3Tools)
+        timing = @{ activeSeconds = [Math]::Round($sw.Elapsed.TotalSeconds, 2); excludedSeconds = 0.0; claudeSeconds = [Math]::Round($claudeSecs, 2); phases = @() }
+        memory = $memSummary
+        epicsCreated = $epicStats.epicsCreated
+        epicsBuilt = $epicStats.epicsBuilt
+        storiesCreated = $epicStats.storiesCreated
+        epics = $epicStats.epics
+        tier3 = @{
+            ran = $true; verdict = $verdict
+            scenario = 'concurrent'
+            passRate = if ($conformed) { 1.0 } else { 0.0 }
+            overlapSeconds = [Math]::Round([double]$conc.overlapSeconds, 1)
+            builtEpicSlug = $slugs.builtEpicSlug
+            plannedEpicSlug = $slugs.plannedEpicSlug
+            tokensTotal = $tokensTotal
+            builds = @(@{ attempt = 1; result = (if ($conformed) { 'passed' } else { 'recorded-fail' }); compiled = $built.ok; tokens = $tokensTotal; turns = $turnsTotal; reason = $buildReason })
+            rulesMissed = @($rulesMissed)
+        }
+        _scaffold = $WorkingDir
+        _plannerScaffold = $plannerDir
+        _remote = $remoteDir
     }
 }

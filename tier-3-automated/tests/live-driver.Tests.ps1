@@ -270,7 +270,11 @@ Describe 'App zip — snapshot the built app, skip the heavy junk' {
         Test-Path $zip | Should -BeTrue
 
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $names = [System.IO.Compression.ZipFile]::OpenRead($zip).Entries.FullName
+        # Dispose the archive before deleting: OpenRead holds the file open, so reading
+        # .Entries off the un-captured handle leaves it open and races Remove-Item (the
+        # "being used by another process" flake). Capture, copy the names out, then Dispose.
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+        try { $names = @($archive.Entries.FullName) } finally { $archive.Dispose() }
         ($names -contains 'CLAUDE.md')       | Should -BeTrue
         ($names -contains 'web/src/page.tsx') | Should -BeTrue
         ($names -join '|') | Should -Not -Match 'node_modules'
@@ -348,6 +352,339 @@ Describe 'Build check — recorded, never gating' {
         $r.ok | Should -BeFalse
         $r.detail | Should -Match 'no web'
         Remove-Item $work -Recurse -Force
+    }
+}
+
+Describe 'PLAN-A prompt — drives /plan through park-ahead, non-interactive' {
+    It 'PASS: builds the first epic, then PLANS (not builds) the next, and parks ready to build' {
+        $p = Get-Tier3PlanPrompt
+        $p | Should -Match '/start'
+        $p | Should -Match '/plan'
+        $p | Should -Match 'NON-INTERACTIVE'
+        $p | Should -Match 'TIER3-ANSWERS\.json'
+        $p | Should -Match 'PARK it ready to build'
+        $p | Should -Match 'BRAND-NEW epic'      # AC3b path
+        $p | Should -Match 'DEPENDS ON'          # AC13 path
+        $p | Should -Match 'straight into BUILD'          # AC5 handoff (resumes without re-planning)
+    }
+}
+
+Describe 'PLAN-A — epic-plan.md slug parsing (outlined vs brand-new)' {
+    It 'PASS: reads each Epics-row slug, ignores the header and the Coverage section' {
+        $md = @'
+# Epic Plan — Demo
+
+## Epics
+
+| # | Epic | Delivers | Builds on |
+|---|---|---|---|
+| 1 | Auth (`auth-and-app-shell`) | sign-in | — |
+| 2 | Transactions (`transactions-core`) | the list | Auth (`auth-and-app-shell`) |
+
+## Coverage
+
+| What you asked for | Epic |
+|---|---|
+| R1 | Reporting (`coverage-only-slug`) |
+'@
+        $slugs = Get-Tier3PlanEpicSlugs -Markdown $md
+        $slugs | Should -Contain 'auth-and-app-shell'
+        $slugs | Should -Contain 'transactions-core'
+        @($slugs).Count | Should -Be 2                     # header skipped (no backticks); each row's OWN slug once
+        $slugs | Should -Not -Contain 'coverage-only-slug'  # Coverage section excluded
+    }
+
+    It 'FAIL-guard: empty / whitespace markdown yields no slugs, not an error' {
+        @(Get-Tier3PlanEpicSlugs -Markdown '').Count    | Should -Be 0
+        @(Get-Tier3PlanEpicSlugs -Markdown "   `n  ").Count | Should -Be 0
+    }
+}
+
+Describe 'PLAN-A — plan conformance rules (record-only)' {
+    BeforeAll {
+        # A fully-correct PLAN-A run: two parked epics (one with a dependency), nothing left
+        # behind, project facts untouched, the new-epic + resume behaviours observed.
+        function New-CleanPlanFacts {
+            return @{
+                parkedEpics          = @(
+                    @{ slug = 'user-settings'; storyCount = 2; dependsOn = @();               onMain = $true; hasEpicBranch = $false; hasBuildCommits = $false },
+                    @{ slug = 'saved-views';   storyCount = 2; dependsOn = @('user-settings'); onMain = $true; hasEpicBranch = $false; hasBuildCommits = $false }
+                )
+                leftoverPlanBranches = @()
+                leftoverWorktrees    = @()
+                projectFactsChanged  = $false
+                plannedNewEpic       = $true
+                resumedToBuild       = $true
+                expectNewEpic        = $true
+                expectBlocked        = $true
+                expectResume         = $true
+            }
+        }
+    }
+
+    It 'PASS: a clean PLAN-A run misses no rules' {
+        @(Get-Tier3PlanRulesMissed -Facts (New-CleanPlanFacts)).Count | Should -Be 0
+    }
+
+    It 'FAIL-guard: no parked epic => plan-no-parked-epic' {
+        $f = New-CleanPlanFacts; $f.parkedEpics = @()
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-no-parked-epic'
+    }
+
+    It 'FAIL-guard: a build branch for a parked epic => plan-created-epic-branch (AC1)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[0].hasEpicBranch = $true
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-created-epic-branch'
+    }
+
+    It 'FAIL-guard: story code committed for a parked epic => plan-build-committed (AC1)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[1].hasBuildCommits = $true
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-build-committed'
+    }
+
+    It 'FAIL-guard: a parked epic with no stories => plan-stories-missing (AC2)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[0].storyCount = 0
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-stories-missing'
+    }
+
+    It 'FAIL-guard: a parked epic not on main => plan-not-on-main (AC4)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[0].onMain = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-not-on-main'
+    }
+
+    It 'FAIL-guard: a leftover throwaway worktree/branch => plan-worktree-leftover (AC4)' {
+        $f = New-CleanPlanFacts; $f.leftoverWorktrees = @('C:\temp\proj-plan-saved-views')
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-worktree-leftover'
+        $g = New-CleanPlanFacts; $g.leftoverPlanBranches = @('plan/saved-views')
+        Get-Tier3PlanRulesMissed -Facts $g | Should -Contain 'plan-worktree-leftover'
+    }
+
+    It 'FAIL-guard: /plan changed project.md => plan-facts-changed (AC11)' {
+        $f = New-CleanPlanFacts; $f.projectFactsChanged = $true
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-facts-changed'
+    }
+
+    It 'FAIL-guard: the brand-new-epic path was not exercised => plan-new-epic-missing (AC3b)' {
+        $f = New-CleanPlanFacts; $f.plannedNewEpic = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-new-epic-missing'
+    }
+
+    It 'FAIL-guard: no parked epic carried a dependency => plan-blocked-ahead-missing (AC13)' {
+        $f = New-CleanPlanFacts
+        foreach ($e in $f.parkedEpics) { $e.dependsOn = @() }   # strip every dependency
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-blocked-ahead-missing'
+    }
+
+    It 'FAIL-guard: a parked epic never resumed into BUILD => plan-resume-missing (AC5)' {
+        $f = New-CleanPlanFacts; $f.resumedToBuild = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-resume-missing'
+    }
+
+    It 'PASS: optional checks are skipped when the scenario did not drive them' {
+        # expect* all false => the new-epic / blocked / resume rules must NOT fire even though
+        # none were observed. Proves the flags gate the optional behaviours.
+        $f = New-CleanPlanFacts
+        $f.plannedNewEpic = $false; $f.resumedToBuild = $false
+        foreach ($e in $f.parkedEpics) { $e.dependsOn = @() }
+        $f.expectNewEpic = $false; $f.expectBlocked = $false; $f.expectResume = $false
+        @(Get-Tier3PlanRulesMissed -Facts $f).Count | Should -Be 0
+    }
+}
+
+Describe 'PLAN-B prompts — bootstrap, builder, planner (concurrent, non-interactive)' {
+    It 'PASS: bootstrap builds only the first epic then stops' {
+        $p = Get-Tier3ConcurrentBootstrapPrompt
+        $p | Should -Match '/start'
+        $p | Should -Match 'ONLY THE FIRST epic'
+        $p | Should -Match 'NON-INTERACTIVE'
+        $p | Should -Match 'origin'
+    }
+    It 'PASS: builder builds the next epic in its own lane, never plans' {
+        $p = Get-Tier3ConcurrentBuilderPrompt
+        $p | Should -Match 'ANOTHER session is planning'
+        $p | Should -Match 'epic/<slug>'
+        $p | Should -Match 'Do NOT run'          # must not plan (phrase wraps across a line)
+        $p | Should -Match '/plan'
+    }
+    It 'PASS: planner parks the next epic on main while a build runs, never builds' {
+        $p = Get-Tier3ConcurrentPlannerPrompt
+        $p | Should -Match 'ANOTHER session is BUILDING'
+        $p | Should -Match '/plan'
+        $p | Should -Match 'PARK it ready'       # "ready to build" wraps across a line
+        $p | Should -Match 'Do NOT run'          # must not /start
+    }
+}
+
+Describe 'PLAN-B — resolve which epic each session touched' {
+    It 'PASS: a newly-complete epic is the builder''s; a newly-ready one is the planner''s' {
+        $before = @(@{ slug = 'epic-1'; phase = 'COMPLETE' }, @{ slug = 'epic-2'; phase = 'PLAN' })
+        $after = @(
+            @{ slug = 'epic-1'; phase = 'COMPLETE' },
+            @{ slug = 'epic-2'; phase = 'COMPLETE' },     # built during the concurrent phase
+            @{ slug = 'user-settings'; phase = 'READY-TO-BUILD' }   # parked during it
+        )
+        $r = Resolve-Tier3ConcurrentSlugs -Before $before -After $after
+        $r.builtEpicSlug   | Should -Be 'epic-2'
+        $r.plannedEpicSlug | Should -Be 'user-settings'
+    }
+    It 'FAIL-guard: an epic already complete before the phase is not counted as newly built' {
+        $before = @(@{ slug = 'epic-1'; phase = 'COMPLETE' })
+        $after = @(@{ slug = 'epic-1'; phase = 'COMPLETE' })
+        $r = Resolve-Tier3ConcurrentSlugs -Before $before -After $after
+        $r.builtEpicSlug | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'PLAN-B — concurrent conformance rules (record-only)' {
+    BeforeAll {
+        function New-CleanConcurrentFacts {
+            return @{
+                builtEpicSlug                = 'transactions-core'
+                plannedEpicSlug              = 'user-settings'
+                overlapSeconds               = 42.0
+                epicPlanRowsOnMain           = @('auth-and-app-shell', 'transactions-core', 'user-settings')
+                plannerPlanOnMain            = $true
+                builderCommitsPreserved      = $true
+                plannerTouchedBuildBranch    = $false
+                projectFactsChangedByPlanner = $false
+                fsckClean                    = $true
+                blockedMergeRefused          = $null
+                expectBlocked                = $false
+            }
+        }
+    }
+
+    It 'PASS: a clean concurrent run misses no rules' {
+        @(Get-Tier3ConcurrentRulesMissed -Facts (New-CleanConcurrentFacts)).Count | Should -Be 0
+    }
+
+    It 'FAIL-guard: sessions did not overlap => plan-concurrent-ran (AC7)' {
+        $f = New-CleanConcurrentFacts; $f.overlapSeconds = 0
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-concurrent-ran'
+    }
+    It 'FAIL-guard: one session never ran => plan-concurrent-ran (AC7)' {
+        $f = New-CleanConcurrentFacts; $f.plannedEpicSlug = ''
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-concurrent-ran'
+    }
+    It 'FAIL-guard: the planner touched the builder''s branch => plan-cross-disturb (AC8)' {
+        $f = New-CleanConcurrentFacts; $f.plannerTouchedBuildBranch = $true
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-cross-disturb'
+    }
+    It 'FAIL-guard: main missing an epic row => plan-main-inconsistent (AC10)' {
+        $f = New-CleanConcurrentFacts; $f.epicPlanRowsOnMain = @('auth-and-app-shell', 'transactions-core')  # planner row lost
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-main-inconsistent'
+    }
+    It 'FAIL-guard: a corrupt remote object store => plan-main-inconsistent (AC10)' {
+        $f = New-CleanConcurrentFacts; $f.fsckClean = $false
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-main-inconsistent'
+    }
+    It 'FAIL-guard: the planner changed project facts => plan-facts-changed (AC11)' {
+        $f = New-CleanConcurrentFacts; $f.projectFactsChangedByPlanner = $true
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-facts-changed'
+    }
+    It 'FAIL-guard: the parked plan is not on main => plan-lost-work (AC12)' {
+        $f = New-CleanConcurrentFacts; $f.plannerPlanOnMain = $false
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-lost-work'
+    }
+    It 'FAIL-guard: builder commits missing from main => plan-lost-work (AC12)' {
+        $f = New-CleanConcurrentFacts; $f.builderCommitsPreserved = $false
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-lost-work'
+    }
+    It 'FAIL-guard: a dependent merged before its dependency => plan-blocked-until-dep (AC14)' {
+        $f = New-CleanConcurrentFacts; $f.expectBlocked = $true; $f.blockedMergeRefused = $false
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-blocked-until-dep'
+    }
+    It 'PASS: the merge-block rule is skipped when the run did not test it ($null)' {
+        $f = New-CleanConcurrentFacts; $f.expectBlocked = $true; $f.blockedMergeRefused = $null
+        Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Not -Contain 'plan-blocked-until-dep'
+    }
+}
+
+Describe 'PLAN-B — bare remote + facts over real git' {
+    BeforeAll {
+        $script:hasGit = [bool](Get-Command git -ErrorAction SilentlyContinue)
+
+        # Build a working tree + bare remote with a docs(project) commit (project.md + epic-plan
+        # with two rows + a built-epic state at COMPLETE + a planned-epic state at READY-TO-BUILD)
+        # and a feat(<built>) commit — the shape a bootstrap+concurrent run lands on origin/main.
+        function New-ConcurrentRepo {
+            $work = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-cwork-" + [Guid]::NewGuid().ToString('N'))
+            $remote = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-corigin-" + [Guid]::NewGuid().ToString('N') + '.git')
+            $built = 'transactions-core'; $planned = 'user-settings'
+            New-Item -ItemType Directory -Path (Join-Path $work "generated-docs/epics/$built/stories") -Force | Out-Null
+            New-Item -ItemType Directory -Path (Join-Path $work "generated-docs/epics/$planned/stories") -Force | Out-Null
+            Set-Content -Path (Join-Path $work 'generated-docs/project.md') -Value "# Project`nRoles: importer, approver`n" -Encoding utf8
+            # Single-quoted here-string keeps the backticks literal (a double-quoted one would treat
+            # `$slug` as an escaped dollar); substitute the slugs into placeholders afterwards.
+            $planMd = @'
+# Epic Plan
+
+## Epics
+
+| # | Epic | Delivers | Builds on |
+|---|---|---|---|
+| 1 | Core (`__BUILT__`) | the list | — |
+| 2 | Settings (`__PLANNED__`) | settings | — |
+'@ -replace '__BUILT__', $built -replace '__PLANNED__', $planned
+            Set-Content -Path (Join-Path $work 'generated-docs/epic-plan.md') -Value $planMd -Encoding utf8
+            Set-Content -Path (Join-Path $work "generated-docs/epics/$built/state.json")   -Value '{"schemaVersion":1,"epic":{"slug":"transactions-core","name":"Core"},"phase":"COMPLETE","stories":{},"lastUpdated":"x"}' -Encoding utf8
+            Set-Content -Path (Join-Path $work "generated-docs/epics/$planned/state.json") -Value '{"schemaVersion":1,"epic":{"slug":"user-settings","name":"Settings"},"phase":"READY-TO-BUILD","stories":{},"lastUpdated":"x"}' -Encoding utf8
+            Set-Content -Path (Join-Path $work "generated-docs/epics/$planned/stories/story-1.md") -Value '# story' -Encoding utf8
+
+            & git -C $work init -q
+            & git -C $work symbolic-ref HEAD refs/heads/main
+            & git -C $work config user.email 't@local'; & git -C $work config user.name 'T'
+            & git -C $work add -A
+            & git -C $work commit -q -m 'docs(project): project setup + epic plan'
+            # a build commit for the built epic
+            Set-Content -Path (Join-Path $work 'web-file.ts') -Value 'export {}' -Encoding utf8
+            & git -C $work add -A
+            & git -C $work commit -q -m "feat($built/story-1): implement the list"
+            & git init --bare -q $remote
+            & git -C $work remote add origin $remote
+            & git -C $work push -u origin main -q 2>$null
+            return @{ work = $work; remote = $remote; built = $built; planned = $planned }
+        }
+    }
+
+    It 'PASS: New-Tier3BareRemote stands up an origin the working tree has pushed main to' -Skip:(-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $work = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-brwork-" + [Guid]::NewGuid().ToString('N'))
+        $remote = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-brorigin-" + [Guid]::NewGuid().ToString('N') + '.git')
+        New-Item -ItemType Directory -Path $work -Force | Out-Null
+        Set-Content -Path (Join-Path $work 'CLAUDE.md') -Value '# t' -Encoding utf8
+        $r = New-Tier3BareRemote -WorkingDir $work -RemoteDir $remote
+        $r.ok | Should -BeTrue
+        (& git -C $work ls-remote origin main 2>$null) | Should -Match 'refs/heads/main'
+        Remove-Item $work, $remote -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'PASS: facts read a clean concurrent landing off origin/main' -Skip:(-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $repo = New-ConcurrentRepo
+        try {
+            $f = Get-Tier3ConcurrentFacts -RemoteDir $repo.remote -BuilderDir $repo.work -BuiltEpicSlug $repo.built -PlannedEpicSlug $repo.planned -OverlapSeconds 30
+            $f.epicPlanRowsOnMain      | Should -Contain $repo.built
+            $f.epicPlanRowsOnMain      | Should -Contain $repo.planned
+            $f.plannerPlanOnMain       | Should -BeTrue     # planned epic parked READY-TO-BUILD on main
+            $f.builderCommitsPreserved | Should -BeTrue     # feat(<built>) reachable from main
+            $f.projectFactsChangedByPlanner | Should -BeFalse
+            $f.fsckClean               | Should -BeTrue
+            @(Get-Tier3ConcurrentRulesMissed -Facts $f).Count | Should -Be 0
+        }
+        finally { Remove-Item $repo.work, $repo.remote -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+
+    It 'FAIL-guard: a post-setup change to project.md is detected as planner-changed facts' -Skip:(-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $repo = New-ConcurrentRepo
+        try {
+            # Simulate the planner editing project-level facts and pushing it — forbidden.
+            Set-Content -Path (Join-Path $repo.work 'generated-docs/project.md') -Value "# Project`nRoles: importer, approver, ADMIN`n" -Encoding utf8
+            & git -C $repo.work add -A
+            & git -C $repo.work commit -q -m 'docs(plan): sneak a project fact change'
+            & git -C $repo.work push origin main -q 2>$null
+            $f = Get-Tier3ConcurrentFacts -RemoteDir $repo.remote -BuilderDir $repo.work -BuiltEpicSlug $repo.built -PlannedEpicSlug $repo.planned -OverlapSeconds 30
+            $f.projectFactsChangedByPlanner | Should -BeTrue
+            Get-Tier3ConcurrentRulesMissed -Facts $f | Should -Contain 'plan-facts-changed'
+        }
+        finally { Remove-Item $repo.work, $repo.remote -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
 

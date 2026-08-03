@@ -27,6 +27,7 @@ param(
     [switch]$IncludeTier3,
     [string]$Tier3Model = 'opus',
     [string]$Benchmark = 'transactions',
+    [ValidateSet('build', 'plan', 'concurrent')][string]$Scenario = 'build',
     [string]$Target,
     [string]$Ref,
     [switch]$KeepDeps,
@@ -207,7 +208,7 @@ function Compress-Tier3Logs {
 
 function Invoke-RunQATests {
     param(
-        [bool]$IncludeTier3, [string]$Tier3Model, [string]$Benchmark,
+        [bool]$IncludeTier3, [string]$Tier3Model, [string]$Benchmark, [string]$Scenario = 'build',
         [string]$Target, [string]$Ref,
         [bool]$KeepDeps, [bool]$KeepRawLogs, [bool]$NoTeardown, [bool]$Cleanup, [bool]$SkipSetup,
         [bool]$SkipLowerTiers, [bool]$Resume, [string]$ReplayResult, [string]$Timestamp, [string]$TestResultsRoot, [string]$BuildRoot
@@ -222,6 +223,10 @@ function Invoke-RunQATests {
     # extended to the target. Without -Target this is just "<benchmark>", as before.
     $targetLabel = Get-Tier3TargetLabel -Target $Target -Ref $Ref
     $resultsKey  = if ($targetLabel) { "$Benchmark@$targetLabel" } else { $Benchmark }
+    # A PLAN-A/PLAN-B run gets its own results world so its (deliberately partial, or two-session)
+    # metrics never mix with a straight build's — same "separated per benchmark" rule, per scenario.
+    if ($Scenario -eq 'plan')       { $resultsKey = "$resultsKey-plan" }
+    elseif ($Scenario -eq 'concurrent') { $resultsKey = "$resultsKey-concurrent" }
 
     # Resume: continue an interrupted run rather than starting a fresh one.
     $resumeSessionId = $null
@@ -283,6 +288,7 @@ function Invoke-RunQATests {
             Model = $Tier3Model; Benchmark = $Benchmark; WorkingDir = $buildsDir
             TemplateRoot = $templateRoot; BenchmarkDir = $benchmarkDir
             LiveDir = (Join-Path $runFolder 'tier3-live'); RunId = $Timestamp; Version = $versionLabel
+            Scenario = $Scenario
         }
         if ($resumeSessionId) { $liveArgs.ResumeSessionId = $resumeSessionId }
         $run = Invoke-Tier3LiveRun @liveArgs
@@ -324,13 +330,19 @@ function Invoke-RunQATests {
     if (-not $NoTeardown -and (Test-Path $buildsDir)) {
         Invoke-Tier3Teardown -WorkingDir $buildsDir -KeepDeps:$KeepDeps -Full:$Cleanup | Out-Null
     }
+    # PLAN-B (concurrent) leaves a second working tree — the planner clone — next to the build dir.
+    # It's rebuildable from the remote (kept under the run folder), so always clear it.
+    $plannerDir = if ($run.ContainsKey('_plannerScaffold')) { $run._plannerScaffold } else { "$buildsDir-planner" }
+    if (-not $NoTeardown -and $plannerDir -and (Test-Path $plannerDir)) {
+        try { Remove-Item $plannerDir -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+    }
 
     return @{ runFolder = $runFolder; report = $reportPath; history = $historyPath; html = $htmlPath; zip = $zipPath }
 }
 
 # Run unless dot-sourced (dot-sourcing exposes the functions for unit tests).
 if ($MyInvocation.InvocationName -ne '.') {
-    $summary = Invoke-RunQATests -IncludeTier3:$IncludeTier3.IsPresent -Tier3Model $Tier3Model -Benchmark $Benchmark `
+    $summary = Invoke-RunQATests -IncludeTier3:$IncludeTier3.IsPresent -Tier3Model $Tier3Model -Benchmark $Benchmark -Scenario $Scenario `
         -Target $Target -Ref $Ref `
         -KeepDeps:$KeepDeps.IsPresent -KeepRawLogs:$KeepRawLogs.IsPresent -NoTeardown:$NoTeardown.IsPresent -Cleanup:$Cleanup.IsPresent `
         -SkipSetup:$SkipSetup.IsPresent -SkipLowerTiers:$SkipLowerTiers.IsPresent -Resume:$Resume.IsPresent -ReplayResult $ReplayResult -Timestamp $Timestamp -TestResultsRoot $TestResultsRoot -BuildRoot $BuildRoot

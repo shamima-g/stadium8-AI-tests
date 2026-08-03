@@ -60,6 +60,13 @@ finds, so adding a new app is just dropping in a new folder (plus its `answers.j
 Name one that doesn't exist and the run stops and lists the valid options. Results land
 in that set's own folder under `TestResults/<benchmark>/`, never mixed across apps.
 
+By default the run drives a straight build. Add `-Scenario` to exercise the `/plan`
+park-ahead command instead — `plan` (PLAN-A) plans and parks epics in a single session,
+`concurrent` (PLAN-B) runs two live sessions at once (one building, one planning) against a
+shared remote. Each files its results separately (`TestResults/<benchmark>-plan/`,
+`…-concurrent/`). See [tier-3-automated/README.md](tier-3-automated/README.md) for the full
+scenario details.
+
 ### Compare release vs dev builds
 
 By default Tier 3 builds against the template the suite is nested in. To build against a

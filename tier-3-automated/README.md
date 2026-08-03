@@ -33,7 +33,29 @@ Open PowerShell 7 in this folder and run:
 
 # Build against a specific template channel + version (dev or release):
 ./Run-QATests.ps1 -IncludeTier3 -Benchmark transactions -Target release -Ref v1.1.0
+
+# Exercise /plan (park an epic ahead, then build it) instead of a straight build:
+./Run-QATests.ps1 -IncludeTier3 -Scenario plan
+
+# Exercise concurrent build-while-planning (two live sessions at once, shared remote):
+./Run-QATests.ps1 -IncludeTier3 -Scenario concurrent
 ```
+
+**Scenarios.** `-Scenario build` (default) drives the straight `/start` → `/continue`
+build. `-Scenario plan` runs **PLAN-A**: it builds the first epic, then uses `/plan` to plan
+and **park** the next epics ready to build (one outlined at setup, one brand-new, one that
+depends on an unbuilt epic), then builds a parked epic to prove it resumes straight into
+BUILD. `-Scenario concurrent` runs **PLAN-B**: it stands up a shared bare remote, bootstraps
+the first epic, then runs **two live sessions at the same time** — one building the next epic,
+one `/plan`-ning the epic after — and checks they don't disturb each other and that `main`
+stays consistent. Each scenario scores its live behaviours into `rulesMissed` — recorded,
+never gating, exactly like the build-conformance rules — and is filed in its own results world
+(`TestResults/<app>-plan/`, `TestResults/<app>-concurrent/`) so scenario metrics never mix with
+a straight build's.
+
+> **PLAN-B is the heavy one.** Two concurrent live sessions plus a bootstrap build ≈ three epic
+> builds of AI time, and it needs Git on PATH for the shared remote. Reach for it when you
+> specifically want the concurrency + shared-`main` guarantees; PLAN-A covers the rest cheaply.
 
 It runs in the background — you get your machine back while it works. If the PC is
 switched off partway, just run the same command again and it carries on from where it
@@ -112,6 +134,7 @@ epic — alongside the time-taken, most-flagged-rules, and last-10-per-model cha
 | `-IncludeTier3` | Turn the live AI run on (off by default). |
 | `-Tier3Model <name>` | Pick the AI model (e.g. `opus`, `sonnet`). Default: `opus`. |
 | `-Benchmark <name>` | Pick which example app to build. Default: the only one there. |
+| `-Scenario <name>` | `build` (default) — straight build; `plan` — PLAN-A `/plan` park-ahead; `concurrent` — PLAN-B two-session build-while-planning (see above). |
 | `-Target <name>` | Build against a template channel from `targets.json` (`dev` or `release`) instead of the local one. Clones it into `.targets/`. |
 | `-Ref <tag\|branch>` | The version to build against with `-Target` (e.g. `v1.1.0`). Default: the repo's default branch. |
 | `-BuildRoot <path>` | Where the app is built. Default: `C:\temp\tier3-builds` (outside the suite). |
