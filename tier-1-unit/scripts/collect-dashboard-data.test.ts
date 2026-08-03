@@ -153,6 +153,48 @@ describe('collect-dashboard-data.js — an in-flight epic on its branch', () => 
   });
 });
 
+describe('collect-dashboard-data.js — a parked (ready-to-build) epic', () => {
+  // v1.2.0: /plan leaves an epic at READY-TO-BUILD. The dashboard must show it as
+  // parked/ready-to-build, NOT as actively building — otherwise a planned-ahead epic
+  // looks like work in progress. (See workflow-tests.md §14 — /plan coverage.)
+  let project: TempProject;
+  beforeEach(() => { project = createTempProject(); });
+  afterEach(() => { rollback(project.root, 'RB-1'); project.cleanup(); });
+
+  function seedEpicAtPhase(phase: 'BUILD' | 'READY-TO-BUILD'): void {
+    const git = gitSandbox(project.root);
+    seedProjectMd(project.root);
+    seedEpicPlan(project.root, [{ slug: 'task-x', name: 'Task X', goal: 'do things' }]);
+    git.commit('intake');
+    expect(git.git('checkout', '-q', '-b', 'epic/task-x').exitCode).toBe(0);
+    seedStoryFile(project.root, { slug: 'task-x', index: 1, title: 'View tasks' });
+    seedEpicState(project.root, { slug: 'task-x', name: 'Task X', phase, stories: { '1': { status: 'pending' } } });
+    git.commit(`state: ${phase}`);
+  }
+
+  it('PASS: a READY-TO-BUILD epic surfaces as parked (ready-to-build), not building', () => {
+    seedEpicAtPhase('READY-TO-BUILD');
+    const json = runScript(SCRIPT, ['--root', project.root, '--format=json'], { cwd: project.root })
+      .json<{ now: { kind: string }; inFlight: { slug: string; phase: string }[]; plan: { slug: string; status: string }[] }>();
+
+    expect(json.now.kind, 'a parked epic must read as ready-to-build').toBe('ready-to-build');
+    expect(json.now.kind, 'a parked epic must NOT read as building').not.toBe('building');
+    expect(json.inFlight.find((e) => e.slug === 'task-x')?.phase).toBe('READY-TO-BUILD');
+    expect(json.plan.find((e) => e.slug === 'task-x')?.status).toBe('ready-to-build');
+  });
+
+  it('FAIL: the collector discriminates parked from building (a BUILD epic → building)', () => {
+    // Proves "ready-to-build" above isn't a constant: the SAME shape at BUILD must
+    // read as building. If the collector ever collapsed the two, one of these flips.
+    seedEpicAtPhase('BUILD');
+    const json = runScript(SCRIPT, ['--root', project.root, '--format=json'], { cwd: project.root })
+      .json<{ now: { kind: string }; plan: { slug: string; status: string }[] }>();
+
+    expect(json.now.kind).toBe('building');
+    expect(json.plan.find((e) => e.slug === 'task-x')?.status).toBe('in-flight');
+  });
+});
+
 describe('collect-dashboard-data.js — --format=text', () => {
   let project: TempProject;
   beforeEach(() => { project = createTempProject(); });
