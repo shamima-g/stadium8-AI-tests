@@ -107,6 +107,62 @@ describe('bash-permission-checker — fuzz (adversarial input)', () => {
   });
 });
 
+describe('bash-permission-checker — worktree + force-push (v1.2.0)', () => {
+  // v1.2.0 added the /plan parallel-planning flow, which does its git work in a
+  // throwaway worktree and lands plans on main via `git push origin HEAD:main`
+  // (epic-branch-concurrency.md §6.1). The checker gained worktree allow-rules and
+  // hardened the force-push denials. These cases pin that behaviour; they assert the
+  // v1.2.0 shape (test an older template with the matching-version suite — Layer D).
+
+  // Good: the worktree + safe-push commands the main-landing write relies on.
+  const ALLOW_CASES: Array<[string, string]> = [
+    ['git worktree add -b main-change/x ../tmp origin/main', 'worktree add for the main-landing write'],
+    ['git worktree remove ../tmp',                           'worktree remove (bare path)'],
+    ['git worktree list',                                    'worktree list (read-only)'],
+    ['git worktree prune',                                   'worktree prune (cleanup)'],
+    ['git push --force-with-lease origin epic/x',            'force-with-lease scoped to epic/*'],
+    ['npm run test:e2e:install',                             'multi-segment npm script'],
+    ['npm run test:e2e:ui',                                  'multi-segment npm script'],
+  ];
+  it.each(ALLOW_CASES)('PASS: does not deny %s — %s', (command) => {
+    expect(runHook(command).actual).not.toBe('deny');
+  });
+
+  // Broken-safe: force / destructive pushes MUST be denied — including a +refspec,
+  // which is a force push spelled without a flag (newly caught in v1.2.0).
+  const DENY_CASES: Array<[string, string]> = [
+    ['git push origin +epic/x',            'force via +refspec'],
+    ['git push -f origin main',            'force via -f'],
+    ['git push origin --force',            'force via --force'],
+    ['git push origin --delete topic',     'remote branch delete'],
+    ['git push --no-verify origin epic/x', 'bypasses pre-push hooks'],
+  ];
+  it.each(DENY_CASES)('FAIL safely (must deny): %s — %s', (command) => {
+    expect(runHook(command).actual).toBe('deny');
+  });
+
+  // Broken: a destructive worktree op (--force can discard or duplicate a tree) must
+  // NOT auto-approve — it falls through to a human prompt.
+  const NO_AUTO_APPROVE: Array<[string, string]> = [
+    ['git worktree remove --force ../tmp',          'remove --force must not auto-approve'],
+    ['git worktree add --force ../tmp origin/main',  'add --force must not auto-approve'],
+  ];
+  it.each(NO_AUTO_APPROVE)('PASS: does NOT auto-approve %s — %s', (command) => {
+    expect(runHook(command).actual).not.toBe('allow');
+  });
+
+  // Regression guard: a legitimate push that only LOOKS force-ish — a branch name
+  // ending in -f, or a benign chained command after a safe push — must NOT be
+  // hard-denied. (The v1.1.0 regex over-matched these; v1.2.0 bounds it.)
+  const NO_HARD_DENY: Array<[string, string]> = [
+    ['git push origin epic/report-f',     'branch name ends in -f, not the -f flag'],
+    ['git push origin main && echo "ok"',  'benign chained command after a safe push'],
+  ];
+  it.each(NO_HARD_DENY)('PASS: does NOT hard-deny %s — %s', (command) => {
+    expect(runHook(command).actual).not.toBe('deny');
+  });
+});
+
 describe('bash-permission-checker — fallthrough for ordinary commands', () => {
   it('PASS: falls through (no decision) for a benign unrelated command', () => {
     const { actual } = runHook('echo hello');

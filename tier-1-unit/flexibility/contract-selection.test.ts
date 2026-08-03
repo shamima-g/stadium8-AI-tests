@@ -17,7 +17,17 @@ describe('contract selection — good case', () => {
   });
 
   it('PASS: no target falls back to the single default contract', () => {
-    expect(path.basename(contractPathFor(undefined))).toBe('template-contract.json');
+    // contractPathFor()'s default arg is process.env.QA_TARGET, so "no target" means
+    // the env is genuinely unset. Isolate it here — otherwise running under the
+    // test:target harness (QA_TARGET=dev|release) leaks in and this fails spuriously.
+    const saved = process.env.QA_TARGET;
+    delete process.env.QA_TARGET;
+    try {
+      expect(path.basename(contractPathFor(undefined))).toBe('template-contract.json');
+      expect(path.basename(contractPathFor())).toBe('template-contract.json');
+    } finally {
+      if (saved !== undefined) process.env.QA_TARGET = saved;
+    }
   });
 
   it('BROKEN: a target with no matching contract file falls back to the default (never crashes)', () => {
