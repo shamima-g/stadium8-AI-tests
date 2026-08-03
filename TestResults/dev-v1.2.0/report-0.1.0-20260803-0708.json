@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "fileStamp": "20260803-0708",
+  "runIso": "2026-08-03 07:08:32",
+  "runFriendly": "3 August 2026, 7:08am",
+  "overall": "fail",
+  "counts": {
+    "total": 312,
+    "passed": 217,
+    "failed": 92,
+    "skipped": 3
+  },
+  "durationMs": 14528.4794921875,
+  "linesOfCode": null,
+  "runBy": "shamima-g",
+  "machine": "SHAMIMA-NB",
+  "tokens": null,
+  "costUsd": null,
+  "target": "dev",
+  "ref": "v1.2.0",
+  "label": "dev-v1.2.0",
+  "report": "report-0.1.0-20260803-0708.md"
+}
