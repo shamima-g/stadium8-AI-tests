@@ -153,7 +153,9 @@ describe('bash-permission-checker — worktree + force-push (v1.2.0)', () => {
 
   // Regression guard: a legitimate push that only LOOKS force-ish — a branch name
   // ending in -f, or a benign chained command after a safe push — must NOT be
-  // hard-denied. (The v1.1.0 regex over-matched these; v1.2.0 bounds it.)
+  // hard-denied. (The v1.1.0 `-f` regex over-matched `epic/report-f` and hard-denied
+  // it; v1.2.0 bounds the flag match. The chained-command case guards the `[^;&|]`
+  // bound added in v1.2.0.)
   const NO_HARD_DENY: Array<[string, string]> = [
     ['git push origin epic/report-f',     'branch name ends in -f, not the -f flag'],
     ['git push origin main && echo "ok"',  'benign chained command after a safe push'],

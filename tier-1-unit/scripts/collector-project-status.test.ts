@@ -55,8 +55,9 @@ describe('collectors — dashboard and build-report agree on project status (v1.
   afterEach(() => { project.cleanup(); });
 
   for (const state of STATES) {
-    it(`PASS: both collectors classify a ${state} tree identically`, () => {
-      if (!BR_PRESENT) return; // build-report collector not present in this version
+    // SKIP (not a fake green) when the build-report collector predates the target
+    // version — workflow-tests.md §12 Layer B distinguishes Skipped from Green.
+    it.skipIf(!BR_PRESENT)(`PASS: both collectors classify a ${state} tree identically`, () => {
       seedState(project, state);
       const dash = statusFrom(DASHBOARD, project.root);
       const build = statusFrom(BUILD_REPORT, project.root);

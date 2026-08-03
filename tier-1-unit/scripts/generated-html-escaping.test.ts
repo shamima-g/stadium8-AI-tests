@@ -31,6 +31,12 @@ import type { TempProject } from '../../helpers/temp-project';
 const DASHBOARD = '.claude/scripts/generate-dashboard-html.js';
 const BUILD_REPORT = '.claude/scripts/generate-build-report-html.js';
 
+// The build report + shared html-escape lib arrived in v1.2.0. Feature-detect so the
+// build-report arm SKIPS (a distinct, honest state — not a fake green) on a template
+// that predates it, per workflow-tests.md §12 Layer B. The dashboard has shipped for
+// longer, so its arm is unconditional.
+const BR_PRESENT = fs.existsSync(path.join(REPO_ROOT, BUILD_REPORT));
+
 // Unmistakable in output, dangerous if unescaped, and quote-free so the escaped form
 // is unambiguous (esc maps < > & " ' — we only rely on < > here).
 const XSS = '<script>alert(1)</script>';
@@ -67,12 +73,7 @@ describe('report generators — HTML-escape data-derived strings (v1.2.0)', () =
     expect(html, 'the raw <script> must never appear').not.toContain(RAW_MARKER);
   });
 
-  it('PASS: the build report escapes a markup-bearing epic name / story title', () => {
-    // Feature-detect: the build report arrived alongside html-escape; skip cleanly if a
-    // (pre-v1.2.0) template under test doesn't ship it, rather than fail spuriously.
-    if (!fs.existsSync(path.join(REPO_ROOT, BUILD_REPORT))) {
-      return; // build-report generator not present in this template version
-    }
+  it.skipIf(!BR_PRESENT)('PASS: the build report escapes a markup-bearing epic name / story title', () => {
     seedMaliciousEpic(project);
     const r = runScript(BUILD_REPORT, ['--root', project.root, '--no-insights'], { cwd: project.root });
     expect(r.exitCode, r.stderr).toBe(0);
@@ -81,10 +82,10 @@ describe('report generators — HTML-escape data-derived strings (v1.2.0)', () =
     expect(html, 'the raw <script> must never appear').not.toContain(RAW_MARKER);
   });
 
-  it('FAIL: the raw-markup detector has teeth (would catch an unescaped page)', () => {
-    // Proves the two assertions above aren't vacuous: an unescaped page IS flagged,
-    // and an escaped one is NOT — so a regression that drops esc() turns them red.
-    expect(`<div>Tasks ${XSS}</div>`.includes(RAW_MARKER)).toBe(true);
-    expect(`<div>Tasks ${ESC_MARKER}</div>`.includes(RAW_MARKER)).toBe(false);
-  });
 });
+
+// The broken case lives INSIDE each PASS test above, not in a separate assertion: the
+// `.not.toContain(RAW_MARKER)` runs against the generator's REAL output, so if the
+// template ever stopped escaping, that arm turns red. (An earlier standalone "teeth"
+// test only exercised String.includes on hand-built literals — it proved nothing about
+// the template, so it was removed as vacuous per workflow-tests.md rule 1.)
