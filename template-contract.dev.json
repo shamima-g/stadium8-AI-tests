@@ -1,5 +1,5 @@
 {
-  "_comment": "The DEV template's pinned shape (github.com/stadium-software/stadium-8). This is one of two per-target recipes — the dev version is judged against THIS file, never against release's. It starts equal to the release baseline (v1.1.0); when dev moves ahead, run `QA_TARGET=dev npm run reconcile` against a dev checkout and update the lists below so dev is judged against its OWN shape.",
+  "_comment": "The DEV template's pinned shape (github.com/stadium-software/stadium-8). This is one of two per-target recipes — the dev version is judged against THIS file, never against release's. Reconciled to dev v1.2.0 live values on 2026-08-03 (added the READY-TO-BUILD stage introduced by /plan). When dev moves ahead, run `QA_TARGET=dev npm run reconcile` against a dev checkout and update the lists below so dev is judged against its OWN shape.",
   "_sources": {
     "stages / storyStatuses / e2eStatusesCore": ".claude/scripts/lib/epic-state.js (EPIC_PHASES / STORY_STATUS_VALUES / E2E_STATUS_VALUES)",
     "docNameIds": ".claude/shared/generated-doc-conventions.json (conventions[].id)"
@@ -7,6 +7,7 @@
 
   "stages": [
     "PLAN",
+    "READY-TO-BUILD",
     "BUILD",
     "EPIC-END",
     "MANUAL-TEST",

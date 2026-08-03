@@ -27,7 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { resolveTarget } = require('../helpers/targets.cjs');
+const { resolveTarget, ensureTargetsDir } = require('../helpers/targets.cjs');
 const { versionGap } = require('../helpers/template-version.cjs');
 const { parseChangelog, entriesBetween } = require('../helpers/changelog.cjs');
 
@@ -63,7 +63,7 @@ function checkout(repo, ref, dest, reuse) {
     }
     fs.rmSync(dest, { recursive: true, force: true });
   }
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  ensureTargetsDir(path.dirname(dest));
   const args = ['clone', '--depth', '1'];
   if (ref) args.push('--branch', ref);
   args.push(repo, dest);

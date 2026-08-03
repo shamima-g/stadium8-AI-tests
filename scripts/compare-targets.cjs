@@ -29,7 +29,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { readLive } = require('../helpers/template-live.cjs');
 const { parseChangelog, findExplaining } = require('../helpers/changelog.cjs');
-const { resolveTarget } = require('../helpers/targets.cjs');
+const { resolveTarget, ensureTargetsDir } = require('../helpers/targets.cjs');
 
 const QA_ROOT = path.resolve(__dirname, '..');
 const TARGETS_DIR = path.join(QA_ROOT, '.targets');
@@ -118,7 +118,7 @@ function ensureCheckout(name, ref) {
   const label = `${name}-${ref || 'default'}`;
   const dest = path.join(TARGETS_DIR, label);
   if (!fs.existsSync(dest)) {
-    fs.mkdirSync(TARGETS_DIR, { recursive: true });
+    ensureTargetsDir(TARGETS_DIR);
     const args = ['clone', '--depth', '1'];
     if (ref) args.push('--branch', ref);
     args.push(target.repo, dest);

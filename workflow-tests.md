@@ -23,9 +23,10 @@ the whole trick to not going stale:
 
 That second rule is why this doc no longer prints "the stages are …": the stages are
 whatever the version under test defines. When a concrete example helps, this doc uses
-the current dev/release template (**v1.1.0**, whose per-epic stages are PLAN → BUILD →
-EPIC-END → MANUAL-TEST → COMPLETE-ON-BRANCH → COMPLETE) — but the *tests* read those
-from the template, they don't assume them.
+the current dev/release template (**v1.2.0**, whose per-epic stages are PLAN →
+READY-TO-BUILD → BUILD → EPIC-END → MANUAL-TEST → COMPLETE-ON-BRANCH → COMPLETE — v1.2.0
+inserted READY-TO-BUILD, where `/plan` parks an epic planned ahead) — but the *tests*
+read those from the template, they don't assume them.
 
 ---
 
@@ -347,7 +348,7 @@ language; each routable story has a real browser test.
 ## 9. Good case / broken case — the discipline
 
 A sample of the pairs the suite proves both ways — the "broken" case is what makes
-each check trustworthy. (The stage/gate names shown are the current v1.1.0 examples;
+each check trustworthy. (The stage/gate names shown are the current v1.2.0 examples;
 the tests read them from the template.)
 
 | Check | "Good" case (passes) | "Broken" case (must go red) |
@@ -586,18 +587,56 @@ least one failure path.
 | Consistency (frontmatter, cross-refs) | ✅ | — | doc-drift lives only here |
 | Schema (`state.json`) | ✅ | — | single-sourced from `epic-state.js` |
 | Artifact-lint (generated code) | ✅ | — | samples always; real output when present |
-| Multi-version (§12) | ✅ | — | 36 tests, good + broken |
+| Multi-version (§12) | ✅ | — | good + broken |
+| Report XSS-escaping (dashboard + build-report) | ✅ | partial | `esc()` over real generated HTML |
+| Collector project-status agreement | ✅ | — | dashboard ↔ build-report cross-script smoke |
+| `/upgrade` deletion-safety (`apply-template.js`) | ✅ | dev only | end-to-end smoke: retired files pruned, user work kept |
+
+**Reconciled to v1.2.0 (2026-08-03).** Both channels (`dev`, `release`) sit at v1.2.0,
+reconciled independently; `VERSION` is v1.2.0 so the gap banner reads *in sync*. v1.2.0
+added the READY-TO-BUILD stage (the `/plan` park-ahead) — pinned in both contracts and
+the drift guard.
+
+**Testing conventions this suite uses (version-independent):**
+
+- **Skip vs. green vs. red are distinct** (rule 6 + §12 Layer B). A check that a version
+  doesn't apply to must **skip**, never quietly pass — use `it.skipIf(...)` /
+  `describe.skipIf(...)`, feature-detected (e.g. "is the build-report collector present?"),
+  not a bare `return` (which Vitest counts as a pass).
+- **Known template defect → `it.fails()`, not a loosened assertion** (§13.1). When the
+  suite catches a real template bug it can't fix from here, mark the case `it.fails()`
+  (expected-fail) with a comment naming the root cause. The baseline stays honestly green
+  on the *known* bug, a real NEW regression is still visible, and the case flips **red**
+  (unexpected pass) the instant the template ships the fix — the cue to remove the marker.
+  Live example: the 6 doc-name-enforcement cases (the epic-scoped `<slug>` defect below).
+- **`test:target` needs a CommonJS marker.** `run-target.cjs` / `compare-targets.cjs`
+  clone the template into `.targets/`, which sits inside this suite (`"type":"module"`).
+  `helpers/targets.cjs → ensureTargetsDir()` drops `{"type":"commonjs"}` at `.targets/`
+  so the template's CommonJS scripts load as CJS, not ESM. Without it every
+  script-spawning test breaks with `require is not defined`.
+
+**Known template defect (open, to be filed upstream):** epic-scoped doc-name enforcement
+is a silent no-op — the hook/validator `dirGlobToRegex` translates `*` but not the
+`<slug>` placeholder, so `generated-docs/epics/<slug>/` never matches a real epic dir.
+Present on both channels since ≤ v1.1.0. The one-line fix: also translate `<...>` →
+`[^/]*` in `dirGlobToRegex` (both `enforce-generated-doc-names.js` and
+`validate-generated-doc-names.js`). The 6 tests that catch it are `it.fails()` until the
+template fixes it.
 
 **Open work:**
 
 - **Capture the golden run** — a one-time manual Team-Task-Manager run into
   `fixtures/golden-run/`; the only thing between the Tier-2 scaffold and a live tier.
   Needs a real workflow run, not code.
-- **Confirm the dev recipe** — `QA_TARGET=dev npm run reconcile` against a dev checkout
-  (dev currently sits at the same v1.1.0 as release, so the recipes match today).
-- **Version-gating (Layer B) annotations** — added per test as versions diverge; e.g.
-  the doc-name-enforcement checks should be gated to the version that fixed drift
-  enforcement, so they skip (not fail) on versions that predate it.
+- **`/plan` coverage gaps** — the dashboard's *ready-to-build / parked* rendering
+  (`collect-dashboard-data.js`) and the shared *epic-picker* legend
+  (`shared/epic-picker.md`) matching the statuses the collector emits. `/plan`'s live
+  behaviour (worktree planning, parking on `main`, no epic branch) is Tier-3 by design.
+- **Version-gating (Layer B) as channels diverge** — today both are at v1.2.0, so the
+  default is **Layer D** (the suite is tagged per version; test an old template with its
+  matching-version suite). When a real divergence appears, gate the affected checks on
+  **feature-detection** (is the surface live?), not a version-number compare — dev and
+  release can share a version string yet differ.
 - **Legacy-migration cross-check** for `migrate-legacy-state.js` (optional; it already
   has a co-located test).
 

@@ -17,7 +17,17 @@ describe('contract selection — good case', () => {
   });
 
   it('PASS: no target falls back to the single default contract', () => {
-    expect(path.basename(contractPathFor(undefined))).toBe('template-contract.json');
+    // contractPathFor()'s default arg is process.env.QA_TARGET, so "no target" means
+    // the env is genuinely unset. Isolate it here — otherwise running under the
+    // test:target harness (QA_TARGET=dev|release) leaks in and this fails spuriously.
+    const saved = process.env.QA_TARGET;
+    delete process.env.QA_TARGET;
+    try {
+      expect(path.basename(contractPathFor(undefined))).toBe('template-contract.json');
+      expect(path.basename(contractPathFor())).toBe('template-contract.json');
+    } finally {
+      if (saved !== undefined) process.env.QA_TARGET = saved;
+    }
   });
 
   it('BROKEN: a target with no matching contract file falls back to the default (never crashes)', () => {
@@ -41,8 +51,10 @@ describe('the per-target contracts exist and are well-formed', () => {
     });
   }
 
-  it('PASS: the release contract matches the documented six-stage order', () => {
+  it('PASS: the release contract matches the documented seven-stage order', () => {
     const c = JSON.parse(fs.readFileSync(contractPathFor('release'), 'utf8'));
-    expect(c.stages).toEqual(['PLAN', 'BUILD', 'EPIC-END', 'MANUAL-TEST', 'COMPLETE-ON-BRANCH', 'COMPLETE']);
+    // Independent hand-pinned oracle (v1.2.0 added READY-TO-BUILD) — deliberately a
+    // literal, not a re-read of the file under test, so it can still go red on drift.
+    expect(c.stages).toEqual(['PLAN', 'READY-TO-BUILD', 'BUILD', 'EPIC-END', 'MANUAL-TEST', 'COMPLETE-ON-BRANCH', 'COMPLETE']);
   });
 });

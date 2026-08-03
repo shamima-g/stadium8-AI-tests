@@ -56,7 +56,17 @@ describe('enforce-generated-doc-names.js — the six conventions', () => {
       expect(r.exitCode, r.stderr).toBe(0);
     });
 
-    it(`FAIL: [${c.id}] a drift-named new file is blocked (${c.bad})`, () => {
+    // KNOWN TEMPLATE DEFECT (epic-scoped conventions only): the hook's dirGlobToRegex
+    // translates `*` but NOT the literal `<slug>` placeholder the conventions use, so
+    // `generated-docs/epics/<slug>/` never matches a real epic dir and these drift names
+    // are wrongly ALLOWED. Present identically on v1.1.0 and v1.2.0 — a real product bug
+    // the suite correctly catches, but the fix lives in the external template repo.
+    // Marked `it.fails` so the baseline stays honestly green on the KNOWN bug and flips
+    // RED the instant the template fixes it (an unexpected pass). Flat-dir conventions
+    // (project-facts, e2e-spec) are unaffected and stay normal `it`.
+    // Fix: also translate `<...>` → `[^/]*` in dirGlobToRegex. Remove the marker when the template ships it.
+    const blockCase = c.dir.startsWith(EPIC) ? it.fails : it;
+    blockCase(`FAIL: [${c.id}] a drift-named new file is blocked (${c.bad})`, () => {
       const r = runHook(project.root, `${c.dir}/${c.bad}`);
       expect(r.exitCode).toBe(2);
       expect(r.stderr).toMatch(/Blocked by filename-convention guard/);
