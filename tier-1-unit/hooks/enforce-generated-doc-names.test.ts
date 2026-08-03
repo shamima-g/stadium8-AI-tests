@@ -64,7 +64,7 @@ describe('enforce-generated-doc-names.js — the six conventions', () => {
     // Marked `it.fails` so the baseline stays honestly green on the KNOWN bug and flips
     // RED the instant the template fixes it (an unexpected pass). Flat-dir conventions
     // (project-facts, e2e-spec) are unaffected and stay normal `it`.
-    // See UPSTREAM-ISSUE-doc-name-enforcement.md. Remove the marker when the template ships the fix.
+    // Fix: also translate `<...>` → `[^/]*` in dirGlobToRegex. Remove the marker when the template ships it.
     const blockCase = c.dir.startsWith(EPIC) ? it.fails : it;
     blockCase(`FAIL: [${c.id}] a drift-named new file is blocked (${c.bad})`, () => {
       const r = runHook(project.root, `${c.dir}/${c.bad}`);

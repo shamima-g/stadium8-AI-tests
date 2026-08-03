@@ -36,7 +36,7 @@ describe('validate-generated-doc-names.js', () => {
   // so epic-scoped files are misclassified `ungoverned` instead of counted/flagged. These
   // two cases exercise epic-scoped paths and so fail on the bug. Marked `it.fails` to keep
   // the baseline honestly green on the KNOWN defect and flip RED when the template is fixed
-  // (unexpected pass). See UPSTREAM-ISSUE-doc-name-enforcement.md. Remove the marker on fix.
+  // (unexpected pass). Fix: also translate `<...>` → `[^/]*` in dirGlobToRegex. Remove the marker on fix.
   it.fails('PASS: a correctly-named tree reports "ok" with zero drift (exit 0) [KNOWN DEFECT]', () => {
     project.write('generated-docs/project.md', '# Project\n');
     project.write('generated-docs/epics/task-browsing/state.json', '{}');

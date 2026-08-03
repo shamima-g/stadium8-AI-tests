@@ -605,23 +605,23 @@ the drift guard.
   not a bare `return` (which Vitest counts as a pass).
 - **Known template defect → `it.fails()`, not a loosened assertion** (§13.1). When the
   suite catches a real template bug it can't fix from here, mark the case `it.fails()`
-  (expected-fail) with a link to the tracked write-up. The baseline stays honestly green
+  (expected-fail) with a comment naming the root cause. The baseline stays honestly green
   on the *known* bug, a real NEW regression is still visible, and the case flips **red**
   (unexpected pass) the instant the template ships the fix — the cue to remove the marker.
-  Live example: the 6 doc-name-enforcement cases, see
-  [`UPSTREAM-ISSUE-doc-name-enforcement.md`](UPSTREAM-ISSUE-doc-name-enforcement.md).
+  Live example: the 6 doc-name-enforcement cases (the epic-scoped `<slug>` defect below).
 - **`test:target` needs a CommonJS marker.** `run-target.cjs` / `compare-targets.cjs`
   clone the template into `.targets/`, which sits inside this suite (`"type":"module"`).
   `helpers/targets.cjs → ensureTargetsDir()` drops `{"type":"commonjs"}` at `.targets/`
   so the template's CommonJS scripts load as CJS, not ESM. Without it every
   script-spawning test breaks with `require is not defined`.
 
-**Known template defect (open, filed for upstream):** epic-scoped doc-name enforcement is
-a silent no-op — the hook/validator `dirGlobToRegex` translates `*` but not the `<slug>`
-placeholder, so `generated-docs/epics/<slug>/` never matches a real epic dir. Present on
-both channels since ≤ v1.1.0. Root cause + validated one-line fix in
-[`UPSTREAM-ISSUE-doc-name-enforcement.md`](UPSTREAM-ISSUE-doc-name-enforcement.md); the 6
-tests that catch it are `it.fails()` until the template fixes it.
+**Known template defect (open, to be filed upstream):** epic-scoped doc-name enforcement
+is a silent no-op — the hook/validator `dirGlobToRegex` translates `*` but not the
+`<slug>` placeholder, so `generated-docs/epics/<slug>/` never matches a real epic dir.
+Present on both channels since ≤ v1.1.0. The one-line fix: also translate `<...>` →
+`[^/]*` in `dirGlobToRegex` (both `enforce-generated-doc-names.js` and
+`validate-generated-doc-names.js`). The 6 tests that catch it are `it.fails()` until the
+template fixes it.
 
 **Open work:**
 
