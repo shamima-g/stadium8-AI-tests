@@ -113,13 +113,19 @@ export const isStoryFile = (name: string): boolean => /^story-.+\.md$/.test(name
 
 /** The role value from a story file, or null when no Role field is present. */
 export function extractRole(content: string): string | null {
-  // Accept singular or plural, bold marker or plain metadata-table row:
-  //   `**Role:** admin`, `**Roles:** admin`, `| **Role:** | admin |`
-  //   `| Role | admin |`, `| Roles | Importer, Approver |`
+  // Accept singular or plural, in any of three shapes the templates emit:
+  //   bold marker      — `**Role:** admin`, `**Roles:** admin`, `| **Role:** | admin |`
+  //   metadata table   — `| Role | admin |`, `| Roles | Importer, Approver |`
+  //   heading + list   — `## Roles\n\n- User (signed-in)` (dev/main story format)
   const bold = content.match(/\*\*Roles?:?\*\*\s*[:|]?\s*([^\n|]+)/i);
   if (bold) return bold[1].trim();
   const row = content.match(/^\s*\|\s*Roles?\s*\|\s*([^\n|]+?)\s*\|/im);
-  return row ? row[1].trim() : null;
+  if (row) return row[1].trim();
+  // A `## Roles` heading (any level) whose first non-blank line is the role value,
+  // with or without a leading list bullet. Guard against an empty section by not
+  // letting the value be the next heading.
+  const heading = content.match(/^#{1,6}[ \t]*Roles?[ \t]*\r?\n\s*(?:[-*+][ \t]*)?(?!#)([^\n]+)/im);
+  return heading ? heading[1].trim() : null;
 }
 
 /** A description of the role problem, or null when the role is valid. */
