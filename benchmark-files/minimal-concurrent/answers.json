@@ -1,0 +1,46 @@
+{
+  "_comment": "Pre-written answers the Tier 3 live driver feeds to the workflow so no person is needed. The pitch, the single user, and the two features come from frontend/docs/requirements.md. This is a minimal 2-epic prototype (Notes + Tasks) for one stubbed signed-in user — all server behaviour (sign-in, persistence) is simulated client-side (see requirements.md Prototype invariants). Intended as the cheap default benchmark for the /plan experiment.",
+
+  "benchmark": "minimal-concurrent",
+
+  "intake": {
+    "pitch": "A tiny Personal Notes & Tasks app for one signed-in user. After a stubbed sign-in the user lands on a home screen linking to two independent features: Notes (add a note, see them newest-first with a count, empty state when none) and Tasks (add a task, tick it done with a struck-through style, see the outstanding count, empty state when none). Front-end only, all data in memory. The two features are independent and should each be one small epic with a single story.",
+    "roles": [
+      { "name": "User", "can": ["sign in", "add a note", "view their notes", "add a task", "mark a task done", "view their tasks"], "cannot": ["nothing beyond their own single-user data — there are no other roles or shared data"] }
+    ],
+    "signIn": {
+      "choice": "no sign-in / stub",
+      "options": ["your own server (BFF)", "a hosted sign-in provider", "no sign-in / stub"],
+      "rationale": "A single-user personal prototype with no back-office roles and no real backend. A stubbed sign-in with one seeded user is enough to give the app a signed-in user (with a display name) without the cost of BFF/hosted auth. Per the prototype invariants, the session is simulated client-side."
+    },
+    "dataSource": {
+      "note": "No backend service. Build against in-memory fixtures derived from the requirements (an empty starting list of notes and tasks, plus the one seeded user below). All server behaviour is simulated client-side; data need not survive a reload.",
+      "seededUsers": ["user@example.com / Test123 (User, display name \"Sam\")"]
+    },
+    "compliance": {
+      "regulatedData": false,
+      "note": "A personal notes/tasks prototype for a single user. No regulated domain and no other people's data."
+    },
+    "styling": {
+      "source": null,
+      "note": "No bespoke design system. Use the template's Shadcn defaults with a clean, neutral palette and centralised styling tokens."
+    }
+  },
+
+  "approvals": {
+    "intakeApproval": { "action": "approve", "note": "Approve the project facts + epic plan once shown. Expect two epics: Notes and Tasks." },
+    "storyApproval": { "action": "approve", "note": "Approve the story list once shown (one small story per feature)." },
+    "handsOnApproval": {
+      "action": "approve",
+      "perPartChecks": [
+        "User can add a note; it appears at the top of the list, the count increases, the field clears, and 'Note added' shows",
+        "Adding an empty note is prevented",
+        "The Notes page shows 'No notes yet' when there are none",
+        "User can add a task and tick it done; the task shows struck-through and the outstanding count decreases",
+        "The Tasks page shows 'No tasks yet' when there are none"
+      ],
+      "note": "User-observable checks ticked at MANUAL-TEST, across the two features."
+    },
+    "mergeApproval": { "action": "approve", "note": "Approve the merge into main once EPIC-END is green." }
+  }
+}
