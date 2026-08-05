@@ -21,6 +21,8 @@
 
   The RUN OBJECT (hashtable) shape (all times in seconds):
     version, timestamp, dateHuman, model, benchmark, runBy, machine, result ('pass'|'fail')
+    command, repository, branch, buildPath   # provenance: how it was run, what template repo +
+                                             # branch/ref it built against, and where the app was built
     groups   = @( @{ name; tests; passed; failed; skipped; durationSeconds; tokens } , … )
     tools    = @( 'node v20.x', 'pwsh 7.5', … )
     timing   = <Summary() from timing.ps1: activeSeconds, excludedSeconds, claudeSeconds, phases[] >
@@ -103,6 +105,7 @@ function New-Tier3Report {
     if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
 
     $dateHuman = if ($Run.ContainsKey('dateHuman') -and $Run.dateHuman) { $Run.dateHuman } else { $Run.timestamp }
+    $tick = [string][char]96   # a literal backtick, for wrapping paths/commands in `code`
     $L = [System.Collections.Generic.List[string]]::new()
     $add = { param($x) $L.Add([string]$x) }
 
@@ -122,6 +125,12 @@ function New-Tier3Report {
     if ($Run.ContainsKey('templateTarget') -and $Run.templateTarget) {
         & $add "| Template | $($Run.templateTarget) |"
     }
+    if ($Run.ContainsKey('repository') -and $Run.repository) {
+        & $add "| Repository | $($Run.repository) |"
+    }
+    if ($Run.ContainsKey('branch') -and $Run.branch) {
+        & $add "| Branch / ref | $($Run.branch) |"
+    }
     & $add "| Version tested | $($Run.version) |"
     if ($Run.ContainsKey('epicsCreated') -and $null -ne $Run.epicsCreated) {
         & $add "| Epics created | $($Run.epicsCreated) |"
@@ -140,6 +149,12 @@ function New-Tier3Report {
     }
     & $add "| Run by | $($Run.runBy) on $($Run.machine) |"
     & $add "| When | $dateHuman |"
+    if ($Run.ContainsKey('command') -and $Run.command) {
+        & $add "| Command | $tick$($Run.command)$tick |"
+    }
+    if ($Run.ContainsKey('buildPath') -and $Run.buildPath) {
+        & $add "| Built at | $tick$($Run.buildPath)$tick |"
+    }
     if ($Run.ContainsKey('timing') -and $Run.timing) {
         # Macro estimate: the average whole-run time from comparable past runs (same
         # model + benchmark), shown next to the actual so you can see at a glance whether

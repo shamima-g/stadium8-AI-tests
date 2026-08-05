@@ -185,6 +185,7 @@ function New-ExperimentReport {
     )
     $specs = Get-ExperimentMetricSpecs
     $arms = @($Setup.arms)
+    $tick = [string][char]96   # a literal backtick, for wrapping paths/commands in `code`
     $L = [System.Collections.Generic.List[string]]::new()
     $add = { param($x) $L.Add([string]$x) }
 
@@ -192,6 +193,14 @@ function New-ExperimentReport {
     & $add ''
     & $add "**Benchmark:** ``$($Setup.benchmark)`` · **Model:** ``$($Setup.model)`` · **Template:** $($Setup.template)"
     & $add "**Arms:** $($arms -join ', ') · **Runs/arm:** $($Setup.runs) · **Order:** $($Setup.order) · **Generated:** $($Setup.generatedAt)"
+    if (($Setup.ContainsKey('repository') -and $Setup.repository) -or ($Setup.ContainsKey('versionTested') -and $Setup.versionTested)) {
+        $repoLine = "**Repository:** $(if ($Setup.ContainsKey('repository') -and $Setup.repository) { $Setup.repository } else { '—' })"
+        if ($Setup.ContainsKey('branch') -and $Setup.branch) { $repoLine += " · **Branch/ref:** $($Setup.branch)" }
+        if ($Setup.ContainsKey('versionTested') -and $Setup.versionTested) { $repoLine += " · **Version tested:** $($Setup.versionTested)" }
+        & $add $repoLine
+    }
+    if ($Setup.ContainsKey('buildPath') -and $Setup.buildPath) { & $add "**Built under:** $tick$($Setup.buildPath)$tick" }
+    if ($Setup.ContainsKey('command') -and $Setup.command) { & $add "**Command:** $tick$($Setup.command)$tick" }
     & $add ''
     & $add '> Measurement study — record-only, never a pass/fail. Read the two axes separately (cost vs speed)'
     & $add '> and treat `Tokens (proxy)` as a rough figure only (it counts cheap cache-reads at par); see Notes.'
@@ -357,10 +366,34 @@ function Invoke-Experiment {
     # 3) Write the aggregate comparison report.
     $templateLabel = if ($Target) { "$Target @ $(if ($Ref) { $Ref } else { 'default' })" } else { 'local checkout' }
     $orderLabel = if ($NoInterleave) { 'sequential' } else { 'interleaved (A B B A …)' }
+
+    # Provenance: the repo + branch/ref under test, where the arms build, and the exact command.
+    $repository = $null; $branch = $null; $versionTested = $templateLabel
+    if ($Target) {
+        $branch = if ($Ref) { $Ref } else { 'default branch' }
+        $targetsFile = Join-Path $PSScriptRoot '..' '..' 'targets.json'
+        if (Test-Path $targetsFile) {
+            $tg = (Get-Content $targetsFile -Raw | ConvertFrom-Json).targets
+            if (@($tg.PSObject.Properties.Name) -contains $Target) { $repository = $tg.$Target.repo }
+        }
+    }
+    else { $repository = 'local checkout'; $branch = 'local' }
+    $cmdParts = [System.Collections.Generic.List[string]]::new()
+    $cmdParts.Add('./Run-Experiment.ps1'); $cmdParts.Add("-Benchmark $Benchmark"); $cmdParts.Add("-Model $Model")
+    if ($Target) { $cmdParts.Add("-Target $Target") }
+    if ($Ref) { $cmdParts.Add("-Ref $Ref") }
+    $cmdParts.Add("-Arms $($Arms -join ',')"); $cmdParts.Add("-Runs $Runs")
+    if ($SkipRuns) { $cmdParts.Add('-SkipRuns') }
+    if ($NoInterleave) { $cmdParts.Add('-NoInterleave') }
+    if ($RunLowerTiers) { $cmdParts.Add('-RunLowerTiers') }
+
     $setup = @{
         benchmark = $Benchmark; model = $Model; template = $templateLabel; arms = $Arms
         runs = $Runs; order = $orderLabel
         generatedAt = $stamp
+        repository = $repository; branch = $branch; versionTested = $versionTested
+        buildPath = 'C:\temp\tier3-builds'   # Run-QATests' default BuildRoot (the arms build here)
+        command = ($cmdParts -join ' ')
     }
     $baseline = $Arms[0]
     $md = New-ExperimentReport -Setup $setup -Aggregates $aggregates -RawRows $rawRows -Baseline $baseline

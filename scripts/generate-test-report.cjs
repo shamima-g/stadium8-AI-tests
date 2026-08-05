@@ -39,6 +39,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+// Resolve a named channel (dev/release) to its repo URL for the provenance rows. Optional:
+// a missing/unknown target just leaves the repository blank rather than failing the report.
+let resolveTarget = null;
+try { ({ resolveTarget } = require('../helpers/targets.cjs')); } catch { /* helper absent — provenance still renders */ }
 
 const QA_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(QA_ROOT, '..');
@@ -455,6 +459,44 @@ function environment() {
   };
 }
 
+/** git origin URL / branch / short commit for a checkout (best-effort; nulls off-repo). */
+function gitInfo(dir) {
+  return {
+    origin: sh('git', ['-C', dir, 'config', '--get', 'remote.origin.url'], dir),
+    branch: sh('git', ['-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD'], dir),
+    commit: sh('git', ['-C', dir, 'rev-parse', '--short', 'HEAD'], dir),
+  };
+}
+
+/**
+ * Provenance for the report header: the exact command, the template repo + branch/ref under
+ * test, the version tested, and where the tests ran. When --target is given the repo comes
+ * from targets.json and the ref is the version asked for; otherwise it's read from the local
+ * checkout's own git metadata.
+ */
+function buildProvenance(opts, env) {
+  const argv = process.argv.slice(2);
+  const command = `node scripts/generate-test-report.cjs${argv.length ? ' ' + argv.join(' ') : ''}`;
+  let repository = null, branch = null, versionTested = null, testedAt = null;
+  if (opts.target) {
+    if (resolveTarget) { try { repository = resolveTarget(opts.target).repo; } catch { /* unknown target */ } }
+    const label = opts.label || `${opts.target}-${opts.ref || 'default'}`;
+    const checkout = path.join(QA_ROOT, '.targets', label);
+    const co = fs.existsSync(checkout) ? gitInfo(checkout) : {};
+    branch = opts.ref || co.branch || 'default branch';
+    if (co.commit) branch += ` (commit ${co.commit})`;
+    versionTested = opts.ref || opts.label || opts.target;
+    testedAt = checkout;
+  } else {
+    const g = gitInfo(REPO_ROOT);
+    repository = g.origin || gitInfo(QA_ROOT).origin || null;
+    branch = env.branch || g.branch || gitInfo(QA_ROOT).branch || null;
+    versionTested = 'local checkout';
+    testedAt = REPO_ROOT;
+  }
+  return { command, repository, branch, versionTested, testedAt };
+}
+
 /** Pull macro token + cost totals from the telemetry report, if a ledger exists. */
 function telemetryTotals(telemetryRoot) {
   if (!telemetryRoot) return null;
@@ -495,6 +537,7 @@ function render(model, env, tel, version, now, extra) {
   extra = extra || {};
   const loc = extra.loc || null;
   const surfaces = extra.surfaces || []; // extra surfaces beyond the QA suite
+  const prov = extra.provenance || null; // command / repository / branch / version tested
 
   const s = stampParts(now);
   const started = model.startTime ? stampParts(new Date(model.startTime)) : s;
@@ -541,6 +584,13 @@ function render(model, env, tel, version, now, extra) {
   if (tel && tel.costUsd != null) L.push(`| Rough AI cost | ${costCell} |`);
   L.push(`| Run by | ${esc(env.runBy)} on ${esc(env.machine)} |`);
   L.push(`| When | ${started.friendly} → finished ${ended.friendlyTime} |`);
+  if (prov) {
+    if (prov.repository) L.push(`| Repository | ${esc(prov.repository)} |`);
+    if (prov.branch) L.push(`| Branch / ref | ${esc(prov.branch)} |`);
+    L.push(`| Version tested | ${esc(prov.versionTested || '—')} |`);
+    if (prov.testedAt) L.push(`| Tested at | \`${esc(prov.testedAt)}\` |`);
+    if (prov.command) L.push(`| Command | \`${esc(prov.command)}\` |`);
+  }
   L.push('');
 
   // ── How each area did ──────────────────────────────────────────────────────
@@ -680,6 +730,7 @@ function main() {
   const env = environment();
   const tel = telemetryTotals(opts.telemetryRoot);
   const loc = countLinesOfCode();
+  const provenance = buildProvenance(opts, env);
 
   // Gather the extra surfaces (run if asked; otherwise reuse the saved result).
   const surfaces = [
@@ -688,7 +739,7 @@ function main() {
     gatherSurface('gates', 'Final quality gates', opts.withGates, runGates, summarizeGatesJson),
   ];
 
-  const md = render(model, env, tel, version, now, { loc, surfaces });
+  const md = render(model, env, tel, version, now, { loc, surfaces, provenance });
 
   const stamp = stampParts(now);
   const outFile = opts.out || path.join(OUT_DIR, `report-${version}-${stamp.file}.md`);
@@ -713,6 +764,9 @@ function main() {
       // Which template/version this run was aimed at (set by run-target.cjs), so
       // labelled histories stay honest about what was under test.
       target: opts.target || null, ref: opts.ref || null, label: opts.label || null,
+      // Provenance: how the run was invoked and what it tested.
+      command: provenance.command, repository: provenance.repository,
+      branch: provenance.branch, versionTested: provenance.versionTested,
       report: path.basename(outFile),
     });
     indexFile = rebuildIndex(OUT_DIR);
@@ -742,5 +796,6 @@ function main() {
 module.exports = {
   buildModel, render, fmtDuration, layerOf, environment, friendlyArea,
   countLinesOfCode, summarizeVitestJson, summarizePlaywrightJson, summarizeGatesJson,
+  gitInfo, buildProvenance,
 };
 if (require.main === module) main();

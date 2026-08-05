@@ -95,7 +95,9 @@ Describe 'Report — the saved comparison, with the peak-memory axis' {
         $planRows = @((New-Row -Tokens 1400 -Claude 130 -Active 150 -Peak 18200), (New-Row -Tokens 1500 -Claude 140 -Active 160 -Peak 18800))
         $agg = @{ build = (Get-ArmAggregate -Rows $buildRows -Keys $keys); plan = (Get-ArmAggregate -Rows $planRows -Keys $keys) }
         $raw = @{ build = $buildRows; plan = $planRows }
-        $setup = @{ benchmark = 'minimal'; model = 'opus'; template = 'local checkout'; arms = @('build', 'plan'); runs = 2; order = 'interleaved'; generatedAt = 'x' }
+        $setup = @{ benchmark = 'minimal'; model = 'opus'; template = 'local checkout'; arms = @('build', 'plan'); runs = 2; order = 'interleaved'; generatedAt = 'x'
+            repository = 'local checkout'; branch = 'local'; versionTested = 'local checkout'
+            buildPath = 'C:\temp\tier3-builds'; command = './Run-Experiment.ps1 -Benchmark minimal -Model opus -Arms build,plan -Runs 2' }
 
         $md = New-ExperimentReport -Setup $setup -Aggregates $agg -RawRows $raw -Baseline 'build'
         $md | Should -Match 'Experiment report'
@@ -104,6 +106,10 @@ Describe 'Report — the saved comparison, with the peak-memory axis' {
         $md | Should -Match 'Fits 16 GB'
         $md | Should -Match 'build'
         $md | Should -Match 'plan'
+        # provenance: repository/version, build path, and the exact command
+        $md | Should -Match 'Repository:'
+        $md | Should -Match 'Built under:.*tier3-builds'
+        $md | Should -Match 'Command:.*Run-Experiment.ps1'
     }
     It 'FAIL-guard: an arm with no runs renders a "no runs" note, not a crash' {
         $keys = @('tokensTotal', 'peakMemoryUsedMB')

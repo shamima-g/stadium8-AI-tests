@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { diffLive, attribute, verdict } from '../../scripts/compare-targets.cjs';
+import { diffLive, attribute, verdict, renderReport } from '../../scripts/compare-targets.cjs';
 
 // A minimal readLive()-shaped record.
 const base = {
@@ -64,5 +64,28 @@ describe('verdict — the three-way rule', () => {
   it('RED: an order-only change is treated as needing review (unexplained)', () => {
     const b = { ...base, stages: ['BUILD', 'PLAN', 'COMPLETE'] };
     expect(verdict(attribute(diffLive(base, b), { a: [], b: [] }))).toBe('red');
+  });
+});
+
+describe('renderReport — provenance header', () => {
+  const meta = {
+    command: 'node scripts/compare-targets.cjs --a release --a-ref v1.2.0 --b dev --b-ref v1.2.0',
+    generatedAt: '2026-08-04 09:00:00',
+    repoA: 'https://github.com/Digiata/Stadium-Builder', refA: 'v1.2.0',
+    repoB: 'https://github.com/stadium-software/stadium-8', refB: 'v1.2.0',
+  };
+
+  it('PASS: emits the command, generated-at, and each side\'s repository + version', () => {
+    const md = renderReport('release-v1.2.0', 'dev-v1.2.0', [], 'green', meta);
+    expect(md).toContain('**Generated:** 2026-08-04 09:00:00');
+    expect(md).toContain('compare-targets.cjs --a release');
+    expect(md).toContain('https://github.com/Digiata/Stadium-Builder');
+    expect(md).toContain('https://github.com/stadium-software/stadium-8');
+  });
+
+  it('FAIL-guard: with no meta, the report still renders (no provenance header, no crash)', () => {
+    const md = renderReport('release-v1.2.0', 'dev-v1.2.0', [], 'green');
+    expect(md).toContain('# Template comparison');
+    expect(md).not.toContain('**Command:**');
   });
 });
