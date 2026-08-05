@@ -19,6 +19,23 @@ Every automated Tier 3 run, newest first, grouped by app. This page is rebuilt a
 |---|---|:--:|---|--:|--:|--:|--:|---|
 | 20260728-0722 | opus | ✅ | incomplete | 96m 42s | 55m 34s | 7.7 GB | 33,165,220 | [open](e-commerce@dev-v1.1.0/opus/20260728-0722/report-v1.1.0-20260728-0722.md) |
 
+## minimal-concurrent@dev-main
+
+[charts & trends](minimal-concurrent@dev-main/tier3-metrics.html)
+
+| When | Model | Result | Verdict | Active | Claude | Peak RAM | Tokens | Report |
+|---|---|:--:|---|--:|--:|--:|--:|---|
+| 20260804-095721 | opus | ✅ | recorded-fail | 58m 57s | 58m 56s | 16 GB | 95,632 | [open](minimal-concurrent@dev-main/opus/20260804-095721/report-main-20260804-095721.md) |
+
+## minimal-concurrent@dev-main-plan
+
+[charts & trends](minimal-concurrent@dev-main-plan/tier3-metrics.html)
+
+| When | Model | Result | Verdict | Active | Claude | Peak RAM | Tokens | Report |
+|---|---|:--:|---|--:|--:|--:|--:|---|
+| 20260804-123157 | opus | ✅ | recorded-fail | 121m 10s | 121m 10s | 15 GB | 180,263 | [open](minimal-concurrent@dev-main-plan/opus/20260804-123157/report-main-20260804-123157.md) |
+| 20260804-105807 | opus | ✅ | recorded-fail | 92m 20s | 92m 20s | 14.7 GB | 202,627 | [open](minimal-concurrent@dev-main-plan/opus/20260804-105807/report-main-20260804-105807.md) |
+
 ## transactions@dev-v1.1.0
 
 [charts & trends](transactions@dev-v1.1.0/tier3-metrics.html)

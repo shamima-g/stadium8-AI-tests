@@ -85,6 +85,36 @@ Describe 'New-Tier3Comparison — release vs dev diff' {
         Remove-Item $sb -Recurse -Force
     }
 
+    It 'PASS: renders provenance (command, generated-at, each side''s repository) when supplied' {
+        $sb = New-Sandbox
+        $hA = Join-Path $sb 'a.jsonl'; $hB = Join-Path $sb 'b.jsonl'
+        Add-Run -History $hA -Ts 'TA'
+        Add-Run -History $hB -Ts 'TB'
+        $out = Join-Path $sb 'cmp.md'
+        New-Tier3Comparison -Benchmark 'transactions' -LabelA 'release-v1.1.0' -LabelB 'dev-v1.1.0' `
+            -HistoryPathA $hA -HistoryPathB $hB -OutFile $out `
+            -Command './Compare-Tier3-Reports.ps1 -Benchmark transactions -A release -ARef v1.1.0 -B dev -BRef v1.1.0' `
+            -GeneratedAt '2026-08-04 09:00:00' `
+            -RepoA 'https://github.com/Digiata/Stadium-Builder' -RepoB 'https://github.com/stadium-software/stadium-8' | Out-Null
+        $md = Get-Content $out -Raw
+        $md | Should -Match 'Generated:\*\* 2026-08-04 09:00:00'
+        $md | Should -Match 'Command:.*Compare-Tier3-Reports.ps1'
+        $md | Should -Match 'Digiata/Stadium-Builder'
+        $md | Should -Match 'stadium-software/stadium-8'
+        Remove-Item $sb -Recurse -Force
+    }
+
+    It 'FAIL-guard: with no provenance supplied, no repository table or command line appears' {
+        $sb = New-Sandbox
+        $hA = Join-Path $sb 'a.jsonl'; $hB = Join-Path $sb 'b.jsonl'
+        Add-Run -History $hA -Ts 'TA'; Add-Run -History $hB -Ts 'TB'
+        $out = Join-Path $sb 'cmp.md'
+        New-Tier3Comparison -Benchmark 'transactions' -LabelA 'release-v1.1.0' -LabelB 'dev-v1.1.0' `
+            -HistoryPathA $hA -HistoryPathB $hB -OutFile $out | Out-Null
+        (Get-Content $out -Raw) | Should -Not -Match 'Command:'
+        Remove-Item $sb -Recurse -Force
+    }
+
     It 'PASS: flags a model mismatch (unfair comparison)' {
         $sb = New-Sandbox
         $hA = Join-Path $sb 'a.jsonl'; $hB = Join-Path $sb 'b.jsonl'

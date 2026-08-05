@@ -125,6 +125,37 @@ function Get-Tier3TargetLabel {
     return "$Target-$r"
 }
 
+# Read the git origin URL + current branch of a checkout, for the report's provenance rows.
+# Best-effort: no git, or a non-repo path, just yields $nulls (the rows are then omitted).
+function Get-Tier3GitProvenance {
+    param([string]$Path)
+    $repo = $null; $branch = $null
+    if ($Path -and (Test-Path $Path) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+        try { $repo = (& git -C $Path config --get remote.origin.url 2>$null); if ($repo) { $repo = ([string]$repo).Trim() } } catch { }
+        try { $branch = (& git -C $Path rev-parse --abbrev-ref HEAD 2>$null); if ($branch) { $branch = ([string]$branch).Trim() } } catch { }
+    }
+    return @{ repo = $repo; branch = $branch }
+}
+
+# Reconstruct the command that produced this run, for the report's "Command" row.
+function Get-Tier3RunCommand {
+    param(
+        [bool]$IncludeTier3, [string]$Benchmark, [string]$Tier3Model, [string]$Scenario,
+        [string]$Target, [string]$Ref, [bool]$Resume, [string]$ReplayResult
+    )
+    $parts = [System.Collections.Generic.List[string]]::new()
+    $parts.Add('./Run-QATests.ps1')
+    if ($IncludeTier3) { $parts.Add('-IncludeTier3') }
+    $parts.Add("-Benchmark $Benchmark")
+    $parts.Add("-Tier3Model $Tier3Model")
+    if ($Scenario -and $Scenario -ne 'build') { $parts.Add("-Scenario $Scenario") }
+    if ($Target) { $parts.Add("-Target $Target") }
+    if ($Ref)    { $parts.Add("-Ref $Ref") }
+    if ($Resume) { $parts.Add('-Resume') }
+    if ($ReplayResult) { $parts.Add("-ReplayResult $ReplayResult") }
+    return ($parts -join ' ')
+}
+
 # Resolve the template Tier 3 builds against.
 #   * No -Target  → the template the QA suite is nested in (../..). The default, and the
 #     original behaviour.
@@ -300,6 +331,28 @@ function Invoke-RunQATests {
     # keep model/benchmark/timestamp authoritative from the invocation
     $run.model = $Tier3Model; $run.benchmark = $Benchmark; $run.timestamp = $Timestamp
     if ($targetLabel) { $run.templateTarget = $targetLabel }   # which template channel@ref this run built against
+
+    # Provenance for the report: the exact command, the template repo + branch/ref it built
+    # against, and where the app was built. A replay reruns the reporting pipeline off saved
+    # JSON (no template, no fresh build), so leave those fields to the JSON in that case.
+    $run.command = Get-Tier3RunCommand -IncludeTier3 $IncludeTier3 -Benchmark $Benchmark -Tier3Model $Tier3Model `
+        -Scenario $Scenario -Target $Target -Ref $Ref -Resume $Resume -ReplayResult $ReplayResult
+    if (-not $ReplayResult) {
+        $run.buildPath = $buildsDir
+        if ($tmpl) {
+            if ($tmpl.ContainsKey('repo') -and $tmpl.repo) {
+                # A -Target run: the repo URL is known from targets.json and the ref is the version asked for.
+                $run.repository = $tmpl.repo
+                $run.branch = if ($tmpl.ContainsKey('ref') -and $tmpl.ref) { $tmpl.ref } else { 'default branch' }
+            }
+            else {
+                # The local template: read its own git origin + branch.
+                $prov = Get-Tier3GitProvenance -Path $tmpl.root
+                if ($prov.repo)   { $run.repository = $prov.repo }
+                if ($prov.branch) { $run.branch = $prov.branch }
+            }
+        }
+    }
 
     # 2b) run the cheap tiers (Tier 1 + Tier 2) so one report covers the whole suite.
     if (-not $SkipLowerTiers -and -not $ReplayResult) {

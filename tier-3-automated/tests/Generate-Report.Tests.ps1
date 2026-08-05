@@ -195,6 +195,34 @@ Describe 'Epics — counts + per-epic build time' {
     }
 }
 
+Describe 'Provenance — command, repository, branch, build path' {
+    It 'PASS: shows each provenance row when the run supplies it' {
+        $out = New-OutDir
+        $run = Base-Run
+        $run.command    = './Run-QATests.ps1 -IncludeTier3 -Benchmark transactions -Tier3Model opus -Target dev -Ref v1.1.0'
+        $run.repository = 'https://github.com/stadium-software/stadium-8'
+        $run.branch     = 'v1.1.0'
+        $run.buildPath  = 'C:\temp\tier3-builds\transactions@dev-v1.1.0\opus\20260710-0630'
+        $path = New-Tier3Report -Run $run -OutDir $out
+        $md = Get-Content $path -Raw
+        $md | Should -Match 'Repository \| https://github.com/stadium-software/stadium-8'
+        $md | Should -Match 'Branch / ref \| v1.1.0'
+        $md | Should -Match 'Command \|.*Run-QATests.ps1'
+        $md | Should -Match 'Built at \|.*tier3-builds'
+        Remove-Item $out -Recurse -Force
+    }
+
+    It 'FAIL-guard: a run without provenance omits those rows (no empty cells)' {
+        $out = New-OutDir
+        $path = New-Tier3Report -Run (Base-Run) -OutDir $out   # Base-Run carries none of them
+        $md = Get-Content $path -Raw
+        $md | Should -Not -Match 'Repository \|'
+        $md | Should -Not -Match 'Built at \|'
+        $md | Should -Not -Match 'Command \|'
+        Remove-Item $out -Recurse -Force
+    }
+}
+
 Describe 'Memory (minimum RAM) section' {
     It 'PASS: reports peak memory and the 16 GB verdict when memory is present' {
         $out = New-OutDir

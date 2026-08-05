@@ -13,7 +13,8 @@ const require = createRequire(import.meta.url);
 const gen = require('../../scripts/generate-test-report.cjs') as {
   buildModel: (json: unknown) => any;
   fmtDuration: (ms: number | null) => string;
-  render: (model: any, env: any, tel: any, version: string, now: Date) => string;
+  render: (model: any, env: any, tel: any, version: string, now: Date, extra?: any) => string;
+  buildProvenance: (opts: any, env: any) => any;
 };
 
 // Minimal Vitest JSON shape: two files in different tiers, one failure with a message.
@@ -101,6 +102,43 @@ describe('generate-test-report — render', () => {
     const md = gen.render(m, ENV, null, '0.1.0', new Date(1_000), { loc, surfaces: [] });
     expect(md).toContain('## Lines of code in the application');
     expect(md).toContain('1,234');
+  });
+
+  it('PASS: renders the provenance rows (command, repository, branch, version tested) when supplied', () => {
+    const m = gen.buildModel(SAMPLE);
+    const provenance = {
+      command: 'node scripts/generate-test-report.cjs --label dev-v1.2.0 --target dev --ref v1.2.0',
+      repository: 'https://github.com/stadium-software/stadium-8',
+      branch: 'v1.2.0 (commit abc1234)',
+      versionTested: 'v1.2.0',
+      testedAt: 'C:/AI/.../.targets/dev-v1.2.0',
+    };
+    const md = gen.render(m, ENV, null, '0.1.0', new Date(1_000), { surfaces: [], provenance });
+    expect(md).toContain('| Repository | https://github.com/stadium-software/stadium-8 |');
+    expect(md).toContain('| Branch / ref | v1.2.0 (commit abc1234) |');
+    expect(md).toContain('| Version tested | v1.2.0 |');
+    expect(md).toContain('generate-test-report.cjs --label dev-v1.2.0');
+  });
+
+  it('FAIL-guard: without provenance, no repository/version rows are emitted', () => {
+    const md = gen.render(gen.buildModel(SAMPLE), ENV, null, '0.1.0', new Date(1_000));
+    expect(md).not.toContain('| Repository |');
+    expect(md).not.toContain('| Version tested |');
+  });
+});
+
+describe('generate-test-report — buildProvenance', () => {
+  it('PASS: a --target run resolves the repo from targets.json and uses the ref as the version', () => {
+    const p = gen.buildProvenance({ target: 'dev', ref: 'v1.2.0', label: 'dev-v1.2.0' }, {});
+    expect(p.repository).toBe('https://github.com/stadium-software/stadium-8');
+    expect(p.versionTested).toBe('v1.2.0');
+    expect(p.command).toContain('generate-test-report.cjs');
+  });
+
+  it('FAIL-guard: a local run (no --target) reports "local checkout", never a crash', () => {
+    const p = gen.buildProvenance({}, { branch: 'main' });
+    expect(p.versionTested).toBe('local checkout');
+    expect(p.branch).toBe('main');
   });
 });
 

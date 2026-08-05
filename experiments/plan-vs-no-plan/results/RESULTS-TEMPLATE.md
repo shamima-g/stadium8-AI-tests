@@ -9,7 +9,11 @@
 |---|---|
 | Benchmark | `minimal-concurrent` |
 | Model | `opus` |
+| Command | `./Run-Experiment.ps1 -Benchmark minimal-concurrent -Model opus -Arms build,plan -Runs 3` |
+| Repository | <targets.json repo URL / local checkout> |
+| Branch / ref | <ref for -Target, else the local branch> |
 | Template ref | <local checkout SHA / target@ref> |
+| Built under | `C:\temp\tier3-builds` |
 | Cache warmth | <cold / warm — note per run below> |
 | Arm order | <e.g. A B B A B A — interleaved> |
 | Runs per arm | <n> |

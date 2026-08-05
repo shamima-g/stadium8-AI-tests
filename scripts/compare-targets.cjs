@@ -140,11 +140,22 @@ function changelogEntries(root) {
   );
 }
 
-function renderReport(labelA, labelB, attributed, v) {
+function renderReport(labelA, labelB, attributed, v, meta) {
+  meta = meta || {};
   const L = [];
   const icon = v === 'green' ? '✅' : v === 'amber' ? '🟠' : '🔴';
   L.push(`# Template comparison — ${labelA} vs ${labelB}`, '');
   L.push(`**Verdict: ${icon} ${v.toUpperCase()}**`, '');
+  // Provenance: which repo/version each side is, when the diff ran, and the command.
+  if (meta.repoA || meta.repoB) {
+    L.push('| Side | Repository | Version tested |', '|---|---|---|');
+    L.push(`| A · ${labelA} | ${meta.repoA || '—'} | ${meta.refA || 'default'} |`);
+    L.push(`| B · ${labelB} | ${meta.repoB || '—'} | ${meta.refB || 'default'} |`, '');
+  }
+  const metaBits = [];
+  if (meta.generatedAt) metaBits.push(`**Generated:** ${meta.generatedAt}`);
+  if (meta.command) metaBits.push(`**Command:** \`${meta.command}\``);
+  if (metaBits.length) L.push(metaBits.join('  ·  '), '');
   if (v === 'green') {
     L.push('The two templates are identical across every compared list. Safe to promote.', '');
     return L.join('\n');
@@ -186,7 +197,17 @@ function main() {
   const diffs = diffLive(readLive(rootA), readLive(rootB));
   const attributed = attribute(diffs, { a: changelogEntries(rootA), b: changelogEntries(rootB) });
   const v = verdict(attributed);
-  const report = renderReport(labelA, labelB, attributed, v);
+
+  // Provenance for the report: the command, when it ran, and each side's repo (from targets.json).
+  const argv = process.argv.slice(2);
+  const command = `node scripts/compare-targets.cjs${argv.length ? ' ' + argv.join(' ') : ''}`;
+  const generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  let repoA = null, repoB = null;
+  try { if (opts.a) repoA = resolveTarget(opts.a).repo; } catch { /* --a-root path, no channel */ }
+  try { if (opts.b) repoB = resolveTarget(opts.b).repo; } catch { /* --b-root path, no channel */ }
+  const meta = { command, generatedAt, repoA, refA: opts.aRef, repoB, refB: opts.bRef };
+
+  const report = renderReport(labelA, labelB, attributed, v, meta);
 
   const outFile = opts.out || path.join(QA_ROOT, 'TestResults', `compare-${labelA}--vs--${labelB}.md`);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -199,5 +220,5 @@ function main() {
   process.exit(v === 'red' ? 1 : 0);
 }
 
-module.exports = { diffLive, attribute, verdict };
+module.exports = { diffLive, attribute, verdict, renderReport };
 if (require.main === module) main();
