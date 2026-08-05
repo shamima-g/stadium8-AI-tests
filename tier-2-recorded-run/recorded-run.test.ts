@@ -43,6 +43,40 @@ function storyFiles(epicDir: string): string[] {
   return fs.readdirSync(dir).filter((f) => /^story-.+\.md$/.test(f)).map((f) => path.join(dir, f));
 }
 
+/** An epic parked ahead by `/plan` waits at this phase (between PLAN and BUILD). */
+const PARKED_PHASE = 'READY-TO-BUILD';
+
+interface EpicStateShape {
+  phase?: string;
+  stories?: Record<string, unknown>;
+  epic?: { dependsOn?: unknown };
+}
+interface EpicRecord { dir: string; slug: string; state: EpicStateShape }
+
+/**
+ * Every epic dir paired with its parsed state.json. A missing or malformed state.json is
+ * skipped here — the artifact-invariants block is what *fails* a malformed one; this helper
+ * only classifies the ones it can read (e.g. to tell a parked epic from a built one).
+ */
+function epicRecords(docsDir: string): EpicRecord[] {
+  const out: EpicRecord[] = [];
+  for (const dir of epicDirs(docsDir)) {
+    const f = path.join(dir, 'state.json');
+    if (!fs.existsSync(f)) continue;
+    try {
+      out.push({ dir, slug: path.basename(dir), state: JSON.parse(fs.readFileSync(f, 'utf8')) as EpicStateShape });
+    } catch {
+      /* ignore — a malformed state.json is caught by the artifact-invariants block */
+    }
+  }
+  return out;
+}
+
+/** Epics parked ahead by `/plan` (phase === READY-TO-BUILD). */
+function parkedEpics(docsDir: string): EpicRecord[] {
+  return epicRecords(docsDir).filter((e) => e.state?.phase === PARKED_PHASE);
+}
+
 // ---------------------------------------------------------------------------
 // Harness meta-checks — ALWAYS run (keep the file non-vacuous even with no fixture)
 // ---------------------------------------------------------------------------
@@ -96,10 +130,13 @@ describe.skipIf(!golden.present)('recorded run — artifact invariants', () => {
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
-  it('PASS: every epic has a decision journal with entries', () => {
-    for (const dir of epicDirs(docsDir)) {
-      const journal = path.join(dir, 'journal.md');
-      expect(fs.existsSync(journal), `${dir} is missing journal.md`).toBe(true);
+  it('PASS: every built epic has a decision journal with entries', () => {
+    // journal.md is a BUILD-phase artifact (appended per story commit), so a PLAN or a
+    // `/plan`-parked (READY-TO-BUILD) epic legitimately has none yet — don't require it there.
+    for (const e of epicRecords(docsDir)) {
+      if (e.state?.phase === 'PLAN' || e.state?.phase === PARKED_PHASE) continue;
+      const journal = path.join(e.dir, 'journal.md');
+      expect(fs.existsSync(journal), `${e.dir} is missing journal.md`).toBe(true);
       expect(fs.readFileSync(journal, 'utf8').trim().length, `${journal} is empty`).toBeGreaterThan(0);
     }
   });
@@ -141,5 +178,101 @@ describe.skipIf(!golden.present || !golden.hasGit)('recorded run — git topolog
     const epicDir = path.join(docsDir, 'epics', slug);
     const stories = fs.existsSync(epicDir) ? storyFiles(epicDir).length : 0;
     expect(commitCount, `epic ${slug} should have ≥ ${stories} commits`).toBeGreaterThanOrEqual(stories);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Parked-epic invariants (/plan) — run only when the recording contains an epic
+// parked at READY-TO-BUILD. Feature-detected off the recording itself, so a
+// version (or a capture) without /plan SKIPS VISIBLY rather than failing.
+//
+// Only the deterministic *traces* a parked epic leaves are asserted here; the
+// /plan behaviours with an irreducible live core (the story approval actually
+// firing, the mid-flow redirect, live merge-block enforcement across two
+// sessions) stay in Tier 3 — see workflow-tests.md §8.
+// ---------------------------------------------------------------------------
+
+const hasParkedEpic = golden.present && parkedEpics(golden.docsDir as string).length > 0;
+
+if (golden.present && !hasParkedEpic) {
+  // eslint-disable-next-line no-console -- intentional visible skip notice
+  console.warn(`\n[tier-2 recorded-run] /plan invariants SKIPPED — the recording has no epic parked at ${PARKED_PHASE} (capture one with /plan to activate them)\n`);
+}
+
+describe.skipIf(!hasParkedEpic)('recorded run — /plan parked-epic invariants (artifacts)', () => {
+  const docsDir = golden.docsDir as string;
+
+  it('PASS: every parked epic carries an approved story list (planned, not just drafted)', () => {
+    // plan-stories-approved (trace) + plan-parked: parking happens *after* PLAN, so a parked
+    // epic must already carry its broken-down stories — both on disk and recorded in state.json.
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      if (storyFiles(e.dir).length === 0) offenders.push(`${e.slug}: parked at ${PARKED_PHASE} but has no story files`);
+      if (!e.state?.stories || Object.keys(e.state.stories).length === 0) {
+        offenders.push(`${e.slug}: parked at ${PARKED_PHASE} but state.json records no stories`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('PASS: a parked epic that depends on an unbuilt epic records that dependency (blocked-ahead)', () => {
+    // plan-blocked-ahead: an epic may be planned ahead while still blocked; if it is, the block
+    // must be recorded as a dependency. Conditional invariant — a parked epic with no deps
+    // neither passes nor fails it (there is nothing to record).
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      const deps = e.state?.epic?.dependsOn;
+      if (Array.isArray(deps)) {
+        const bad = deps.filter((d) => typeof d !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(d));
+        if (bad.length) offenders.push(`${e.slug}: malformed dependsOn ${JSON.stringify(bad)}`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});
+
+describe.skipIf(!hasParkedEpic || !golden.hasGit)('recorded run — /plan parked-epic invariants (git topology)', () => {
+  const git = golden.git as NonNullable<typeof golden.git>;
+  const docsDir = golden.docsDir as string;
+
+  const allBranches = (): string[] =>
+    git('branch', '-a', '--format=%(refname:short)').stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const branchExists = (name: string): boolean =>
+    allBranches().some((b) => b === name || b.endsWith(`/${name}`));
+
+  it('PASS: a parked epic has NOT started building — no epic/<slug> branch exists for it', () => {
+    // plan-no-build-started: /plan parks WITHOUT building, and a build only ever happens on the
+    // epic branch — so that branch's absence is the robust "no build started" signal.
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      if (branchExists(`epic/${e.slug}`)) {
+        offenders.push(`${e.slug}: an epic/${e.slug} branch exists — a parked epic must not have started building`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('PASS: no leftover plan/<slug> planning worktree/branch remains', () => {
+    // plan-parked: /plan does its work in a throwaway plan/<slug> worktree and must clean it up
+    // once the epic is parked on main.
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      if (branchExists(`plan/${e.slug}`)) offenders.push(`${e.slug}: a plan/${e.slug} branch was left behind`);
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('PASS: a parked epic is parked on main (its state.json is committed on the default branch)', () => {
+    // plan-parked: the parked record lands on main via a docs(plan) commit, so main's history
+    // touches it. (Tightening to the exact docs(plan) subject is deferred until a golden run
+    // with a parked epic is captured — matching this file's tolerant-until-recorded stance.)
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      const rel = path.posix.join('generated-docs', 'epics', e.slug, 'state.json');
+      if (!git('log', '--oneline', 'main', '--', rel).stdout.trim()) {
+        offenders.push(`${e.slug}: no commit on main touches ${rel} — parked epic is not on main`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });

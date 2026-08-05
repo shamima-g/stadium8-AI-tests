@@ -10,8 +10,10 @@ vacuous green).
 Drive the make-believe **Team Task Manager** scenario through the real workflow once, on a
 faithful target (prefer the release repo `Digiata/Stadium-8`, or a `dry_run` publish — not
 the dev arrangement), building **at least one epic through to a merge into `main`**
-(INTAKE → PLAN → BUILD → EPIC-END → MANUAL-TEST → COMPLETE-ON-BRANCH → COMPLETE). Then drop
-the result here in **one** of these two forms.
+(INTAKE → PLAN → BUILD → EPIC-END → MANUAL-TEST → COMPLETE-ON-BRANCH → COMPLETE), **and
+planning one more epic ahead with `/plan`** — parked at `READY-TO-BUILD` and left unbuilt.
+The parked epic activates the Tier-2 parked-epic invariants (below); without one they skip.
+Then drop the result here in **one** of these two forms.
 
 ### Preferred — a git bundle (carries branch topology + history)
 
@@ -57,6 +59,12 @@ orchestrator rules / settings it should reflect).
   reason.
 - **Absence canaries:** no `telemetry.ndjson`, no `.claude/logs/`, no `project-brief.md`, no
   performance gate, no `code-reviewer`.
+- **Parked epics (`/plan`):** an epic parked at `READY-TO-BUILD` carries its approved story
+  list (on disk + in `state.json`), has **no `epic/<slug>` branch** and started no build,
+  left **no `plan/<slug>` worktree**, is reachable on `main` via its `docs(plan)` commit, and
+  records `dependsOn` when blocked. Feature-detected — with no parked epic in the recording,
+  these skip. (The live-only halves — approval firing, mid-flow redirect, two-session
+  merge-block — stay in Tier 3.)
 
 ## When to re-capture
 

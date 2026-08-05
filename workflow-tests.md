@@ -249,8 +249,10 @@ only make sense across a whole epic.
 
 1. **Record once, by hand.** A person runs the workflow end-to-end for the Team Task
    Manager (see [section 11](#11-test-inputs-and-fixtures)), building at least one epic
-   through to a merge. The result — a git bundle of the `epic/<slug>` branch and the
-   merge into `main`, plus a copy of the `generated-docs/` tree — is saved into
+   through to a merge **and planning one more ahead with `/plan`** (parked at
+   `READY-TO-BUILD`, never built) so the parked-epic invariants activate. The result — a
+   git bundle of the `epic/<slug>` branch, the merge into `main`, and the parked epic's
+   `docs(plan)` commit, plus a copy of the `generated-docs/` tree — is saved into
    `fixtures/golden-run/`.
 2. **Replay automatically.** The Tier 2 tests load that bundle and tree — no AI is
    needed at test time.
@@ -277,6 +279,16 @@ only make sense across a whole epic.
   ledger, session logs, a `project-brief.md`, a `code-reviewer` agent, retired stage
   names). A freshness canary warns if the recording is older than the orchestrator
   rules or `settings.json`.
+- **The parked-epic (`/plan`) traces** — an epic planned ahead and parked at
+  `READY-TO-BUILD` already carries its **approved story list** (on disk *and* in
+  `state.json`), has **no `epic/<slug>` branch** and started **no build** (the whole point
+  of parking), left **no `plan/<slug>` worktree** behind, is reachable on `main` via its
+  `docs(plan)` commit, and — if blocked — recorded its `dependsOn`. Only these
+  deterministic *traces* live in Tier 2; the `/plan` behaviours with an irreducible live
+  core (the story approval firing, the mid-flow redirect, the merge-block across two live
+  sessions) stay in Tier 3 — see [section 8](#8-tier-3--the-human-walkthrough). The block is
+  **feature-detected off the recording**: a run with no parked epic (an older version, or a
+  capture that skipped `/plan`) **skips visibly**, it never fails.
 
 > **When to re-record.** The recording is a committed fixture. Re-record it after any
 > change that alters how the workflow runs (orchestrator rules, agent prompts,
@@ -398,6 +410,26 @@ list, record-only):
 confirms the behaviour. And **two are already substantially Tier-1** from the v1.2.0 work —
 the parked-epic dashboard/status distinctness (`plan-distinct-status`) and the ordering half
 of the dependency block — so here Tier 3 adds live confirmation, not net-new coverage.
+
+**Where each half runs — the three-tier split for `/plan`.** The deterministic *traces* a
+parked epic leaves are asserted in **two** places, and they are the only halves that gate:
+
+- **Tier 1** proves each pure/real-git assertion function good **and** broken over *synthetic*
+  scaffolds (a parked epic vs. one still at BUILD; a clean worktree teardown vs. a leftover
+  `plan/<slug>`).
+- **Tier 2** asserts those same traces over the **one real recording** — parked story list
+  present (`plan-stories-approved` trace), no `epic/<slug>` branch and no build
+  (`plan-no-build-started`), no leftover `plan/<slug>` and on-`main`-via-`docs(plan)`
+  (`plan-parked`), `dependsOn` recorded when blocked (`plan-blocked-ahead`). These are
+  **pass/fail** Tier-2 invariants, feature-detected off the recording (no parked epic →
+  skip, never fail) — see [section 7](#7-tier-2--invariants-over-a-recorded-run).
+- **Tier 3** is reserved for the **irreducible live cores** above (the approval firing, the
+  mid-flow redirect, the two-session merge-block), which stay **record-only** in the live
+  run — they never gate.
+
+So a rule id like `plan-parked` is *record-only* when observed live in Tier 3, but the same
+trace is a *gating* invariant when replayed over the golden run in Tier 2. Nothing is
+double-counted: Tier 2 gates the traces; Tier 3 confirms only what can't be replayed.
 
 ---
 
@@ -683,7 +715,9 @@ template fixes it.
 
 - **Capture the golden run** — a one-time manual Team-Task-Manager run into
   `fixtures/golden-run/`; the only thing between the Tier-2 scaffold and a live tier.
-  Needs a real workflow run, not code.
+  Needs a real workflow run, not code. **The run should also plan one epic ahead with
+  `/plan`** (parked at `READY-TO-BUILD`, never built) so the parked-epic invariants
+  ([section 7](#7-tier-2--invariants-over-a-recorded-run)) activate rather than skip.
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
   the collector's statuses), and **both live scenarios are now built** in
@@ -695,7 +729,12 @@ template fixes it.
   [section 8's `/plan` subsection](#8-tier-3--the-human-walkthrough). **What remains is live
   validation** — a real run of each (they drive real Claude sessions, so like the rest of
   Tier 3 they're proven by running them, not by the unit suite), and PLAN-B's AC14 merge-block
-  is scored only when a run actually reaches a dependent merge.
+  is scored only when a run actually reaches a dependent merge. The **deterministic parked-epic
+  traces** are now *also* asserted in **Tier 2** as pass/fail invariants over the recording
+  (parked story list, no `epic/<slug>` branch / no build, no leftover `plan/<slug>`,
+  on-`main`-via-`docs(plan)`, `dependsOn` when blocked) — feature-detected, so they activate
+  the moment the golden run above includes a parked epic. Tier 3 keeps only the irreducible
+  live cores (see [section 8](#8-tier-3--the-human-walkthrough)).
 - **Version-gating (Layer B) as channels diverge** — today both are at v1.2.0, so the
   default is **Layer D** (the suite is tagged per version; test an old template with its
   matching-version suite). When a real divergence appears, gate the affected checks on
