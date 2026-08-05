@@ -36,6 +36,14 @@ Every automated Tier 3 run, newest first, grouped by app. This page is rebuilt a
 | 20260804-123157 | opus | ✅ | recorded-fail | 121m 10s | 121m 10s | 15 GB | 180,263 | [open](minimal-concurrent@dev-main-plan/opus/20260804-123157/report-main-20260804-123157.md) |
 | 20260804-105807 | opus | ✅ | recorded-fail | 92m 20s | 92m 20s | 14.7 GB | 202,627 | [open](minimal-concurrent@dev-main-plan/opus/20260804-105807/report-main-20260804-105807.md) |
 
+## singlepage-epic-test@dev-v1.2.0
+
+[charts & trends](singlepage-epic-test@dev-v1.2.0/tier3-metrics.html)
+
+| When | Model | Result | Verdict | Active | Claude | Peak RAM | Tokens | Report |
+|---|---|:--:|---|--:|--:|--:|--:|---|
+| 20260805-1430 | opus | ✅ | pass | 60m 59s | 60m 59s | 16.9 GB | 139,054 | [open](singlepage-epic-test@dev-v1.2.0/opus/20260805-1430/report-v1.2.0-20260805-1430.md) |
+
 ## transactions@dev-v1.1.0
 
 [charts & trends](transactions@dev-v1.1.0/tier3-metrics.html)
