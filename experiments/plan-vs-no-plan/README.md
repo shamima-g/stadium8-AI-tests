@@ -32,6 +32,10 @@ From this folder:
 ./Run-Experiment.ps1 -Benchmark transactions -Model sonnet -Target dev -Ref v1.2.0 `
   -Arms build,plan,concurrent -Runs 5
 
+# All three arms against the dev channel's main branch, 5 runs each:
+./Run-Experiment.ps1 -Benchmark minimal-concurrent -Model opus -Target dev -Ref main `
+  -Arms build,plan,concurrent -Runs 5
+
 # Re-generate the report from runs already recorded, without launching anything:
 ./Run-Experiment.ps1 -SkipRuns -Runs 5
 ```
@@ -52,6 +56,17 @@ From this folder:
 
 Every live run is a full Tier-3 build, so a batch of `-Runs 3 -Arms build,plan` is **6 real AI
 builds** — use the cheap `minimal-concurrent` bench to keep it affordable.
+
+### Why the runs are interleaved (`A B B A` counterbalancing)
+
+By default the runner **alternates** the arms and reverses the order every other cycle
+(`A B` then `B A` …), rather than running all of one arm then the next. This is
+**counterbalancing** — it spreads each arm evenly across the batch so that drift over time (machine
+warming up, servers busier later, etc.) hits every arm equally and cancels out, instead of getting
+baked into whichever arm ran last. Pass `-NoInterleave` to run in strict clumps instead.
+
+Full walkthrough with diagrams — the trap, the fix, and why `A B B A` beats `A B A B`:
+**[COUNTERBALANCING.md](COUNTERBALANCING.md)**.
 
 ---
 
@@ -88,6 +103,7 @@ builds** — use the cheap `minimal-concurrent` bench to keep it affordable.
 | Path | What it is |
 |---|---|
 | [ABOUT.md](ABOUT.md) | The experiment and its tests, explained in full. |
+| [COUNTERBALANCING.md](COUNTERBALANCING.md) | Why the runs interleave (`A B B A`), with diagrams. |
 | `README.md` | This page — how to run it. |
 | `Run-Experiment.ps1` | The flexible runner + comparison-report generator. |
 | [results/](results/) | This experiment's reports + findings (raw runs stay in `TestResults/`). |
