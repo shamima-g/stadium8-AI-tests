@@ -522,8 +522,10 @@ function Get-Tier3CommitEpic {
     return $null
 }
 
-# Epic folders + story counts under the built app's generated-docs/epics. Returns an
-# ordered array of @{ slug; stories } (empty when the app has no epics yet).
+# Epic folders + story counts + lifecycle phase under the built app's generated-docs/epics.
+# Returns an ordered array of @{ slug; stories; phase } (empty when the app has no epics yet).
+# `phase` is the epic's state.json phase (e.g. READY-TO-BUILD, COMPLETE, EPIC-END), or '' when
+# there's no readable state — a built-then-branched epic can leave an empty folder on this branch.
 function Get-Tier3EpicDirs {
     param([Parameter(Mandatory)][string]$Scaffold)
     $epicsRoot = Join-Path $Scaffold 'generated-docs/epics'
@@ -531,7 +533,12 @@ function Get-Tier3EpicDirs {
     $out = [System.Collections.Generic.List[hashtable]]::new()
     foreach ($d in (Get-ChildItem -Path $epicsRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name)) {
         $stories = @(Get-ChildItem -Path (Join-Path $d.FullName 'stories') -Filter 'story-*.md' -File -ErrorAction SilentlyContinue).Count
-        $out.Add(@{ slug = $d.Name; stories = [int]$stories })
+        $phase = ''
+        $stateFile = Join-Path $d.FullName 'state.json'
+        if (Test-Path $stateFile) {
+            try { $phase = [string]((Get-Content -Raw -Path $stateFile -ErrorAction Stop | ConvertFrom-Json).phase) } catch { $phase = '' }
+        }
+        $out.Add(@{ slug = $d.Name; stories = [int]$stories; phase = $phase })
     }
     return @($out)
 }
@@ -560,14 +567,42 @@ function Measure-Tier3Epics {
     return @($out)
 }
 
+# Epic state.json phases that mean the epic reached the end of BUILD (as opposed to READY-TO-BUILD,
+# which is a PARKED/planned epic /plan broke into stories but never built).
+$script:Tier3BuiltEpicPhases = @('COMPLETE', 'COMPLETE-ON-BRANCH', 'MANUAL-TEST', 'EPIC-END')
+
+# Conventional-commit subject fragments that only appear once an epic has been BUILT to epic-end.
+# A parked epic's commits say "plan epic" / "park epic" / "start epic" — never these — so this is the
+# signal that separates built from merely-planned. Matched case-insensitively on the subject.
+$script:Tier3EpicEndCommitMarkers = 'epic-end|manual test passed|mark epic complete'
+
+# Pure: the DISTINCT epic slugs that reached epic-end, from commit records (@{ ts; subject }). The
+# slug is the commit SCOPE (Get-Tier3CommitEpic), so `chore(notes): epic-end review` -> 'notes'.
+# Feed it `git log --all` so an epic built on ANY branch/worktree is seen — a plan run builds each
+# epic on its own branch and merges only some, so a single-branch view would miss a built epic that
+# was branched away. Testable without git.
+function Get-Tier3EpicEndSlugs {
+    param([array]$Commits)
+    $seen = @{}
+    foreach ($c in @($Commits)) {
+        $subj = [string]$c.subject
+        if ($subj -notmatch "(?i)($script:Tier3EpicEndCommitMarkers)") { continue }
+        $slug = Get-Tier3CommitEpic -Subject $subj
+        if ($slug) { $seen[$slug] = $true }
+    }
+    return @($seen.Keys)
+}
+
 # Gather epic/story counts + per-epic build time from the built app (filesystem + git log).
 # Best-effort: no git or no epics yields zeroes, never throws.
 function Get-Tier3EpicStats {
     param([Parameter(Mandatory)][string]$Scaffold)
     $epics = @(Get-Tier3EpicDirs -Scaffold $Scaffold)
+    # --all: a plan run builds epics on separate branches and merges only some, so the checked-out
+    # branch alone would miss a built-then-branched epic (its commits live on another ref).
     $commits = @()
     try {
-        foreach ($line in @(& git -C $Scaffold log --reverse --format='%ct|%s' 2>$null)) {
+        foreach ($line in @(& git -C $Scaffold log --all --reverse --format='%ct|%s' 2>$null)) {
             $parts = [string]$line -split '\|', 2
             if ($parts.Count -eq 2) { $commits += @{ ts = [long]$parts[0]; subject = $parts[1] } }
         }
@@ -575,10 +610,15 @@ function Get-Tier3EpicStats {
     catch { }
     $perEpic = @(Measure-Tier3Epics -Epics $epics -Commits $commits)
     $stories = 0; foreach ($e in $epics) { $stories += [int]$e.stories }
-    # "Built" epics are those that actually produced stories (code). "Created" is every epic
-    # the plan wrote a brief folder for. A run that plans 7 but builds 1 (e.g. it stalled at
-    # the first epic-end gate) has epicsBuilt=1, epicsCreated=7 — the completeness signal.
-    $builtEpics = @($perEpic | Where-Object { [int]$_.stories -gt 0 }).Count
+    # "Built" = the epic reached the end of BUILD, by EITHER signal — so both failure modes of a
+    # naive count are covered: a PARKED epic (READY-TO-BUILD, has stories) is NOT counted, and a
+    # BUILT epic branched away (empty folder / no phase on this branch) is still caught by its
+    # epic-end commit. "Created" is every epic folder the plan wrote. A run that plans 7 but builds 1
+    # has epicsBuilt=1, epicsCreated=7 — the completeness signal.
+    $endSlugs = @{}; foreach ($s in (Get-Tier3EpicEndSlugs -Commits $commits)) { $endSlugs[$s] = $true }
+    $builtEpics = @($epics | Where-Object {
+            ($script:Tier3BuiltEpicPhases -contains ([string]$_.phase).ToUpper()) -or $endSlugs.ContainsKey($_.slug)
+        }).Count
     return @{ epicsCreated = @($epics).Count; epicsBuilt = $builtEpics; storiesCreated = $stories; epics = $perEpic }
 }
 

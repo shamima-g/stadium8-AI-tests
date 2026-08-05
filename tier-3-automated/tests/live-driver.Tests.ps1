@@ -135,16 +135,28 @@ Describe 'Epic stats — commit-epic parse, per-epic time, story counts' {
         ($m | Where-Object { $_.slug -eq 'ghost' }).seconds | Should -Be 0
     }
 
-    It 'PASS: Get-Tier3EpicDirs counts story-*.md per epic folder' {
+    It 'PASS: Get-Tier3EpicDirs counts story-*.md per epic folder and reads the state.json phase' {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-epics-" + [Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path (Join-Path $root 'generated-docs/epics/alpha/stories') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $root 'generated-docs/epics/beta/stories')  -Force | Out-Null
         Set-Content -Path (Join-Path $root 'generated-docs/epics/alpha/stories/story-1.md') -Value 'x'
         Set-Content -Path (Join-Path $root 'generated-docs/epics/alpha/stories/story-2.md') -Value 'x'
+        Set-Content -Path (Join-Path $root 'generated-docs/epics/alpha/state.json') -Value '{"phase":"EPIC-END"}'
+        Set-Content -Path (Join-Path $root 'generated-docs/epics/beta/state.json')  -Value '{"phase":"READY-TO-BUILD"}'
         $dirs = Get-Tier3EpicDirs -Scaffold $root
         @($dirs).Count | Should -Be 2
         ($dirs | Where-Object { $_.slug -eq 'alpha' }).stories | Should -Be 2
         ($dirs | Where-Object { $_.slug -eq 'beta' }).stories  | Should -Be 0
+        ($dirs | Where-Object { $_.slug -eq 'alpha' }).phase   | Should -Be 'EPIC-END'
+        ($dirs | Where-Object { $_.slug -eq 'beta' }).phase    | Should -Be 'READY-TO-BUILD'
+        Remove-Item $root -Recurse -Force
+    }
+
+    It 'FAIL-guard: an epic folder with no/broken state.json reports an empty phase, not an error' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-nostate-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path (Join-Path $root 'generated-docs/epics/gamma/stories') -Force | Out-Null
+        $dirs = Get-Tier3EpicDirs -Scaffold $root
+        ($dirs | Where-Object { $_.slug -eq 'gamma' }).phase | Should -Be ''
         Remove-Item $root -Recurse -Force
     }
 
@@ -153,6 +165,75 @@ Describe 'Epic stats — commit-epic parse, per-epic time, story counts' {
         New-Item -ItemType Directory -Path $root -Force | Out-Null
         @(Get-Tier3EpicDirs -Scaffold $root).Count | Should -Be 0
         Remove-Item $root -Recurse -Force
+    }
+
+    It 'PASS: Get-Tier3EpicEndSlugs keeps only epics that reached epic-end, dropping parked ones' {
+        # notes + tasks reach epic-end (on different branches, as a plan run leaves them); the two
+        # parked epics only ever have plan/park commits, so they must NOT count as built.
+        $commits = @(
+            @{ ts = 1; subject = 'docs(notes): start epic' },
+            @{ ts = 2; subject = 'feat(notes/story-1): notes page' },
+            @{ ts = 3; subject = 'chore(notes): epic-end code review' },
+            @{ ts = 4; subject = 'feat(tasks/story-1): tasks page' },
+            @{ ts = 5; subject = 'chore(tasks): manual test passed — ready to merge' },
+            @{ ts = 6; subject = 'plan(saved-views): park epic ready to build (depends on tasks)' },
+            @{ ts = 7; subject = 'docs(plan): plan epic user-settings (ready to build)' }
+        )
+        $built = @(Get-Tier3EpicEndSlugs -Commits $commits)
+        $built.Count | Should -Be 2
+        ($built -contains 'notes')         | Should -BeTrue
+        ($built -contains 'tasks')         | Should -BeTrue
+        ($built -contains 'saved-views')   | Should -BeFalse
+        ($built -contains 'user-settings') | Should -BeFalse
+    }
+
+    It 'FAIL-guard: Get-Tier3EpicEndSlugs returns nothing when no commit reached epic-end' {
+        $commits = @(
+            @{ ts = 1; subject = 'plan(saved-views): park epic ready to build' },
+            @{ ts = 2; subject = 'chore: initial template scaffold' }
+        )
+        @(Get-Tier3EpicEndSlugs -Commits $commits).Count | Should -Be 0
+        @(Get-Tier3EpicEndSlugs -Commits @()).Count      | Should -Be 0
+    }
+
+    # End-to-end for the whole epicsBuilt fix, on the exact shape that broke the old "stories > 0"
+    # count: one normally-built epic, one built-then-branched (epic-end commit on another ref, empty
+    # shell folder on HEAD), and TWO parked epics (stories written, never built). The old heuristic
+    # would score this 3 (built-normal + the two parked, missing the branched one); the fix scores 2.
+    # The two parked epics make the counts diverge, so this genuinely guards the plan-arm miscount.
+    It 'PASS: Get-Tier3EpicStats counts built (phase OR epic-end commit) and excludes parked' -Skip:(-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-stats-" + [Guid]::NewGuid().ToString('N'))
+        $epics = Join-Path $root 'generated-docs/epics'
+        # (1) normally built: COMPLETE phase + an epic-end commit on this branch.
+        New-Item -ItemType Directory -Path (Join-Path $epics 'built-normal/stories') -Force | Out-Null
+        Set-Content -Path (Join-Path $epics 'built-normal/state.json')         -Value '{"phase":"COMPLETE"}'
+        Set-Content -Path (Join-Path $epics 'built-normal/stories/story-1.md')  -Value '# s'
+        # (3) two parked epics: READY-TO-BUILD + a story each, NO epic-end commit -> must NOT count.
+        foreach ($p in 'parked-a', 'parked-b') {
+            New-Item -ItemType Directory -Path (Join-Path $epics "$p/stories") -Force | Out-Null
+            Set-Content -Path (Join-Path $epics "$p/state.json")         -Value '{"phase":"READY-TO-BUILD"}'
+            Set-Content -Path (Join-Path $epics "$p/stories/story-1.md") -Value '# s'
+        }
+
+        & git -C $root init -q
+        & git -C $root symbolic-ref HEAD refs/heads/main
+        & git -C $root config user.email 't@local'; & git -C $root config user.name 'T'
+        & git -C $root add -A
+        & git -C $root commit -q -m 'docs(project): setup'
+        & git -C $root commit -q --allow-empty -m 'chore(built-normal): epic-end code review'
+        & git -C $root commit -q --allow-empty -m 'plan(parked-a): park epic ready to build (no build)'
+        & git -C $root commit -q --allow-empty -m 'plan(parked-b): park epic ready to build (no build)'
+        # (2) built-then-branched: its epic-end commit lives on ANOTHER branch, and on main the folder
+        # is an empty shell (no state/stories) — the merged-away case, caught only via `git log --all`.
+        & git -C $root checkout -q -b epic/built-branched
+        & git -C $root commit -q --allow-empty -m 'chore(built-branched): epic-end code review'
+        & git -C $root checkout -q main
+        New-Item -ItemType Directory -Path (Join-Path $epics 'built-branched') -Force | Out-Null
+
+        $s = Get-Tier3EpicStats -Scaffold $root
+        $s.epicsCreated | Should -Be 4   # four epic folders on disk
+        $s.epicsBuilt   | Should -Be 2   # built-normal (phase) + built-branched (commit); two parked excluded
+        Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
