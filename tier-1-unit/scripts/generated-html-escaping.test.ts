@@ -77,7 +77,7 @@ describe('report generators — HTML-escape data-derived strings (v1.2.0)', () =
     seedMaliciousEpic(project);
     const r = runScript(BUILD_REPORT, ['--root', project.root, '--no-insights'], { cwd: project.root });
     expect(r.exitCode, r.stderr).toBe(0);
-    const html = project.read('generated-docs/build-report.html');
+    const html = project.read('generated-docs/reports/build-report.html');
     expect(html, 'the payload should reach the page (escaped)').toContain(ESC_MARKER);
     expect(html, 'the raw <script> must never appear').not.toContain(RAW_MARKER);
   });

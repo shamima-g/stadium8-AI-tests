@@ -11,10 +11,17 @@ import { describeTemplate as describe } from '../../helpers';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createTempProject, runScript } from '../../helpers';
+import { createTempProject, runScript, REPO_ROOT } from '../../helpers';
 import type { TempProject } from '../../helpers/temp-project';
 
 const SCRIPT = '.claude/scripts/import-prototype.js';
+
+// The prototype-import capability was removed in the post-v1.2.0 template cut (CHANGELOG:
+// "No more importing from a prototype repo … the onboarding option … is gone"). Older
+// archives (v1.1.0/v1.2.0) still ship the script, so feature-detect and SKIP when it's
+// absent — an honest state, not a fake green, per workflow-tests.md §12 Layer B. Without
+// this guard the tests hard-error (node can't find the script), masking the real signal.
+const SCRIPT_PRESENT = fs.existsSync(path.join(REPO_ROOT, SCRIPT));
 
 function makeV2Source(base: string): string {
   // Layout per import-prototype.js header:
@@ -49,7 +56,7 @@ describe('import-prototype.js — genesis layout', () => {
     fs.rmSync(src, { recursive: true, force: true });
   });
 
-  it('PASS: copies genesis marker files into documentation/ when genesis.md is present', () => {
+  it.skipIf(!SCRIPT_PRESENT)('PASS: copies genesis marker files into documentation/ when genesis.md is present', () => {
     const r = runScript(SCRIPT, ['--from', src], { cwd: project.root });
     const json = r.parsedJson as { status?: string } | undefined;
     // The genesis layout copies genesis/genesis.md → documentation/genesis.md
@@ -57,7 +64,7 @@ describe('import-prototype.js — genesis layout', () => {
     expect(copied || json?.status === 'ok').toBe(true);
   });
 
-  it('FAIL: returns status=error when --from path does not exist', () => {
+  it.skipIf(!SCRIPT_PRESENT)('FAIL: returns status=error when --from path does not exist', () => {
     const r = runScript(SCRIPT, ['--from', path.join(os.tmpdir(), 'does-not-exist-xyz')], { cwd: project.root });
     const json = r.parsedJson as { status?: string } | undefined;
     expect(json?.status).toBe('error');
