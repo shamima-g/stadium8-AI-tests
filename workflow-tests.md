@@ -809,8 +809,26 @@ graceful degradation, the rate reaching every figure). The maintainer subprocess
 exercised end-to-end by #9. Re-testing them here would duplicate co-located coverage (§13.6), so
 they're left where they live.
 
-The only remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
-update-design-mid-project), which need a real AI run and can't be automated in this suite.
+The remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
+update-design-mid-project), which need a real AI run.
+
+**#14/#15 — deterministic halves built (branch `S8-129`); live capture pending.** Following the
+`/plan` three-tier split (§8), the deterministic traces are done and green:
+- **assertion functions** → [`helpers/design-digest.ts`] — `digestReadyForIntake` (a filled digest
+  vs the unfilled template), `decisionsPreserved` (a re-read never drops a recorded decision),
+  `changesScopedTo` (a design update touches only the named screens).
+- **Tier-1 good/broken** → [`tier-1-unit/design/design-traces.test.ts`] — over synthetic scaffolds
+  and the REAL `.claude/templates/design-digest.md` as the canonical unfilled case; feature-detected
+  on the design-interpreter agent.
+- **benchmark fixture** → [`benchmark-files/design-taskboard/`] — a design (mockup + tokens +
+  notes) with a deliberate Uncertainty and a Phase-2 update that renames/moves/adds and conflicts
+  (purple vs the recorded blue).
+- **capture checklist + rule ids** → [`tier-3-automated/DESIGN-SCENARIO.md`].
+
+What remains is the **live run** (a real AI build of the benchmark) to exercise those functions
+over a captured run and record the two irreducible live cores (`design-readback-confirmed`,
+`design-conflict-asks`) — the same state `/plan` is in. A `-Scenario design` isn't wired into the
+runner yet; the checklist is the contract that wiring must satisfy.
 
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
