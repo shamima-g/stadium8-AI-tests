@@ -763,17 +763,18 @@ so the tests target the scripts and their output, not commands.
 | 14 | **Design ingestion read back at Intake** | live behaviour — Claude reads `documentation/` design, states the screens/colours/wording (incl. what it couldn't work out) **before** building, to confirm | 3 | intake read-back names the design-derived facts and asks to confirm | it builds from the design without a confirmable read-back → noted |
 | 15 | **Update design mid-project** | live behaviour — "rebuild these screens to match my updated design" changes only the named screens; prior decisions preserved; a contradiction **asks which wins** | 3 | only named screens change; kept decisions survive; conflict prompts | an un-named screen changes, or a prior decision is silently overwritten → noted |
 
-**Implemented so far (branch `S8-129`):** #11, #9, and #8 are built and green against the
+**Implemented so far (branch `S8-129`):** #11 and #9 are built and green against the
 post-v1.2.0 archive —
 - **#11** → [`tier-1-unit/consistency/ci-no-pr-comments.test.ts`] — scans `.github/workflows/*.yml`;
   teeth over the real matcher.
 - **#9** → [`tier-1-unit/scripts/report-missing-figure-resilience.test.ts`] — end-to-end subprocess
   proof the CLI writes a whole page (exit 0, no `NaN`) on a partial **and** a corrupt data file.
-- **#8** → [`tier-1-unit/scripts/transcript-sibling-scoping.test.ts`] — drives the live
-  `report-core.mjs` `discoverTranscriptDirs()` over a **real git worktree** + a same-prefix
-  non-worktree sibling (complements the template's co-located `report-core.tests.js`).
 
-The remaining rows (#1–7, #10, #12–15) are still spec-only.
+**#8 is deliberately NOT added here** — the sibling-scoping rule is already covered by the
+template's own co-located `lib/report-core.tests.js` (it drives `discoverTranscriptDirs()`
+directly). Duplicating it in this suite would break §13.6 ("don't duplicate a script's
+co-located tests; add only the cross-repo/drift/smoke checks those can't cover"), so it's
+left where it lives. The remaining rows (#1–7, #10, #12–15) are still spec-only.
 
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
