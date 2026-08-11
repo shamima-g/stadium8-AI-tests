@@ -763,8 +763,14 @@ so the tests target the scripts and their output, not commands.
 | 14 | **Design ingestion read back at Intake** | live behaviour — Claude reads `documentation/` design, states the screens/colours/wording (incl. what it couldn't work out) **before** building, to confirm | 3 | intake read-back names the design-derived facts and asks to confirm | it builds from the design without a confirmable read-back → noted |
 | 15 | **Update design mid-project** | live behaviour — "rebuild these screens to match my updated design" changes only the named screens; prior decisions preserved; a contradiction **asks which wins** | 3 | only named screens change; kept decisions survive; conflict prompts | an un-named screen changes, or a prior decision is silently overwritten → noted |
 
-**Implemented so far (branch `S8-129`):** #1, #2, #3, #9, #10, #11, #12, and #13 are built
-and green against the post-v1.2.0 archive —
+**Implemented so far (branch `S8-129`):** #1–5, #9–13 are built and green against the
+post-v1.2.0 archive —
+- **#4** → [`tier-1-unit/scripts/stakeholder-decisions.test.ts`] — end-to-end `--audience
+  stakeholders`: the "Decisions you signed off" section renders each decision + choice + date
+  from the authored record; teeth = nothing invented, and the section vanishes with no record.
+- **#5** → [`tier-1-unit/scripts/maintainer-involvement.test.ts`] — end-to-end `--audience
+  maintainer`: a populated `build-cost-data.json` surfaces the unattended-phase count, the
+  typical answer time, and the verbatim logged question; teeth = an unlogged question never appears.
 - **#1** → [`tier-1-unit/scripts/report-output-location.test.ts`] — maintainer + stakeholders
   both write under `generated-docs/reports/`; teeth = neither leaks to the old root path.
 - **#12** → [`tier-1-unit/scripts/open-page-cross-platform.test.ts`] — `open-page.js`
@@ -793,8 +799,18 @@ and green against the post-v1.2.0 archive —
 template's own co-located `lib/report-core.tests.js` (it drives `discoverTranscriptDirs()`
 directly). Duplicating it in this suite would break §13.6 ("don't duplicate a script's
 co-located tests; add only the cross-repo/drift/smoke checks those can't cover"), so it's
-left where it lives. The remaining rows (#4–7 report content, #14–15 Tier-3 live) are still
-spec-only.
+left where it lives.
+
+**#6 and #7 are deliberately NOT added here** — the effort benchmarks / sizing calculator (#6)
+and the part-built-feature exclusion (#7) live in `generate-build-effort.mjs` and `renderEffort()`,
+both **heavily covered by the template's co-located `generate-build-effort.tests.js` /
+`generate-build-report-html.tests.js`** (medians, one-feature-indicative, partial-epic exclusion,
+graceful degradation, the rate reaching every figure). The maintainer subprocess wiring is already
+exercised end-to-end by #9. Re-testing them here would duplicate co-located coverage (§13.6), so
+they're left where they live.
+
+The only remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
+update-design-mid-project), which need a real AI run and can't be automated in this suite.
 
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
