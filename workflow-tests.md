@@ -841,6 +841,12 @@ staged run to the active Tier-2 golden run, reconcile the per-story-commit invar
 `feat(<slug>/story-N)` subjects (or re-capture in the expected format), then move its bundle to
 `fixtures/golden-run/` root.
 
+> **Coverage map, evidence corrections, and the prioritised gap plan** for the six build-from-design
+> acceptance criteria live in [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md)
+> — a council audit confirmed all six labels but corrected the evidence behind AC3/AC5/AC6 (checks
+> credited with more than they do). Start there to continue the work (AC4 real-backend benchmark is
+> the one true hole).
+
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
 `import-prototype.js` and the retired report commands; and — if the recorded run carried a
