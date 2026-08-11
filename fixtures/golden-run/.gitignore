@@ -4,3 +4,10 @@
 *
 !.gitignore
 !README.md
+
+# Exception: the build-from-design capture (#14/#15) is a small (~1 MB) STAGED run,
+# committed so it can later be promoted to the active golden run at this folder's root.
+# It is NOT the active golden run (it lives in a subfolder the loader ignores). See
+# design-capture/README-staging.md.
+!design-capture/
+!design-capture/**

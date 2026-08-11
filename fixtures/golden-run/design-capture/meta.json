@@ -1,0 +1,12 @@
+{
+  "scenario": "design-taskboard",
+  "kind": "build-from-design (#14/#15)",
+  "capturedAt": "2026-08-11",
+  "model": "opus",
+  "templateVersion": "post-v1.2.0 (s8-129 test line)",
+  "epics": ["sign-in", "task-board", "design-update-board-detail"],
+  "phase2Baseline": "ef94fc9d1702bff3aea309d7f56f40ff5481d1f0",
+  "staged": true,
+  "form": "docs-only (repo.bundle omitted for size; re-capture from phase2Baseline at promotion if git-topology is needed)",
+  "note": "STAGED, not the active golden run. It lives in this subfolder, which the loader (helpers/golden-run.ts) ignores, so Tier-2 keeps skipping. Before promoting to fixtures/golden-run/ root, reconcile Tier-2's per-story-commit invariant: this run's commit subjects are feat(<slug>/story-N), not the feat(epic-N-story-M) the invariant expects."
+}

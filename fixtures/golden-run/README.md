@@ -74,3 +74,15 @@ prompts, settings, hooks). Run the Tier 3 walkthrough once and refresh the bundl
 > **Git-ignored by default.** A real bundle can be large; this directory's contents (except
 > this README) are git-ignored — the recording is a local/CI artifact, not committed source.
 > Remove the ignore entry if your team decides to commit a small golden bundle.
+
+## Staged: build-from-design run (`design-capture/`)
+
+A real captured run of the `design-taskboard` benchmark (the build-from-design Tier-3 scenario,
+#14/#15) is **staged** under [`design-capture/`](design-capture/README-staging.md) — committed via
+a scoped `.gitignore` exception, **docs-only** (~150 KB; the git bundle was omitted for size and is
+re-captured at promotion). It is **not** the active golden run: it lives in a subfolder the loader
+ignores, so Tier 2 keeps skipping. It's kept here to
+**later merge into the active Tier-2 golden run** once its per-story-commit format is reconciled
+(this run uses `feat(<slug>/story-N)`, not the `feat(epic-N-story-M)` the invariant expects). The
+design-specific traces are already gating via `fixtures/design-capture/` +
+`tier-1-unit/design/design-capture-replay.test.ts` — no promotion needed for those.

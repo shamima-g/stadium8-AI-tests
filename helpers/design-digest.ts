@@ -80,13 +80,24 @@ export interface DecisionsPreserved {
   dropped: string[];
 }
 
+/** The stable topic of a decision: its leading `**bold**` label, else the whole line. */
+export function decisionKey(item: string): string {
+  const m = /^\*\*(.+?)\*\*/.exec(item.trim());
+  return (m ? m[1] : item).trim();
+}
+
 /**
  * A re-read reconciles the digest IN PLACE: every decision recorded before must still be present
  * after (decisions override the design files, so re-reading must never quietly drop one).
+ *
+ * "Present" means the decision's TOPIC survives — reconciled wording is expected and fine (the
+ * digest updates a decision in place, e.g. "New task" → "Add task", and tells you what moved). A
+ * DROPPED decision loses its topic entirely. So match on the stable key, not the verbatim line —
+ * an exact-line match would wrongly flag every legitimately-reconciled decision as dropped.
  */
 export function decisionsPreserved(before: string, after: string): DecisionsPreserved {
   const afterBody = digestSections(after)['Your Decisions'] ?? '';
-  const dropped = decisionsIn(before).filter((d) => !afterBody.includes(d));
+  const dropped = decisionsIn(before).filter((d) => !afterBody.includes(decisionKey(d)));
   return { ok: dropped.length === 0, dropped };
 }
 

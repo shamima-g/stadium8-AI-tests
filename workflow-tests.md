@@ -812,8 +812,18 @@ they're left where they live.
 The remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
 update-design-mid-project), which need a real AI run.
 
-**#14/#15 — deterministic halves built (branch `S8-129`); live capture pending.** Following the
-`/plan` three-tier split (§8), the deterministic traces are done and green:
+**#14/#15 — live capture DONE (branch `S8-129`); all six traces PASS.** A real Opus build of the
+`design-taskboard` benchmark was run and captured. Deterministic traces are asserted over the
+captured artifacts by [`tier-1-unit/design/design-capture-replay.test.ts`] (reads
+`fixtures/design-capture/`); the full run is staged for the eventual Tier-2 join under
+`fixtures/golden-run/design-capture/` (committed, but a subfolder the loader ignores — Tier-2 keeps
+skipping until its per-story-commit format is reconciled). The two live cores
+(`design-readback-confirmed`, `design-conflict-asks`) were eyeballed and recorded. **The live run
+also tightened a check:** `decisionsPreserved` matched decisions verbatim, which mis-flagged a
+legitimately *reconciled* decision ("New task" → "Add task") as dropped — now it matches on the
+decision's stable topic/label, so reconciled wording passes and only a genuinely-dropped topic fails.
+
+Following the `/plan` three-tier split (§8), the deterministic traces are done and green:
 - **assertion functions** → [`helpers/design-digest.ts`] — `digestReadyForIntake` (a filled digest
   vs the unfilled template), `decisionsPreserved` (a re-read never drops a recorded decision),
   `changesScopedTo` (a design update touches only the named screens).
@@ -825,10 +835,11 @@ update-design-mid-project), which need a real AI run.
   (purple vs the recorded blue).
 - **capture checklist + rule ids** → [`tier-3-automated/DESIGN-SCENARIO.md`].
 
-What remains is the **live run** (a real AI build of the benchmark) to exercise those functions
-over a captured run and record the two irreducible live cores (`design-readback-confirmed`,
-`design-conflict-asks`) — the same state `/plan` is in. A `-Scenario design` isn't wired into the
-runner yet; the checklist is the contract that wiring must satisfy.
+The live capture (above) has now exercised those functions over a real run; a `-Scenario design`
+still isn't wired into the runner, so re-capturing is manual per the checklist. To promote the
+staged run to the active Tier-2 golden run, reconcile the per-story-commit invariant to this run's
+`feat(<slug>/story-N)` subjects (or re-capture in the expected format), then move its bundle to
+`fixtures/golden-run/` root.
 
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
