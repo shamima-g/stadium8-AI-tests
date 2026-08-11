@@ -763,13 +763,19 @@ so the tests target the scripts and their output, not commands.
 | 14 | **Design ingestion read back at Intake** | live behaviour — Claude reads `documentation/` design, states the screens/colours/wording (incl. what it couldn't work out) **before** building, to confirm | 3 | intake read-back names the design-derived facts and asks to confirm | it builds from the design without a confirmable read-back → noted |
 | 15 | **Update design mid-project** | live behaviour — "rebuild these screens to match my updated design" changes only the named screens; prior decisions preserved; a contradiction **asks which wins** | 3 | only named screens change; kept decisions survive; conflict prompts | an un-named screen changes, or a prior decision is silently overwritten → noted |
 
-**Implemented so far (branch `S8-129`):** #1, #2, #3, #9, #10, #11, and #12 are built and
-green against the post-v1.2.0 archive —
+**Implemented so far (branch `S8-129`):** #1, #2, #3, #9, #10, #11, #12, and #13 are built
+and green against the post-v1.2.0 archive —
 - **#1** → [`tier-1-unit/scripts/report-output-location.test.ts`] — maintainer + stakeholders
   both write under `generated-docs/reports/`; teeth = neither leaks to the old root path.
 - **#12** → [`tier-1-unit/scripts/open-page-cross-platform.test.ts`] — `open-page.js`
   `openerCandidates()` resolves a real opener for win32 / darwin / linux (macOS `open`, Linux
   `xdg-open`); teeth = no platform returns an empty no-op list.
+- **#13** → [`tier-1-unit/consistency/design-digest-contract.test.ts`] — the design feature is
+  deliberately AI-driven/schema-free (its *reading* is Tier-3, #14/#15), so the plan's original
+  scan-doc/manifest angle didn't fit. What IS deterministic is the **wiring**: `design-interpreter`
+  emits `generated-docs/design/digest.md`, a `.claude/templates/design-digest.md` shapes it, and
+  downstream agents read that path (cross-doc drift check, not prose). Teeth = a made-up digest
+  path is referenced nowhere.
 - **#11** → [`tier-1-unit/consistency/ci-no-pr-comments.test.ts`] — scans `.github/workflows/*.yml`;
   teeth over the real matcher.
 - **#9** → [`tier-1-unit/scripts/report-missing-figure-resilience.test.ts`] — end-to-end subprocess
@@ -787,8 +793,8 @@ green against the post-v1.2.0 archive —
 template's own co-located `lib/report-core.tests.js` (it drives `discoverTranscriptDirs()`
 directly). Duplicating it in this suite would break §13.6 ("don't duplicate a script's
 co-located tests; add only the cross-repo/drift/smoke checks those can't cover"), so it's
-left where it lives. The remaining rows (#4–7 report content, #13 design scan, #14–15 Tier-3
-live) are still spec-only.
+left where it lives. The remaining rows (#4–7 report content, #14–15 Tier-3 live) are still
+spec-only.
 
 **Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
 reports land under `generated-docs/reports/`; the **absence canaries** grow to include
