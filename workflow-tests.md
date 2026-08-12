@@ -816,14 +816,13 @@ update-design-mid-project), which need a real AI run.
 
 **#14/#15 — live capture DONE (branch `S8-129`); all six traces PASS.** A real Opus build of the
 `design-taskboard` benchmark was run and captured. Deterministic traces are asserted over the
-captured artifacts by [`tier-1-unit/design/design-capture-replay.test.ts`] (reads
-`fixtures/design-capture/`); the full run is staged for the eventual Tier-2 join under
-`fixtures/golden-run/design-capture/` (committed, but a subfolder the loader ignores — Tier-2 keeps
-skipping until its per-story-commit format is reconciled). The two live cores
-(`design-readback-confirmed`, `design-conflict-asks`) were eyeballed and recorded. **The live run
-also tightened a check:** `decisionsPreserved` matched decisions verbatim, which mis-flagged a
-legitimately *reconciled* decision ("New task" → "Add task") as dropped — now it matches on the
-decision's stable topic/label, so reconciled wording passes and only a genuinely-dropped topic fails.
+captured artifacts (digests + Phase-2 diff) by [`tier-1-unit/design/design-capture-replay.test.ts`]
+(reads `fixtures/design-capture/`). The two live cores (`design-readback-confirmed`,
+`design-conflict-asks`) were eyeballed and recorded in `tier-3-automated/DESIGN-CAPTURE-LOG.md`.
+**The live run also tightened a check:** `decisionsPreserved` matched decisions verbatim, which
+mis-flagged a legitimately *reconciled* decision ("New task" → "Add task") as dropped — now it
+matches on the decision's stable topic/label, so reconciled wording passes and only a
+genuinely-dropped topic fails.
 
 Following the `/plan` three-tier split (§8), the deterministic traces are done and green:
 - **assertion functions** → [`helpers/design-digest.ts`] — `digestReadyForIntake` (a filled digest
@@ -837,15 +836,14 @@ Following the `/plan` three-tier split (§8), the deterministic traces are done 
   (purple vs the recorded blue).
 - **capture checklist + rule ids** → [`tier-3-automated/DESIGN-SCENARIO.md`].
 
-The live capture (above) has now exercised those functions over a real run; a `-Scenario design`
-still isn't wired into the runner, so re-capturing is manual per the checklist. The design-taskboard
-run has since been **promoted to the active Tier-2 golden run** (docs-only, `fixtures/golden-run/generated-docs/`),
-so Tier-2's artifact invariants now gate; and the AC3 **navigability** trace is built and replayed over
-a small single-page contact-form design run (`tier-1-unit/design/contact-navigability-replay.test.ts`).
-No commit-subject reconcile was needed — the git-topology invariant asserts commit *count* ≥ stories,
-not a subject format (git-topology/parked-epic stay skipped: docs-only, no `/plan`). See
-[`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md) — only **AC4** (a design +
-real-backend benchmark) remains.
+The live capture (above) exercised those functions over a real run; a `-Scenario design` still isn't
+wired into the runner, so re-capturing is manual per the checklist. **All six acceptance criteria are
+now covered** (AC1/AC2 record-only rules, AC3 navigability, AC4 real-backend exact-paths, AC5/AC6
+hardened checks) — see [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md).
+The design **content** traces (digest ready, decisions preserved, navigability, exact API paths, the
+AC5 can't-use case) gate via the `fixtures/design-capture/` replays. The Tier-2 golden run is a
+separate `/plan` run (see [section 7](#7-tier-2--invariants-over-a-recorded-run) / the golden-run
+README) — the design-taskboard run is not the golden run.
 
 > **Coverage map, evidence corrections, and the prioritised gap plan** for the six build-from-design
 > acceptance criteria live in [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md)

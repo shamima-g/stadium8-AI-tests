@@ -120,6 +120,9 @@ Hand these to the QA suite so the deterministic traces run over the real run:
 
 The deterministic traces are asserted by the already-built functions:
 `digestReadyForIntake` / `decisionsPreserved` (over `digest.before.md` vs the final digest) /
-`changesScopedTo` (over the Phase-2 diff, allowed = Board + Task-detail paths). Fold the run into
-the Tier-2 golden-run fixture so these become replayable, gating invariants — and file the two live
-cores as record-only, exactly as the `/plan` scenarios do.
+`changesScopedTo` (over the Phase-2 diff). Commit the captured artifacts (digests + diff, and any
+spec/endpoints/route list) under `fixtures/design-capture/` and add a replay test that runs those
+functions over them — like the existing `tier-1-unit/design/*-replay.test.ts` — so the design
+**content** traces become replayable, gating checks. (These gate independently of the Tier-2
+golden run, which is a separate `/plan` recording.) File the two live cores (`design-readback-confirmed`,
+`design-conflict-asks`) as record-only in `DESIGN-CAPTURE-LOG.md`.

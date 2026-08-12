@@ -19,8 +19,9 @@ Two-phase build (build from design → update design + rebuild named screens). *
 | `design-decisions-preserved` | ✅ | all 7 prior Your-Decisions survived the re-read; digest reconciled in place (44→46 items) |
 | `design-conflict-asks` | ✅ (live) | surfaced purple-vs-blue ("do NOT switch silently"); kept blue `#2563eb`; commit `df566ec` "blue reaffirmed over update purple"; built `globals.css` has no `#7c3aed` |
 
-Artifacts: `fixtures/design-capture/` (digests + phase2 diff). Promoted to the active Tier-2 golden
-run at `fixtures/golden-run/generated-docs/` (docs-only).
+Artifacts: `fixtures/design-capture/` (digests + phase2 diff), replayed by
+`tier-1-unit/design/design-capture-replay.test.ts`. (This run is **not** the Tier-2 golden run — that
+is a separate `/plan` run; see `fixtures/golden-run/`.)
 
 ## Run 2 — `contact-form-design` (AC3 navigability) · 2026-08-12 · Opus · post-v1.2.0 cut
 

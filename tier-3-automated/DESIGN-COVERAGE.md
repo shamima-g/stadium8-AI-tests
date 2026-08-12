@@ -22,6 +22,8 @@ of them (below) — i.e. some checks were credited with doing more than they act
    spec" is **prose in `workflow-tests.md`, not implemented** in `tier-2-recorded-run/recorded-run.test.ts`.
    And Tier-2 **skips the design run** anyway (the staged run lives in a subfolder `helpers/golden-run.ts`
    ignores). Real suite coverage for AC3 is screen *existence* + scoping only — **not navigability**.
+   *(Since resolved — see the progress note above: a `/plan` run is now the active golden run so Tier-2
+   gates, and a navigability trace was added.)*
 2. **AC5 — the stated gate is inert.** `digestReadyForIntake` requires the Uncertainties **section to
    exist**, not to contain anything (`ok` depends on screens + palette, never Uncertainties content),
    so an empty section passes. The real teeth are the replay asserts over the captured run.
@@ -42,11 +44,12 @@ of them (below) — i.e. some checks were credited with doing more than they act
 > Original prioritised plan (all landed):
 > - **2 (AC3)** ✅ — navigability trace built (`screenNames`/`appRoutePaths`/`unroutedScreens` + synthetic
 >   good/broken) and replayed over a real single-page contact-form design run
->   (`contact-navigability-replay.test.ts`: 1 screen → `/`, no unrouted screens). The design-taskboard
->   run was **promoted to the active Tier-2 golden run** (docs-only, `fixtures/golden-run/generated-docs/`),
->   so Tier-2's artifact invariants now gate. (No commit-subject reconcile was needed — the git-topology
->   invariant asserts commit *count* ≥ stories, not a subject format; git-topology stays skipped as
->   docs-only.)
+>   (`contact-navigability-replay.test.ts`: 1 screen → `/`, no unrouted screens). The Tier-2 **golden
+>   run** is a separate `/plan` run (`minimal-concurrent`, build-one-park-one) committed as a
+>   `repo.bundle`, which activates **all three** Tier-2 blocks (artifact + git-topology + `/plan`
+>   parked-epic). The design **content** traces gate independently via the `fixtures/design-capture/`
+>   replays. (No commit-subject reconcile was needed — the git-topology invariant asserts commit
+>   *count* ≥ stories, not a subject format.)
 > - **5 (AC5)** ✅ — the Uncertainties gate now requires ≥1 real item (`uncertaintiesItems` /
 >   `surfacesUncertainty`), with a present-but-empty broken case and a can't-use-element good/broken
 >   (commit `d6cd325`). The inert gate is fixed.
@@ -55,11 +58,12 @@ of them (below) — i.e. some checks were credited with doing more than they act
 > - **3 (AC2)** ✅ and **4 (AC1)** ✅ — record-only rules `design-no-manual-intervention` and
 >   `design-only-input` added to `DESIGN-SCENARIO.md` (table + capture checklist).
 >
-> **Remaining: tasks 1 (AC4) and 2 (AC3)** — both Large. Task 1 needs a backend choice; task 2 needs
-> the golden-run promotion (commit-subject reconcile) + the navigability trace.
+> **All tasks landed.** Every AC is covered; the Tier-2 golden run (a `/plan` run) has all three
+> invariant blocks gating; and the missing-journal finding was refined into a decision-trail check
+> (`epicHasDecisionTrail` + `tier-1-unit/design/decision-trail.test.ts`).
 
-Ordered so the biggest, most-isolated hole comes first. Each task lists where it lives and what
-"done" means. Small = a Tier-1 test / doc edit; Large = a fixture/benchmark or a live re-capture.
+The original plan is kept below as the record of what was done. (Ordered so the biggest,
+most-isolated hole came first; each task lists where it lives and what "done" meant.)
 
 ### 1. AC4 — a design **+ real-backend** benchmark  *(Large; the only true hole)*
 - **Goal:** prove a design build replaces stand-in data with **real backend calls**.
@@ -70,12 +74,12 @@ Ordered so the biggest, most-isolated hole comes first. Each task lists where it
   exist — so real-backend correctness (exact paths, no raw `fetch`, shared client) becomes gating.
 - **Done when:** a design-driven build hits a real backend and the api-path linter runs (not skips) over it.
 
-### 2. AC3 — promote the staged run + add a **navigability** trace  *(Large + Medium)*
-- **Goal:** make Tier-2 actually gate the design feature, and check "user can move through it".
-- **Do (promote):** reconcile the per-story-commit invariant — this run uses `feat(<slug>/story-N)`,
-  Tier-2 expects `feat(epic-N-story-M)` (see `fixtures/golden-run/design-capture/meta.json`) — then move
-  the run to `fixtures/golden-run/` root (re-capture a `repo.bundle` from the baseline commit if topology
-  checks are wanted).
+### 2. AC3 — golden run + a **navigability** trace  *(Large + Medium)*  ✅ DONE
+- **Goal:** make Tier-2 actually gate a real run, and check "user can move through it".
+- **Outcome (golden run):** the feared per-story-commit reconcile was moot — the git-topology
+  invariant checks commit *count* ≥ stories, not a `feat(...)` subject format. A `/plan` run
+  (`minimal-concurrent`) was captured as `fixtures/golden-run/repo.bundle` (local heads only, to
+  exclude a polluted shared remote), activating all three Tier-2 blocks including parked-epic.
 - **Do (navigability):** add a trace mapping the digest **Screens → live `(app)` routes** — a page/route
   exists per designed screen, and (via the workflow's per-story e2e specs) each is reachable.
 - **Done when:** Tier-2 no longer skips the design run, and a suite test maps each digest screen to a route.
