@@ -41,6 +41,39 @@ are the contract that wiring must satisfy.
    target via `REPO_ROOT`, not something you build against live.)
 2. **Model + budget** — opus vs sonnet; it's a full real build (real tokens/time).
 
+## Reusable autonomous build prompt
+
+Each live run is driven by pasting one prompt into a Claude Code session opened on a fresh build-run
+copy (design dropped into `documentation/design/`, any API into `documentation/backend/`, and the
+benchmark's `answers.json` copied to `TIER3-ANSWERS.json` at the root). The per-benchmark specifics
+(pitch, sign-in, data source, scope, exact API paths) all come from that `answers.json` — so this
+prompt template is the same across benchmarks; only the parenthetical hints change.
+
+```
+This is an AUTOMATED, NON-INTERACTIVE build. For every approval or choice, read the pre-planned
+answers in TIER3-ANSWERS.json at the repo root and proceed WITHOUT waiting.
+
+Build the app described by the DESIGN in documentation/design/ <plus the REAL standalone API in
+documentation/backend/ when present>. Run /start and build it as ONE small epic with a SINGLE story
+(unless the design clearly needs more), to a merge on main. Use the design's tokens verbatim.
+
+<Mock vs real data: for a mock-only design, build a stand-in data layer. For a design + backend,
+generate generated-docs/specs/api-spec.yaml from documentation/backend/ and a typed client at
+web/src/lib/api/endpoints.ts using the spec's EXACT paths via the shared client — no mock, no raw
+fetch, no invented paths.>
+
+At Intake, read the design back to me (the screens, fields, colours, copy <and any API endpoints>)
+and name anything you couldn't determine, then confirm and continue per TIER3-ANSWERS.json.
+
+<For a design-UPDATE (#15) run, instead: drop the update/ design over documentation/design/, then
+start ONE ordinary piece of work "rebuild only the <named> screens to match my updated design;
+leave <other> as is." Preserve the recorded decisions; if the update contradicts one, surface the
+conflict and ask which wins rather than silently switching.>
+```
+
+The exact prompts used for the recorded runs are reconstructable from this template + each
+benchmark's `answers.json`; the runs and their verdicts are logged in `DESIGN-CAPTURE-LOG.md`.
+
 ## Run — Phase 1 (#14: build from the design)
 
 1. Scaffold a fresh project (the runner's Setup). The benchmark drop lands
