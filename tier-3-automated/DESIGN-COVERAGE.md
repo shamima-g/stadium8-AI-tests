@@ -33,7 +33,13 @@ of them (below) — i.e. some checks were credited with doing more than they act
 
 ## Work plan — prioritised by leverage
 
-> **Progress (2026-08-12):** tasks **2, 3, 4, 5, 6 are DONE** on `S8-129`. Only **task 1 (AC4)** remains.
+> **COMPLETE (2026-08-12):** all six tasks are DONE on `S8-129`.
+> - **1 (AC4)** ✅ — `feedback-api-design` benchmark (design + standalone API) built; the build
+>   produced `api-spec.yaml` + `endpoints.ts`, and `feedback-api-replay.test.ts` runs the exact-path
+>   matcher over them (no invented paths, shared client, no raw fetch). Real backend, not mock —
+>   TG-31 now gates on a design build instead of skipping.
+>
+> Original prioritised plan (all landed):
 > - **2 (AC3)** ✅ — navigability trace built (`screenNames`/`appRoutePaths`/`unroutedScreens` + synthetic
 >   good/broken) and replayed over a real single-page contact-form design run
 >   (`contact-navigability-replay.test.ts`: 1 screen → `/`, no unrouted screens). The design-taskboard

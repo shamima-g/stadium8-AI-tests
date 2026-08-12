@@ -34,9 +34,23 @@ A small single-page contact form (1 epic, 1 story, 1 screen at `/`), to prove na
   epic writes one; that's why this run wasn't used as the golden run (design-taskboard, which has
   journals, was). Candidate Tier-2 refinement: require the journal only when the epic recorded decisions.
 
-## Run 3 — `feedback-api-design` (AC4 real backend) · PENDING
+## Run 3 — `feedback-api-design` (AC4 real backend) · 2026-08-12 · Opus · post-v1.2.0 cut · **PASS**
 
-Design + standalone API (GET/POST `/api/v1/messages`). Expected to produce
-`generated-docs/specs/api-spec.yaml` + `web/src/lib/api/endpoints.ts`, so the TG-31 exact-path check
-gates. Capture those two files after the run; the AC4 replay asserts no invented paths. *(Verdicts to
-be filled in when the run completes.)*
+Design + standalone API (single-page feedback wall, GET/POST `/api/v1/messages`), one epic
+(`feedback-wall`), one story. The build produced the real-backend artifacts, so TG-31 gates.
+
+| Rule id | Verdict | Evidence |
+|---|:--:|---|
+| `design-digest-written` / `-uncertainties-surfaced` | ✅ | digest is a filled read-back; flagged pagination as unspecified |
+| **`exact-api-paths` (TG-31, AC4)** | ✅ | `generated-docs/specs/api-spec.yaml` (`/api/v1/messages`) + `web/src/lib/api/endpoints.ts` both produced; `findInventedPaths` = 0 — every client path matches the spec exactly |
+| real-backend, shared client | ✅ | `endpoints.ts` (auto-generated from the spec) calls `get`/`post` from `@/lib/api/client` at `/api/v1/messages`; **no raw `fetch`** outside the shared client; not a stand-in data layer |
+
+Note: a `web/src/mocks/` dir exists (MSW test doubles of the *real* endpoints — the app's data path
+still goes through `endpoints.ts` → the shared client → `/api/v1/messages`, so it's real backend
+calls, mocked only at test time). Artifacts: `fixtures/design-capture/feedback/` (spec + endpoints);
+replay: `tier-1-unit/design/feedback-api-replay.test.ts`.
+
+---
+
+**All AC coverage complete.** AC1/AC2 (record-only rules), AC3 (navigability + golden run), AC4
+(this run), AC5/AC6 (hardened checks) are done. See `DESIGN-COVERAGE.md`.
