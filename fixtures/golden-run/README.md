@@ -3,13 +3,15 @@
 Tier 2 (`tier-2-recorded-run/`) replays **one real end-to-end workflow run** and asserts
 invariants over it — no live AI at test time. This directory holds that recording.
 
-> **Active golden run (captured 2026-08-11).** A real build-from-design run (`design-taskboard`,
-> 3 epics) is committed here as **`repo.bundle`** (~1 MB — carries both the `generated-docs/` tree
-> and the git history) — see `meta.json`. So Tier-2's **artifact invariants** (state schema, role+AC
-> per story, decision trail, absence canaries) **and its git-topology invariants** (`epic/<slug>`
-> branches, merge-into-main, commit count ≥ stories) **both gate**. Only the **`/plan` parked-epic**
-> invariants still skip: this run has no `/plan`-parked epic — capture a `/plan` run (e.g.
-> `minimal-concurrent`) to activate them. A skipped block **skips visibly** — never a vacuous green.
+> **Active golden run (captured 2026-08-12).** A real **build-one-park-one** run (`minimal-concurrent`:
+> Notes built + merged, Tasks planned + parked at `READY-TO-BUILD`) is committed here as
+> **`repo.bundle`** (~900 KB — carries the `generated-docs/` tree + git history) — see `meta.json`.
+> **All three Tier-2 blocks now gate:** the **artifact** invariants (state schema, role+AC per story,
+> decision trail, absence canaries), the **git-topology** invariants (`epic/<slug>` branch,
+> merge-into-main, commit count ≥ stories), **and the `/plan` parked-epic** invariants (parked story
+> list, no `epic/tasks` branch, no `plan/tasks` worktree, on-`main`-via-`docs(plan)`, `dependsOn`).
+> It replaced the earlier design-taskboard golden run; the design-specific *content* traces gate
+> separately via `fixtures/design-capture/` + the `tier-1-unit/design/*replay*.test.ts` files.
 
 ## What to capture
 

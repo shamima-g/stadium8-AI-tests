@@ -1,10 +1,10 @@
 {
-  "scenario": "design-taskboard",
-  "kind": "build-from-design (#14/#15)",
-  "form": "repo.bundle (carries generated-docs + git topology)",
-  "epicSlug": "task-board",
-  "capturedAt": "2026-08-11",
+  "scenario": "minimal-concurrent",
+  "kind": "/plan build-one-park-one (Notes built + merged, Tasks planned + parked)",
+  "form": "repo.bundle (generated-docs + git topology + a /plan-parked epic)",
+  "epicSlug": "notes",
+  "capturedAt": "2026-08-12",
   "templateVersion": "post-v1.2.0 (s8-129 test line)",
-  "epics": ["sign-in", "task-board", "design-update-board-detail"],
-  "note": "Active Tier-2 golden run as a git bundle: the ARTIFACT invariants (state schema, role+AC per story, decision trail, absence canaries) AND the GIT-TOPOLOGY invariants (epic/<slug> branches, merge-into-main, commit count >= stories) both gate. epicSlug picks the branch for the commit-count check. The /plan parked-epic invariants still skip — this run has no /plan-parked epic; capture a /plan run (e.g. minimal-concurrent) to activate them."
+  "epics": ["notes (COMPLETE)", "tasks (READY-TO-BUILD, parked, dependsOn notes)"],
+  "note": "Active Tier-2 golden run. ALL THREE blocks gate: artifact invariants, git-topology, AND the /plan parked-epic invariants (Tasks parked at READY-TO-BUILD). Spec-driven (no design digest); the design-specific traces gate separately via fixtures/design-capture/ replays. Replaces the earlier design-taskboard golden run — a build-one-park-one recording per workflow-tests.md §7."
 }
