@@ -77,7 +77,7 @@ describe('maintainer report — user-involvement summary + decision log (post-v1
     project = createTempProject();
   });
   afterEach(() => {
-    project.cleanup();
+    project.cleanup(); // RB-0 — the throwaway temp project is discarded
   });
 
   it.skipIf(!BR_PRESENT)('PASS: a populated cost file surfaces the unattended-phase count, answer time, and the logged question', () => {

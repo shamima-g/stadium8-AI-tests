@@ -30,7 +30,7 @@ describe('build report points to /start before a project exists (post-v1.2.0)', 
     project = createTempProject();
   });
   afterEach(() => {
-    project.cleanup();
+    project.cleanup(); // RB-0 — the throwaway temp project is discarded
   });
 
   it.skipIf(!BR_PRESENT)('PASS: a no-project tree returns /start guidance, not a report', () => {

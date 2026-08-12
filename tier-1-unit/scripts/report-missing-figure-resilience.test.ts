@@ -64,7 +64,7 @@ describe('build report degrades on a partial/foreign data file (v1.2.0)', () => 
     project = createTempProject();
   });
   afterEach(() => {
-    project.cleanup();
+    project.cleanup(); // RB-0 — the throwaway temp project is discarded
   });
 
   it.skipIf(!BR_PRESENT)(

@@ -63,7 +63,7 @@ describe('stakeholders report — Decisions you signed off (post-v1.2.0)', () =>
     project = createTempProject();
   });
   afterEach(() => {
-    project.cleanup();
+    project.cleanup(); // RB-0 — the throwaway temp project is discarded
   });
 
   it.skipIf(!SPLIT)('PASS: signed-off decisions render, dated, from the record — and nothing is invented', () => {

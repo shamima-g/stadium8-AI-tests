@@ -57,7 +57,7 @@ describe('both build reports land under generated-docs/reports/ (post-v1.2.0)', 
     project = createTempProject();
   });
   afterEach(() => {
-    project.cleanup();
+    project.cleanup(); // RB-0 — the throwaway temp project is discarded
   });
 
   it.skipIf(!SPLIT)(
