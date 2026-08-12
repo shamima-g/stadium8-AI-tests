@@ -14,7 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   digestReadyForIntake,
-  digestSections,
+  uncertaintiesItems,
+  surfacesUncertainty,
   decisionsPreserved,
   changesScopedTo,
 } from '../../helpers/design-digest';
@@ -40,10 +41,10 @@ describe('design-capture replay — real run traces (#14/#15)', () => {
     expect(r.missingSections).toEqual([]);
   });
 
-  it('design-uncertainties-surfaced: the intake digest names the due-date it could not determine', () => {
-    const uncertainties = digestSections(intake)['Uncertainties'] ?? '';
-    expect(uncertainties.length, 'Uncertainties is non-empty').toBeGreaterThan(0);
-    expect(uncertainties.toLowerCase()).toMatch(/due-date|due date/);
+  it('design-uncertainties-surfaced: the intake digest surfaces real uncertainties incl. the due-date', () => {
+    // Real items, not just a heading — the run surfaced several (due-date, assignee source, …).
+    expect(uncertaintiesItems(intake).length, 'real uncertainty items').toBeGreaterThanOrEqual(1);
+    expect(surfacesUncertainty(intake, /due-date|due date/i), 'the due-date it could not determine was shown').toBe(true);
   });
 
   // ---- #15 ----

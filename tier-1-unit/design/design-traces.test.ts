@@ -22,6 +22,8 @@ import {
   decisionsPreserved,
   decisionsIn,
   changesScopedTo,
+  uncertaintiesItems,
+  surfacesUncertainty,
 } from '../../helpers/design-digest';
 
 const DESIGN_INTERPRETER = path.join(REPO_ROOT, '.claude', 'agents', 'design-interpreter.md');
@@ -81,6 +83,7 @@ describe('build-from-design — deterministic digest traces (#14/#15)', () => {
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect(r.realScreens).toBeGreaterThanOrEqual(2);
     expect(r.hasRealPalette).toBe(true);
+    expect(r.realUncertainties, 'surfaced at least one real uncertainty').toBeGreaterThanOrEqual(1);
     expect(r.missingSections).toEqual([]);
   });
 
@@ -101,6 +104,33 @@ describe('build-from-design — deterministic digest traces (#14/#15)', () => {
     const r = digestReadyForIntake(noUncertainties);
     expect(r.ok).toBe(false);
     expect(r.missingSections).toContain('Uncertainties');
+  });
+
+  it.skipIf(!PRESENT)('BROKEN: an Uncertainties section that is present but EMPTY is not ready', () => {
+    // The heading is there (so it isn't "missing"), but it holds no real item — the inert
+    // section-existence gate used to pass this; the content gate must reject it.
+    const emptyUncertainties = FILLED_DIGEST.replace(/## Uncertainties[\s\S]*$/, '## Uncertainties\n\n- None.\n');
+    const r = digestReadyForIntake(emptyUncertainties);
+    expect(r.ok, JSON.stringify(r)).toBe(false);
+    expect(r.missingSections, 'the section is present, just empty').not.toContain('Uncertainties');
+    expect(r.realUncertainties).toBe(0);
+  });
+
+  // ---- #14 (AC5): a design element the workflow can't use is SHOWN, not silently dropped ----
+
+  it.skipIf(!PRESENT)('PASS: an unusable design element is surfaced under Uncertainties', () => {
+    const withUnusable = FILLED_DIGEST.replace(
+      /## Uncertainties[\s\S]*$/,
+      '## Uncertainties\n\n- The hero logo asset could not be decoded (binary blob) — please re-supply it.\n',
+    );
+    expect(uncertaintiesItems(withUnusable).length).toBeGreaterThanOrEqual(1);
+    expect(surfacesUncertainty(withUnusable, /could not be decoded|undecodable|unreadable|re-supply/i)).toBe(true);
+  });
+
+  it.skipIf(!PRESENT)('BROKEN: an unusable element dropped from Uncertainties is caught (nothing surfaced)', () => {
+    // Same digest, but the can't-use element was quietly omitted — the check must not find it.
+    const dropped = FILLED_DIGEST; // its only uncertainty is the due-date; no mention of the asset
+    expect(surfacesUncertainty(dropped, /could not be decoded|undecodable|unreadable|re-supply/i)).toBe(false);
   });
 
   // ---- #15a: decisions survive a re-read (reconciled in place, never dropped) ----

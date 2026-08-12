@@ -42,12 +42,20 @@ export interface DigestReadiness {
   missingSections: string[];
   realScreens: number;
   hasRealPalette: boolean;
+  realUncertainties: number;
 }
 
 /**
  * Is a digest a filled read-back, not the unfilled template? Ready when every required section
- * is present, at least one real (non-`[placeholder]`) screen was extracted, and the palette
- * carries a concrete colour value (not the `#XXXXXX` placeholder).
+ * is present, at least one real (non-`[placeholder]`) screen was extracted, the palette carries a
+ * concrete colour value (not the `#XXXXXX` placeholder), and Uncertainties has at least one real
+ * item.
+ *
+ * The Uncertainties requirement is a FILLED-vs-TEMPLATE discriminator, not a claim that every
+ * design must be ambiguous: the empty template's Uncertainties holds only guidance prose (no real
+ * bullets), while a real read-back — per the design-interpreter's "never omit Uncertainties" /
+ * "state what you couldn't determine" contract — always surfaces at least its assumptions. It
+ * fixes the earlier inert gate that checked only that the section EXISTED (an empty section passed).
  */
 export function digestReadyForIntake(md: string): DigestReadiness {
   const sections = digestSections(md);
@@ -62,8 +70,28 @@ export function digestReadyForIntake(md: string): DigestReadiness {
   const paletteBody = sections['Palette & Typography'] ?? '';
   const hasRealPalette = /#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b/.test(paletteBody.replace(/#X{3,6}/gi, ''));
 
-  const ok = missingSections.length === 0 && realScreens >= 1 && hasRealPalette;
-  return { ok, missingSections, realScreens, hasRealPalette };
+  const realUncertainties = uncertaintiesItems(md).length;
+
+  const ok = missingSections.length === 0 && realScreens >= 1 && hasRealPalette && realUncertainties >= 1;
+  return { ok, missingSections, realScreens, hasRealPalette, realUncertainties };
+}
+
+/** The real (non-placeholder, non-"none") list items under `## Uncertainties`. */
+export function uncertaintiesItems(md: string): string[] {
+  const body = digestSections(md)['Uncertainties'] ?? '';
+  return body
+    .split(/\r?\n/)
+    .filter((l) => /^\s*[-*]\s+/.test(l))
+    .map((l) => l.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim())
+    .filter((l) => l.length > 0 && !/^\[.*\]$/.test(l) && !/^(none|nothing)\b/i.test(l));
+}
+
+/**
+ * Is a specific can't-use topic surfaced under Uncertainties rather than silently dropped? This is
+ * the AC5 teeth: given a design element the workflow couldn't use, the digest names it.
+ */
+export function surfacesUncertainty(md: string, pattern: RegExp): boolean {
+  return uncertaintiesItems(md).some((item) => pattern.test(item));
 }
 
 /** The non-empty, non-placeholder list items under `## Your Decisions`. */
