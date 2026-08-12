@@ -143,3 +143,44 @@ export function changesScopedTo(changedPaths: string[], allowed: (RegExp | strin
   const stray = changedPaths.filter((p) => !matches(p));
   return { ok: stray.length === 0, stray };
 }
+
+// ── Navigability (AC3): every designed screen has a live route to move through ───────────────
+
+/** Real (non-placeholder) screen names — the `### ` headings under `## Screens`. */
+export function screenNames(md: string): string[] {
+  const body = digestSections(md)['Screens'] ?? '';
+  return (body.match(/^###\s+(.+)$/gm) ?? [])
+    .map((h) => h.replace(/^###\s+/, '').trim())
+    .filter((n) => n.length > 0 && !/^\[.*\]$/.test(n));
+}
+
+/**
+ * The Next.js app-router URL a `page.tsx` file serves: everything under `app/`, with route groups
+ * `(group)/` dropped and `/page.tsx` removed. `app/(app)/tasks/[id]/page.tsx` → `/tasks/[id]`;
+ * `app/page.tsx` → `/`. Returns null for a non-route file.
+ */
+export function routeForPageFile(file: string): string | null {
+  const p = file.replace(/\\/g, '/');
+  const i = p.lastIndexOf('/app/');
+  const appRel = i >= 0 ? p.slice(i + '/app/'.length) : p.startsWith('app/') ? p.slice('app/'.length) : null;
+  if (appRel === null || !/(^|\/)page\.[jt]sx?$/.test(appRel)) return null;
+  const segs = appRel.replace(/\/?page\.[jt]sx?$/, '').split('/').filter((s) => s && !/^\(.*\)$/.test(s));
+  return '/' + segs.join('/');
+}
+
+/** The distinct route URLs implied by a list of files (page.tsx files only). */
+export function appRoutePaths(files: string[]): string[] {
+  return [...new Set(files.map(routeForPageFile).filter((r): r is string => r !== null))];
+}
+
+/**
+ * AC3 navigability: given an authored screen→route map (which designed screen lives at which URL)
+ * and the app's real routes, return the screens whose route is missing — a screen with nowhere to
+ * live means the user can't move to it. Empty = every designed screen is reachable.
+ */
+export function unroutedScreens(screenToRoute: Record<string, string>, routePaths: string[]): string[] {
+  const routes = new Set(routePaths);
+  return Object.entries(screenToRoute)
+    .filter(([, route]) => !routes.has(route))
+    .map(([screen]) => screen);
+}

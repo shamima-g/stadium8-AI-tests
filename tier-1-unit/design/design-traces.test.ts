@@ -24,6 +24,10 @@ import {
   changesScopedTo,
   uncertaintiesItems,
   surfacesUncertainty,
+  screenNames,
+  routeForPageFile,
+  appRoutePaths,
+  unroutedScreens,
 } from '../../helpers/design-digest';
 
 const DESIGN_INTERPRETER = path.join(REPO_ROOT, '.claude', 'agents', 'design-interpreter.md');
@@ -175,5 +179,32 @@ describe('build-from-design — deterministic digest traces (#14/#15)', () => {
     const r = changesScopedTo(changed, allowed);
     expect(r.ok).toBe(false);
     expect(r.stray).toEqual(['web/src/app/settings/page.tsx']);
+  });
+
+  // ---- #14 (AC3): every designed screen has a live route to move through ----
+
+  it.skipIf(!PRESENT)('PASS: page files map to the right app-router URLs', () => {
+    expect(routeForPageFile('web/src/app/page.tsx')).toBe('/');
+    expect(routeForPageFile('web/src/app/(app)/settings/page.tsx')).toBe('/settings');
+    expect(routeForPageFile('web/src/app/(app)/tasks/[id]/page.tsx')).toBe('/tasks/[id]');
+    expect(routeForPageFile('web/src/app/globals.css'), 'non-route file').toBeNull();
+    expect(appRoutePaths(['web/src/app/page.tsx', 'web/src/app/globals.css'])).toEqual(['/']);
+  });
+
+  it.skipIf(!PRESENT)('PASS: every designed screen has a route (the user can move through it)', () => {
+    // A one-screen design (contact form) that lives at "/": screenNames finds it, and it's routed.
+    const digest = FILLED_DIGEST.replace(
+      /## Screens[\s\S]*?\n## Palette/,
+      '## Screens\n\n### Contact\n- **Purpose:** name/email/message form\n\n## Palette',
+    );
+    expect(screenNames(digest)).toEqual(['Contact']);
+    const routes = appRoutePaths(['web/src/app/page.tsx']); // ['/']
+    expect(unroutedScreens({ Contact: '/' }, routes)).toEqual([]);
+  });
+
+  it.skipIf(!PRESENT)('BROKEN: a designed screen with no route is caught', () => {
+    const routes = appRoutePaths(['web/src/app/page.tsx']); // only '/'
+    // "Privacy" was designed but never built a route — the user can't reach it.
+    expect(unroutedScreens({ Contact: '/', Privacy: '/privacy' }, routes)).toEqual(['Privacy']);
   });
 });
