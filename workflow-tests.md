@@ -268,9 +268,11 @@ only make sense across a whole epic.
   and a coverage note accounting for every part of the request.
 - **Every story is complete on paper** — each story file has a non-empty role and
   testable acceptance criteria.
-- **The notebook and registry are real** — `journal.md` has plain-English decision
-  entries; `architecture.md` registry entries are well-formed; any "please
-  double-check" items exist and were floated ahead of the merge.
+- **The notebook and registry are real** — each built epic records a decision trail: a non-empty
+  `journal.md`, or — for a design-driven run — the design digest's "Your Decisions" (a minimal
+  design epic keeps its decisions there rather than a per-epic journal; a present-but-empty journal
+  still fails). `architecture.md` registry entries are well-formed; any "please double-check" items
+  exist and were floated ahead of the merge.
 - **The app tests line up with the stories** — every routable story has a live
   Playwright spec (`web/e2e/epic-<N>-story-<M>-<slug>.spec.ts`); a non-routable one
   has a spec marked `test.fixme()` with a one-line reason (and that marker is **not**

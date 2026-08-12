@@ -184,3 +184,38 @@ export function unroutedScreens(screenToRoute: Record<string, string>, routePath
     .filter(([, route]) => !routes.has(route))
     .map(([screen]) => screen);
 }
+
+// ── Decision trail (Tier-2 journal refinement) ───────────────────────────────────────────────
+
+export interface DecisionTrail {
+  ok: boolean;
+  reason: string;
+}
+
+/**
+ * Does a built epic record its decisions somewhere? Refines the Tier-2 "every built epic has a
+ * journal" invariant, which was too strict: a minimal, design-driven epic keeps its decisions in
+ * the design digest's "Your Decisions" rather than a per-epic `journal.md` (observed in the
+ * contact-form run — a COMPLETE epic with no journal). The intent is "the decision trail isn't
+ * lost", so accept EITHER a non-empty `journal.md` OR (for a design-driven run) the design digest.
+ *
+ * Teeth kept: a present-but-EMPTY journal is always a fail (that's a real bug), and an epic with
+ * neither a journal nor any design-digest decision fails. Pass the file CONTENTS (or null when the
+ * file is absent) so this stays pure and unit-testable.
+ *
+ * Note: the design digest is project-level, so for a multi-epic design run this accepts the
+ * project's decision trail for any built epic without a journal — consistent with how design-driven
+ * runs record decisions centrally, not per epic.
+ */
+export function epicHasDecisionTrail(journal: string | null, designDigest: string | null): DecisionTrail {
+  if (journal !== null && journal.trim().length === 0) {
+    return { ok: false, reason: 'journal.md is present but empty' };
+  }
+  if (journal !== null && journal.trim().length > 0) {
+    return { ok: true, reason: 'journal.md' };
+  }
+  if (designDigest !== null && decisionsIn(designDigest).length > 0) {
+    return { ok: true, reason: 'design digest "Your Decisions"' };
+  }
+  return { ok: false, reason: 'no journal.md and no design-digest decision trail' };
+}

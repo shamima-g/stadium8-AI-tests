@@ -29,10 +29,13 @@ A small single-page contact form (1 epic, 1 story, 1 screen at `/`), to prove na
 - `design-digest-written` ✅ · `design-uncertainties-surfaced` ✅ (flagged where the message goes — no backend, + 3 more)
 - **navigability** ✅ — 1 screen "Contact" → route `/`; `unroutedScreens` empty (replayed in
   `tier-1-unit/design/contact-navigability-replay.test.ts`).
-- **Finding:** the single COMPLETE epic produced **no `journal.md`** — a minimal/design-driven epic
-  may keep its decisions in the design digest instead. Tier-2's journal invariant assumes every built
-  epic writes one; that's why this run wasn't used as the golden run (design-taskboard, which has
-  journals, was). Candidate Tier-2 refinement: require the journal only when the epic recorded decisions.
+- **Finding (RESOLVED):** the single COMPLETE epic produced **no `journal.md`** — a minimal/design-driven
+  epic keeps its decisions in the design digest instead. Tier-2's journal invariant assumed every built
+  epic writes one. **Refined:** the invariant now accepts a decision trail in *either* a non-empty
+  `journal.md` *or* the design digest's "Your Decisions" (design-driven runs), while still failing an
+  empty journal or an epic with no trail at all — see `helpers/design-digest.ts` `epicHasDecisionTrail`,
+  `tier-1-unit/design/decision-trail.test.ts` (good/broken), and the updated invariant in
+  `tier-2-recorded-run/recorded-run.test.ts`.
 
 ## Run 3 — `feedback-api-design` (AC4 real backend) · 2026-08-12 · Opus · post-v1.2.0 cut · **PASS**
 
