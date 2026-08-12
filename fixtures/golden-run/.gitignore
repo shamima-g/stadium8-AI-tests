@@ -5,9 +5,9 @@
 !.gitignore
 !README.md
 
-# Exception: the build-from-design capture (#14/#15) is a small (~1 MB) STAGED run,
-# committed so it can later be promoted to the active golden run at this folder's root.
-# It is NOT the active golden run (it lives in a subfolder the loader ignores). See
-# design-capture/README-staging.md.
-!design-capture/
-!design-capture/**
+# The ACTIVE golden run (docs-only): a real design-driven build (design-taskboard),
+# ~150 KB, committed so Tier-2's artifact invariants actually gate the design feature.
+# The loader reads generated-docs/ at this root. See README.md.
+!generated-docs/
+!generated-docs/**
+!meta.json

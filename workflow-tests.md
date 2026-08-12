@@ -836,10 +836,14 @@ Following the `/plan` three-tier split (§8), the deterministic traces are done 
 - **capture checklist + rule ids** → [`tier-3-automated/DESIGN-SCENARIO.md`].
 
 The live capture (above) has now exercised those functions over a real run; a `-Scenario design`
-still isn't wired into the runner, so re-capturing is manual per the checklist. To promote the
-staged run to the active Tier-2 golden run, reconcile the per-story-commit invariant to this run's
-`feat(<slug>/story-N)` subjects (or re-capture in the expected format), then move its bundle to
-`fixtures/golden-run/` root.
+still isn't wired into the runner, so re-capturing is manual per the checklist. The design-taskboard
+run has since been **promoted to the active Tier-2 golden run** (docs-only, `fixtures/golden-run/generated-docs/`),
+so Tier-2's artifact invariants now gate; and the AC3 **navigability** trace is built and replayed over
+a small single-page contact-form design run (`tier-1-unit/design/contact-navigability-replay.test.ts`).
+No commit-subject reconcile was needed — the git-topology invariant asserts commit *count* ≥ stories,
+not a subject format (git-topology/parked-epic stay skipped: docs-only, no `/plan`). See
+[`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md) — only **AC4** (a design +
+real-backend benchmark) remains.
 
 > **Coverage map, evidence corrections, and the prioritised gap plan** for the six build-from-design
 > acceptance criteria live in [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md)
@@ -854,11 +858,12 @@ design in `documentation/` — the design-derived intake facts are present.
 
 **Open work:**
 
-- **Capture the golden run** — a one-time manual Team-Task-Manager run into
-  `fixtures/golden-run/`; the only thing between the Tier-2 scaffold and a live tier.
-  Needs a real workflow run, not code. **The run should also plan one epic ahead with
-  `/plan`** (parked at `READY-TO-BUILD`, never built) so the parked-epic invariants
-  ([section 7](#7-tier-2--invariants-over-a-recorded-run)) activate rather than skip.
+- **Golden run — captured (docs-only); two blocks still to activate.** A real build-from-design run
+  (`design-taskboard`) is committed at `fixtures/golden-run/generated-docs/`, so the Tier-2 **artifact
+  invariants now gate** (no longer skipping). Still to activate: (a) **git-topology** — drop a
+  `repo.bundle` (re-capture from the design build); (b) **parked-epic (`/plan`)** — capture a run that
+  plans one epic ahead with `/plan` (parked at `READY-TO-BUILD`, never built). Both skip visibly until
+  then ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
   the collector's statuses), and **both live scenarios are now built** in

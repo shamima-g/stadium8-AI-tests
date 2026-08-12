@@ -33,7 +33,14 @@ of them (below) — i.e. some checks were credited with doing more than they act
 
 ## Work plan — prioritised by leverage
 
-> **Progress (2026-08-12):** tasks **3, 4, 5, 6 are DONE** on `S8-129`.
+> **Progress (2026-08-12):** tasks **2, 3, 4, 5, 6 are DONE** on `S8-129`. Only **task 1 (AC4)** remains.
+> - **2 (AC3)** ✅ — navigability trace built (`screenNames`/`appRoutePaths`/`unroutedScreens` + synthetic
+>   good/broken) and replayed over a real single-page contact-form design run
+>   (`contact-navigability-replay.test.ts`: 1 screen → `/`, no unrouted screens). The design-taskboard
+>   run was **promoted to the active Tier-2 golden run** (docs-only, `fixtures/golden-run/generated-docs/`),
+>   so Tier-2's artifact invariants now gate. (No commit-subject reconcile was needed — the git-topology
+>   invariant asserts commit *count* ≥ stories, not a subject format; git-topology stays skipped as
+>   docs-only.)
 > - **5 (AC5)** ✅ — the Uncertainties gate now requires ≥1 real item (`uncertaintiesItems` /
 >   `surfacesUncertainty`), with a present-but-empty broken case and a can't-use-element good/broken
 >   (commit `d6cd325`). The inert gate is fixed.
