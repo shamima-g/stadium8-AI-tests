@@ -31,7 +31,19 @@ of them (below) — i.e. some checks were credited with doing more than they act
 
 ---
 
-## Work plan (tomorrow) — prioritised by leverage
+## Work plan — prioritised by leverage
+
+> **Progress (2026-08-12):** tasks **3, 4, 5, 6 are DONE** on `S8-129`.
+> - **5 (AC5)** ✅ — the Uncertainties gate now requires ≥1 real item (`uncertaintiesItems` /
+>   `surfacesUncertainty`), with a present-but-empty broken case and a can't-use-element good/broken
+>   (commit `d6cd325`). The inert gate is fixed.
+> - **6 (AC6)** ✅ — `quality-gates.test.ts` now drives the real runner (`--checks lint`,
+>   `scriptLocation:'temp'`) and proves pass-when-green / fail-when-red (commit `6ff4410`).
+> - **3 (AC2)** ✅ and **4 (AC1)** ✅ — record-only rules `design-no-manual-intervention` and
+>   `design-only-input` added to `DESIGN-SCENARIO.md` (table + capture checklist).
+>
+> **Remaining: tasks 1 (AC4) and 2 (AC3)** — both Large. Task 1 needs a backend choice; task 2 needs
+> the golden-run promotion (commit-subject reconcile) + the navigability trace.
 
 Ordered so the biggest, most-isolated hole comes first. Each task lists where it lives and what
 "done" means. Small = a Tier-1 test / doc edit; Large = a fixture/benchmark or a live re-capture.

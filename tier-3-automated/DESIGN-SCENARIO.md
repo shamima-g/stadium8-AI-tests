@@ -20,12 +20,18 @@ are the contract that wiring must satisfy.
 
 | Behaviour | Phase | Deterministic trace (auto) | Live core (eyeball) | Rule id |
 |---|:--:|---|---|---|
-| Design read into a digest | 1 | `generated-docs/design/digest.md` exists and `digestReadyForIntake()` is `ok` (real screens + palette + all sections) | — | `design-digest-written` |
-| Uncertainties surfaced | 1 | digest has a non-empty **Uncertainties** section (the due-date format) | — | `design-uncertainties-surfaced` |
+| Design is the ONLY input (no written spec) (AC1) | 1 | precondition: `documentation/` holds only the design (no hand-written spec) and `generated-docs/specs/` has no author-supplied spec | operator confirms only the design was supplied | `design-only-input` |
+| Design read into a digest | 1 | `generated-docs/design/digest.md` exists and `digestReadyForIntake()` is `ok` (real screens + palette + all sections + ≥1 real Uncertainty) | — | `design-digest-written` |
+| Uncertainties surfaced (AC5) | 1 | `digestReadyForIntake` requires ≥1 **real** Uncertainties item; `surfacesUncertainty(digest, /due-date/)` — the intake digest names what it couldn't determine, not just an empty heading | — | `design-uncertainties-surfaced` |
 | Read-back confirmed at Intake | 1 | — | the workflow **showed** the screens/colours/copy read-back and asked to confirm **before** building | `design-readback-confirmed` |
+| No manual intervention (AC2) | 1–2 | — | operator confirms the run reached a running app via **normal approvals only** — no renaming files, fixing mismatches, or hand-writing code | `design-no-manual-intervention` |
 | Update rebuilds only named screens | 2 | `changesScopedTo(gitDiffPaths, [Board, Task detail])` is `ok` — Settings untouched | — | `design-update-scoped` |
 | Prior decisions survive the re-read | 2 | `decisionsPreserved(digestBefore, digestAfter)` is `ok` (sign-in + blue-primary decisions still present) | — | `design-decisions-preserved` |
 | A design conflict asks which wins | 2 | — | the purple-vs-blue conflict **stopped and asked**; it did not silently switch | `design-conflict-asks` |
+
+> `design-only-input` and `design-no-manual-intervention` are record-only (AC1/AC2). `design-only-input`
+> could later become a deterministic precondition assert over the captured tree; `design-no-manual-intervention`
+> stays an operator eyeball (nothing in the run's traces reveals an out-of-band hand-edit).
 
 ## Decisions needed before the run
 
@@ -41,12 +47,17 @@ are the contract that wiring must satisfy.
    `benchmark-files/design-taskboard/frontend/docs/*` into `documentation/` (so
    `documentation/design/` holds `mockup.html`, `tokens.css`, `design-notes.md`) and
    `answers.json` → `TIER3-ANSWERS.json`.
-2. Run `/start`. For every approval/choice, use `TIER3-ANSWERS.json` (see its `intake` and
+2. **Precondition `design-only-input`:** confirm `documentation/` holds only the design (no
+   hand-written spec) — the requirements come from the design, not a written doc. Record pass/fail.
+3. Run `/start`. For every approval/choice, use `TIER3-ANSWERS.json` (see its `intake` and
    `designReadback` blocks).
-3. **Eyeball `design-readback-confirmed`:** did Intake show the design read-back (screens, fields,
+4. **Eyeball `design-readback-confirmed`:** did Intake show the design read-back (screens, fields,
    colours, copy) *and* name what it couldn't determine (the due-date format), and ask to confirm
    before building? Record pass/fail + a one-line note.
-4. Build one epic through to a merge on `main`.
+5. Build one epic through to a merge on `main`.
+6. **Eyeball `design-no-manual-intervention`:** confirm you reached a running app via normal
+   approvals only — you did **not** rename files, fix a mismatch by hand, or write code. Record
+   pass/fail + a note.
 
 ## Run — Phase 2 (#15: update the design)
 
@@ -69,7 +80,8 @@ Hand these to the QA suite so the deterministic traces run over the real run:
 - [ ] `git bundle` of the built repo (all branches + `main`), **or** the whole working tree.
 - [ ] `generated-docs/design/digest.md` (final) **and** `digest.before.md` (the Phase-1 snapshot).
 - [ ] The list of files changed by the Phase-2 rebuild (`git diff --name-only <phase1-merge>..HEAD`).
-- [ ] The two eyeballed verdicts: `design-readback-confirmed`, `design-conflict-asks` (pass/fail + note).
+- [ ] The four eyeballed/precondition verdicts: `design-only-input`, `design-readback-confirmed`,
+      `design-no-manual-intervention`, `design-conflict-asks` (pass/fail + note each).
 
 ## Then (QA side)
 
