@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: Feedback API
+  version: 1.0.0
+  description: >
+    A small standalone API for the FeedbackWall benchmark — list and create messages.
+    The generated app must call these EXACT paths through its shared client (no invented
+    paths, no raw fetch in components).
+servers:
+  - url: http://localhost:4010
+paths:
+  /api/v1/messages:
+    get:
+      summary: List messages (newest first)
+      responses:
+        '200':
+          description: The messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+    post:
+      summary: Create a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewMessage'
+      responses:
+        '201':
+          description: The created message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Validation error
+components:
+  schemas:
+    Message:
+      type: object
+      required: [id, author, body, createdAt]
+      properties:
+        id: { type: string }
+        author: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+    NewMessage:
+      type: object
+      required: [author, body]
+      properties:
+        author: { type: string }
+        body: { type: string }

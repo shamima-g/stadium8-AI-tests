@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>FeedbackWall — mockup</title>
+    <link rel="stylesheet" href="tokens.css" />
+  </head>
+  <body style="font-family: var(--font-sans); background: var(--color-bg); color: var(--color-text)">
+    <!-- SCREEN: Feedback (route /) -->
+    <main data-screen="feedback">
+      <h1>What people are saying</h1>
+
+      <!-- List from GET /api/v1/messages, newest first -->
+      <ul data-list="messages">
+        <li><strong>Ada</strong> — Love this! <span class="muted">2026-05-01</span></li>
+        <li><strong>Grace</strong> — Very handy. <span class="muted">2026-04-30</span></li>
+      </ul>
+      <p data-empty hidden>No messages yet — be the first.</p>
+
+      <!-- Form posts to POST /api/v1/messages -->
+      <form data-form="new-message">
+        <label>Name <input type="text" placeholder="Your name" required /></label>
+        <label>Message <textarea placeholder="Say something nice" required></textarea></label>
+        <button type="submit" style="background: var(--color-primary); color: #fff">Post message</button>
+      </form>
+    </main>
+  </body>
+</html>
