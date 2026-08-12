@@ -4,12 +4,12 @@ Tier 2 (`tier-2-recorded-run/`) replays **one real end-to-end workflow run** and
 invariants over it — no live AI at test time. This directory holds that recording.
 
 > **Active golden run (captured 2026-08-11).** A real build-from-design run (`design-taskboard`,
-> 3 epics) is committed here as **`generated-docs/`** (docs-only, ~150 KB) — see `meta.json`. So
-> Tier-2's **artifact invariants now gate** (state schema, role+AC per story, per-epic journal,
-> absence canaries). The **git-topology** and **`/plan` parked-epic** invariants still skip: this is
-> docs-only (no `repo.bundle`) and the run has no `/plan`-parked epic. To activate those, drop a
-> `repo.bundle` here (re-capture from the design build) and/or capture a `/plan` run. Until a given
-> block is activated it **skips visibly** — never a vacuous green.
+> 3 epics) is committed here as **`repo.bundle`** (~1 MB — carries both the `generated-docs/` tree
+> and the git history) — see `meta.json`. So Tier-2's **artifact invariants** (state schema, role+AC
+> per story, decision trail, absence canaries) **and its git-topology invariants** (`epic/<slug>`
+> branches, merge-into-main, commit count ≥ stories) **both gate**. Only the **`/plan` parked-epic**
+> invariants still skip: this run has no `/plan`-parked epic — capture a `/plan` run (e.g.
+> `minimal-concurrent`) to activate them. A skipped block **skips visibly** — never a vacuous green.
 
 ## What to capture
 

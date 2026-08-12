@@ -1,13 +1,11 @@
 # The recorded run is a local/CI artifact, not committed source. Keep only the
-# capture instructions. Remove these lines if your team decides to commit a small
-# golden bundle.
+# capture instructions + the small committed golden run below.
 *
 !.gitignore
 !README.md
 
-# The ACTIVE golden run (docs-only): a real design-driven build (design-taskboard),
-# ~150 KB, committed so Tier-2's artifact invariants actually gate the design feature.
-# The loader reads generated-docs/ at this root. See README.md.
-!generated-docs/
-!generated-docs/**
+# The ACTIVE golden run: a real design-driven build (design-taskboard), committed as a
+# repo.bundle (~1 MB, carries generated-docs + git topology) + meta. Small enough to commit;
+# activates BOTH the artifact and git-topology invariants. See README.md.
+!repo.bundle
 !meta.json

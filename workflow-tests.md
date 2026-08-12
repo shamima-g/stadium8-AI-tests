@@ -860,12 +860,12 @@ design in `documentation/` — the design-derived intake facts are present.
 
 **Open work:**
 
-- **Golden run — captured (docs-only); two blocks still to activate.** A real build-from-design run
-  (`design-taskboard`) is committed at `fixtures/golden-run/generated-docs/`, so the Tier-2 **artifact
-  invariants now gate** (no longer skipping). Still to activate: (a) **git-topology** — drop a
-  `repo.bundle` (re-capture from the design build); (b) **parked-epic (`/plan`)** — capture a run that
-  plans one epic ahead with `/plan` (parked at `READY-TO-BUILD`, never built). Both skip visibly until
-  then ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
+- **Golden run — captured as a bundle; artifact + git-topology gating, only `/plan` left.** A real
+  build-from-design run (`design-taskboard`) is committed at `fixtures/golden-run/repo.bundle`
+  (~1 MB, carries the `generated-docs/` tree + git history), so the Tier-2 **artifact** *and*
+  **git-topology** invariants now gate. Still to activate: **parked-epic (`/plan`)** — capture a run
+  that plans one epic ahead with `/plan` (parked at `READY-TO-BUILD`, never built); it skips visibly
+  until then ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
   the collector's statuses), and **both live scenarios are now built** in
