@@ -57,3 +57,13 @@ replay: `tier-1-unit/design/feedback-api-replay.test.ts`.
 
 **All AC coverage complete.** AC1/AC2 (record-only rules), AC3 (navigability + golden run), AC4
 (this run), AC5/AC6 (hardened checks) are done. See `DESIGN-COVERAGE.md`.
+
+## Future — AC5 "truly unusable" live case
+
+The `design-taskboard` benchmark now ships `frontend/docs/design/brand-export.bin` — a garbled
+binary blob the design-interpreter **cannot** decode — referenced from `design-notes.md` as the
+brand logo. On the **next** design-taskboard re-run, a correct workflow must **surface** it under
+Uncertainties (e.g. "couldn't read brand-export.bin — re-supply in a readable format"), not silently
+ignore it. That exercises AC5's genuinely-unusable path live (the synthetic good/broken already
+covers it deterministically via `surfacesUncertainty` in `tier-1-unit/design/design-traces.test.ts`).
+Record the verdict here when that re-run happens.

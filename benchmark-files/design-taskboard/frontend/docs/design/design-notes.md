@@ -29,6 +29,17 @@ Opens when a card is clicked. Shows and edits one task.
 Brand colours are in `tokens.css`. Primary is the blue used for buttons and the active column
 header. Body font is Inter.
 
+## Brand logo
+The brand logo is provided as `brand-export.bin` — an export from the design tool. Use it for the
+app's logo/mark.
+
 ## Deliberately not specified
 The **due-date format** (e.g. `2026-05-01` vs `1 May 2026`) is not decided here — pick a sensible
 default and flag it so we can confirm.
+
+<!-- AC5 "truly unusable" case: brand-export.bin is deliberately a garbled binary blob the
+     design-interpreter cannot decode. A correct run must SHOW this under Uncertainties (e.g.
+     "couldn't read brand-export.bin — please re-supply the logo in a readable format"), not
+     silently ignore it. This exercises the live can't-use path that the synthetic good/broken in
+     tier-1-unit/design/design-traces.test.ts (surfacesUncertainty) covers deterministically. -->
+
