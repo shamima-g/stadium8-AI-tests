@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Tier 3 — feedback-api-design@release-v1.3.0</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem auto; max-width: 60rem; padding: 0 1rem; line-height: 1.5; }
+  h1 { margin-bottom: .25rem; } h2 { margin-top: 2rem; border-bottom: 1px solid #8884; padding-bottom: .25rem; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0; font-size: .92rem; }
+  th, td { border: 1px solid #8883; padding: .35rem .5rem; text-align: left; }
+  th { background: #8881; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; height: .8rem; border-radius: 2px; }
+  .bar-active { background: #4a90d9; } .bar-claude { background: #7bc043; }
+  .muted { color: #8889; } .pass { color: #2e8b57; } .fail { color: #c0392b; }
+  .chartrow { display:flex; align-items:center; gap:.5rem; margin:.15rem 0; }
+  .chartrow .lbl { width: 9rem; font-size:.82rem; }
+  caption { text-align:left; color:#8889; font-size:.82rem; margin-bottom:.25rem; }
+  .legend { display:flex; gap:1.25rem; align-items:center; font-size:.82rem; color:#8889; margin:.25rem 0 .75rem; }
+  .legend .swatch { display:inline-block; width:.8rem; height:.8rem; border-radius:2px; margin-right:.35rem; vertical-align:-1px; }
+  .vchart { display:flex; align-items:flex-end; gap:1.1rem; height:17rem; padding-top:1.25rem; border-bottom:1px solid #8883; overflow-x:auto; }
+  .vgroup { display:flex; flex-direction:column; align-items:center; gap:.4rem; min-width:3.25rem; flex:0 0 auto; }
+  .vbars { display:flex; align-items:flex-end; gap:.3rem; height:13rem; }
+  .vbar { width:1.15rem; min-height:2px; border-radius:3px 3px 0 0; position:relative; }
+  .vbar .val { position:absolute; top:-1.15rem; left:50%; transform:translateX(-50%); font-size:.68rem; color:#8889; white-space:nowrap; }
+  .vlbl { font-size:.72rem; line-height:1.2; text-align:center; color:#8889; max-width:5rem; word-break:break-word; }
+</style>
+</head><body>
+<h1>Tier 3 — feedback-api-design@release-v1.3.0</h1>
+<p class="muted">1 run(s) recorded. Newest first.</p>
+<h2>Last 10 runs per model</h2>
+<h3>opus</h3>
+<table><tr><th>When</th><th>Result</th><th>Active</th><th>Claude</th><th>Peak RAM</th><th>Tokens</th><th>Pass-rate</th><th>Rules missed</th></tr>
+<tr><td>20260814-1000</td><td class="pass">pass</td><td class="num">46m 14s</td><td class="num">46m 14s</td><td class="num">16.7 GB</td><td class="num">103,535</td><td class="num">100%</td><td><span class="muted">none</span></td></tr>
+</table>
+<h2>Time taken — overall (active) vs Claude's own</h2>
+<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Active (overall)</span><span><span class="swatch" style="background:#7bc043"></span>Claude's own</span></div>
+<div class="vchart">
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:100%" title="Active 46m 14s"><span class="val">46m 14s</span></div><div class="vbar bar-claude" style="height:100%" title="Claude 46m 14s"><span class="val">46m 14s</span></div></div><div class="vlbl">opus 20260814-1000</div></div>
+</div>
+<h2>Epics — time to build each one (latest run)</h2>
+<p class="muted">Latest run created <strong>1</strong> epic(s) and <strong>1</strong> story(ies).</p>
+<div class="legend"><span><span class="swatch" style="background:#4a90d9"></span>Actual this run</span><span><span class="swatch" style="background:#7bc043"></span>Average across runs</span></div>
+<div class="vchart">
+<div class="vgroup"><div class="vbars"><div class="vbar bar-active" style="height:100%" title="Actual 34m 7s"><span class="val">34m 7s</span></div><div class="vbar bar-claude" style="height:100%" title="Average 34m 7s"><span class="val">34m 7s</span></div></div><div class="vlbl">feedback-wall (1 st.)</div></div>
+</div>
+<h2>Most-flagged rules (what to make clearer)</h2>
+<p class="muted">No rules have been flagged. 🎉</p>
+<h2>By version</h2>
+<table><tr><th>Version</th><th>Runs</th><th>Avg active</th><th>Avg Claude</th></tr>
+<tr><td>v1.3.0</td><td class="num">1</td><td class="num">46m 14s</td><td class="num">46m 14s</td></tr>
+</table>
+</body></html>
