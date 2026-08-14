@@ -1,9 +1,17 @@
 # Golden run — the recorded workflow run for Tier 2
 
 Tier 2 (`tier-2-recorded-run/`) replays **one real end-to-end workflow run** and asserts
-invariants over it — no live AI at test time. This directory holds that recording. Until
-it's captured, the Tier-2 invariants **skip visibly** (a notice prints; they never show a
-vacuous green).
+invariants over it — no live AI at test time. This directory holds that recording.
+
+> **Active golden run (captured 2026-08-12).** A real **build-one-park-one** run (`minimal-concurrent`:
+> Notes built + merged, Tasks planned + parked at `READY-TO-BUILD`) is committed here as
+> **`repo.bundle`** (~900 KB — carries the `generated-docs/` tree + git history) — see `meta.json`.
+> **All three Tier-2 blocks now gate:** the **artifact** invariants (state schema, role+AC per story,
+> decision trail, absence canaries), the **git-topology** invariants (`epic/<slug>` branch,
+> merge-into-main, commit count ≥ stories), **and the `/plan` parked-epic** invariants (parked story
+> list, no `epic/tasks` branch, no `plan/tasks` worktree, on-`main`-via-`docs(plan)`, `dependsOn`).
+> It replaced the earlier design-taskboard golden run; the design-specific *content* traces gate
+> separately via `fixtures/design-capture/` + the `tier-1-unit/design/*replay*.test.ts` files.
 
 ## What to capture
 
@@ -71,6 +79,13 @@ orchestrator rules / settings it should reflect).
 Re-record after any change that alters how the workflow runs (orchestrator rules, agent
 prompts, settings, hooks). Run the Tier 3 walkthrough once and refresh the bundle here.
 
-> **Git-ignored by default.** A real bundle can be large; this directory's contents (except
-> this README) are git-ignored — the recording is a local/CI artifact, not committed source.
-> Remove the ignore entry if your team decides to commit a small golden bundle.
+> **Bundles are git-ignored by default.** A real `repo.bundle` can be large; only the small
+> docs-only `generated-docs/` (+ `meta.json`) is committed here, via a scoped `.gitignore`
+> exception. Drop a `repo.bundle` to activate the git-topology invariants — it stays local unless
+> you add an exception for it too.
+
+> **Note.** The active run above (docs-only) does not carry git topology. When the §7 doc mentions
+> `feat(epic-<N>-story-<M>)` commit subjects, that's descriptive — the Tier-2 git-topology invariants
+> assert commit **count ≥ stories** and a merge-into-main, not a subject format. The
+> design-specific *content* traces (digest ready, decisions preserved, navigability) gate separately
+> via `fixtures/design-capture/` + `tier-1-unit/design/*replay*.test.ts`.

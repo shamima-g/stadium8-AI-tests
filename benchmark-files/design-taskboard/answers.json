@@ -1,0 +1,40 @@
+{
+  "_comment": "Pre-written answers for the build-from-design Tier-3 scenario (#14/#15). Unlike a spec-driven benchmark, the requirements come from the DESIGN dropped in documentation/design/ (mockup.html, tokens.css, design-notes.md) — the workflow reads it at Intake and reads it back for confirmation. These answers only fill the gaps a design doesn't cover (sign-in, data source, compliance) and confirm the read-back. Two are marked NEEDS_CONFIRMATION.",
+
+  "benchmark": "design-taskboard",
+  "designDriven": true,
+
+  "intake": {
+    "pitch": "TaskBoard — a small team task board. Build it to match the design in documentation/design/ (mockup.html + tokens.css + design-notes.md): a Board screen with To do / In progress / Done columns of task cards, a Task detail screen, and a Settings screen.",
+    "roles": "One role: team member. Everyone can create, edit, move and delete tasks, and set their own display name. No admin tier.",
+    "signIn": "Simple email + password, no SSO for launch. NEEDS_CONFIRMATION.",
+    "dataSource": "No backend yet — build against a stand-in (mock) data layer for tasks. Data shape from the design: task = { id, title, assignee, status (To do | In progress | Done), dueDate }.",
+    "compliance": "No regulated data.",
+    "styling": "Use the design's tokens verbatim (documentation/design/tokens.css): primary #2563eb, Inter. Do not invent a new palette."
+  },
+
+  "designReadback": {
+    "_comment": "Confirm the read-back the workflow presents at Intake. These are the design-derived facts it should surface; approve them.",
+    "screensExpected": ["Board", "Task detail", "Settings"],
+    "confirm": "Yes — the screens, fields, colours and copy read back match the design. Proceed.",
+    "uncertaintyToConfirm": "Due-date format was not specified in the design. Use ISO (2026-05-01) for now. NEEDS_CONFIRMATION."
+  },
+
+  "designUpdate": {
+    "_comment": "PHASE 2 (#15): after the first build merges, drop the files from ../design-taskboard/update/docs/ into documentation/design/ (replacing the originals), then start ONE ordinary piece of work with the instruction below. Only the named screens should change; the Settings screen must be left alone; the earlier decisions (e.g. sign-in email+password) must survive the re-read.",
+    "dropIn": "update/docs/design/",
+    "instruction": "Rebuild the Board and Task detail screens to match my updated design. Leave Settings as it is.",
+    "expectedChanges": [
+      "Board: the 'New task' button is renamed to 'Add task'",
+      "Board: the assignee filter moves from top-left to top-right",
+      "Task detail: add a 'Priority' field (Low | Medium | High)"
+    ],
+    "mustNotChange": ["Settings screen"],
+    "conflict": {
+      "_comment": "The updated design contradicts an earlier decision, so the workflow must ASK which wins rather than silently overwrite.",
+      "priorDecision": "Primary colour is #2563eb (blue).",
+      "designNowSays": "tokens.css in the update sets --color-primary to #7c3aed (purple).",
+      "answer": "Keep the blue #2563eb — the earlier decision wins over the design file. NEEDS_CONFIRMATION."
+    }
+  }
+}

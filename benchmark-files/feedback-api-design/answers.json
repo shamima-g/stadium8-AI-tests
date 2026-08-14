@@ -1,0 +1,30 @@
+{
+  "_comment": "Pre-written answers for the build-from-design + REAL-backend run (AC4). Requirements come from the DESIGN in documentation/design/; the data comes from the standalone API in documentation/backend/api.yaml. This is the design counterpart to the mock-only runs: the app must wire REAL backend calls to the spec's exact paths, so generated-docs/specs/api-spec.yaml + web/src/lib/api/endpoints.ts exist and the TG-31 exact-path check gates.",
+
+  "benchmark": "feedback-api-design",
+  "designDriven": true,
+
+  "intake": {
+    "pitch": "FeedbackWall — a single-page feedback wall built from the design in documentation/design/, backed by the standalone API in documentation/backend/api.yaml: it lists messages (GET /api/v1/messages) and posts new ones (POST /api/v1/messages).",
+    "roles": "No roles / no sign-in — a public single-page wall.",
+    "signIn": "None — public page.",
+    "dataSource": "A REAL backend: the provided standalone API (documentation/backend/api.yaml). Do NOT build a mock/stand-in data layer. Generate the OpenAPI spec at generated-docs/specs/api-spec.yaml from it and a typed client at web/src/lib/api/endpoints.ts that uses the spec's EXACT paths (/api/v1/messages) via the shared client — no raw fetch scattered in components, no invented paths. The server can be run for real with `node documentation/backend/server.mjs` on http://localhost:4010.",
+    "compliance": "No regulated data.",
+    "styling": "Use the design's tokens verbatim (documentation/design/tokens.css): primary #2563eb, Inter."
+  },
+
+  "designReadback": {
+    "screensExpected": ["Feedback"],
+    "confirm": "Yes — the single Feedback screen (list + post form), its colours and copy, and the two API endpoints match. Proceed.",
+    "uncertaintyToConfirm": "How many messages to show / pagination is unspecified — assume show all, newest first."
+  },
+
+  "scope": { "_comment": "ONE epic, ONE story — small and fast.", "epics": 1, "stories": 1 },
+
+  "ac4": {
+    "_comment": "The AC4 point: stand-in data replaced by real backend calls. After the build, the exact-path check (TG-31) runs over the produced artifacts.",
+    "specFile": "generated-docs/specs/api-spec.yaml",
+    "endpointsFile": "web/src/lib/api/endpoints.ts",
+    "exactPaths": ["/api/v1/messages"]
+  }
+}

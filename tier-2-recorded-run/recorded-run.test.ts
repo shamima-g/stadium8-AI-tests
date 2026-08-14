@@ -16,6 +16,7 @@ import Ajv from 'ajv';
 import { loadGoldenRun } from '../helpers/golden-run';
 import { epicStateSchema } from '../helpers/schemas/epic-state.schema';
 import { roleViolation } from '../tier-1-unit/artifact-lint/linters';
+import { epicHasDecisionTrail } from '../helpers/design-digest';
 
 const golden = loadGoldenRun();
 afterAll(() => golden.cleanup());
@@ -130,15 +131,23 @@ describe.skipIf(!golden.present)('recorded run — artifact invariants', () => {
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
-  it('PASS: every built epic has a decision journal with entries', () => {
-    // journal.md is a BUILD-phase artifact (appended per story commit), so a PLAN or a
-    // `/plan`-parked (READY-TO-BUILD) epic legitimately has none yet — don't require it there.
+  it('PASS: every built epic records a decision trail (journal.md, or the design digest for a design-driven run)', () => {
+    // journal.md is a BUILD-phase artifact, so a PLAN or `/plan`-parked epic legitimately has none.
+    // Refinement (see helpers/design-digest.ts epicHasDecisionTrail + tier-1-unit/design/decision-trail.test.ts):
+    // a minimal design-driven epic can be COMPLETE with no per-epic journal because its decisions
+    // live in the design digest's "Your Decisions" instead. Accept either; still fail an empty
+    // journal or an epic with no trail at all.
+    const digestPath = path.join(docsDir, 'design', 'digest.md');
+    const digest = fs.existsSync(digestPath) ? fs.readFileSync(digestPath, 'utf8') : null;
+    const offenders: string[] = [];
     for (const e of epicRecords(docsDir)) {
       if (e.state?.phase === 'PLAN' || e.state?.phase === PARKED_PHASE) continue;
-      const journal = path.join(e.dir, 'journal.md');
-      expect(fs.existsSync(journal), `${e.dir} is missing journal.md`).toBe(true);
-      expect(fs.readFileSync(journal, 'utf8').trim().length, `${journal} is empty`).toBeGreaterThan(0);
+      const jf = path.join(e.dir, 'journal.md');
+      const journal = fs.existsSync(jf) ? fs.readFileSync(jf, 'utf8') : null;
+      const trail = epicHasDecisionTrail(journal, digest);
+      if (!trail.ok) offenders.push(`${path.basename(e.dir)}: ${trail.reason}`);
     }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
   it('PASS: absence canaries — no retired telemetry ledger or project-brief', () => {

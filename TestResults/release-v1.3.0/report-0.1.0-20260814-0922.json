@@ -1,0 +1,27 @@
+{
+  "version": "0.1.0",
+  "fileStamp": "20260814-0922",
+  "runIso": "2026-08-14 09:22:56",
+  "runFriendly": "14 August 2026, 9:22am",
+  "overall": "pass",
+  "counts": {
+    "total": 430,
+    "passed": 425,
+    "failed": 0,
+    "skipped": 5
+  },
+  "durationMs": 34030.505615234375,
+  "linesOfCode": null,
+  "runBy": "shamima-g",
+  "machine": "SHAMIMA-NB",
+  "tokens": null,
+  "costUsd": null,
+  "target": "release",
+  "ref": "v1.3.0",
+  "label": "release-v1.3.0",
+  "command": "node scripts/generate-test-report.cjs --label release-v1.3.0 --target release --ref v1.3.0",
+  "repository": "https://github.com/Digiata/Stadium-Builder",
+  "branch": "v1.3.0 (commit b85d808)",
+  "versionTested": "v1.3.0",
+  "report": "report-0.1.0-20260814-0922.md"
+}

@@ -156,7 +156,7 @@ Each area maps to a tier and to the real machinery under `.claude/`.
 | B | **Legacy migration** | `migrate-legacy-state.js` — upgrades an old-shape project to the epic-branch model | 1 |
 | C | **Quality-checks runner** | `quality-gates.js` — runs the automatic checks and reports pass/fail | 1 |
 | D | **Dashboard & progress** | `collect-dashboard-data.js`, `generate-dashboard-html.js` (pulls every branch together, auto-refresh, fire-and-forget) | 1 |
-| E | **Import, scan & setup utilities** | `import-prototype.js`, `scan-doc.js`, `init-preferences.js`, `run-smoke-test.js`, `summarize-playwright.js` | 1 |
+| E | **Scan & setup utilities** | `scan-doc.js`, `init-preferences.js`, `run-smoke-test.js`, `summarize-playwright.js` (`import-prototype.js` was **removed** post-v1.2.0 — you now drop design files straight into `documentation/`; the old test feature-detects it and skips when absent) | 1 |
 | F | **Permission & doc-name hooks** | `bash-permission-checker.js`, `enforce-generated-doc-names.js` (+ `validate-generated-doc-names.js`) | 1 |
 | G | **PowerShell hooks** | `workflow-guard.ps1`, `inject-phase-context.ps1`, `inject-agent-context.ps1` (tested with Pester) | 1 |
 | H | **Branch & merge machinery** | Epic branch naming and the auto-combine-vs-halt behaviour, exercised in a throwaway git repo | 1 |
@@ -268,9 +268,11 @@ only make sense across a whole epic.
   and a coverage note accounting for every part of the request.
 - **Every story is complete on paper** — each story file has a non-empty role and
   testable acceptance criteria.
-- **The notebook and registry are real** — `journal.md` has plain-English decision
-  entries; `architecture.md` registry entries are well-formed; any "please
-  double-check" items exist and were floated ahead of the merge.
+- **The notebook and registry are real** — each built epic records a decision trail: a non-empty
+  `journal.md`, or — for a design-driven run — the design digest's "Your Decisions" (a minimal
+  design epic keeps its decisions there rather than a per-epic journal; a present-but-empty journal
+  still fails). `architecture.md` registry entries are well-formed; any "please double-check" items
+  exist and were floated ahead of the merge.
 - **The app tests line up with the stories** — every routable story has a live
   Playwright spec (`web/e2e/epic-<N>-story-<M>-<slug>.spec.ts`); a non-routable one
   has a spec marked `test.fixme()` with a one-line reason (and that marker is **not**
@@ -680,10 +682,29 @@ least one failure path.
 | Collector project-status agreement | ✅ | — | dashboard ↔ build-report cross-script smoke |
 | `/upgrade` deletion-safety (`apply-template.js`) | ✅ | dev only | end-to-end smoke: retired files pruned, user work kept |
 
-**Reconciled to v1.2.0 (2026-08-03).** Both channels (`dev`, `release`) sit at v1.2.0,
-reconciled independently; `VERSION` is v1.2.0 so the gap banner reads *in sync*. v1.2.0
-added the READY-TO-BUILD stage (the `/plan` park-ahead) — pinned in both contracts and
-the drift guard.
+**Baselined to v1.3.0 (2026-08-14).** The suite `VERSION` is `v1.3.0` and the release contract is
+reconciled to it. Validated against the real released template: `test:target --target release --ref
+v1.3.0` → 425 passed / 0 failed / 5 skipped, and `reconcile:check` (QA_TARGET=release) → nothing to
+update. v1.3.0 is the post-v1.2.0 cut this branch (S8-129) re-baselined to — the build-from-design
+feature, the report split, the removed `import-prototype`, and the doc-name fix. (v1.2.0 added the
+READY-TO-BUILD stage for `/plan`, still pinned.)
+
+**Re-baselined for a post-v1.2.0 (`[Unreleased]`) cut (branch `S8-129`).** A template
+archive labelled `v1.2.0` but carrying later `[Unreleased]` changelog work was run through
+Tier 1 and produced 9 failures — **all suite-lag, no template regression** (triaged per
+§13.1). Three `[Unreleased]` changes drove them, and the version-sensitive tests were
+realigned to match:
+- **Doc-name enforcement fixed.** The epic-scoped `<slug>` defect (below) was fixed, so the
+  6 `it.fails()` markers became unexpected-passes and were removed (they now assert the
+  drift is blocked/flagged directly). See the resolved-defect note.
+- **Build report moved to `generated-docs/reports/`.** The XSS-escaping canary read the old
+  root path and ENOENT'd *before* its assertions ran — silently vacuous. It now reads
+  `generated-docs/reports/build-report.html`, restoring real coverage.
+- **`import-prototype.js` removed.** The two tests for it now `skipIf(!scriptPresent)`
+  (feature-detected) instead of hard-erroring on the absent script.
+
+Result against that archive: Tier 1 **365 passed, 5 skipped, 0 failed**. See *Planned
+coverage for the post-v1.2.0 changes* below for the new tests these changes call for.
 
 **Testing conventions this suite uses (version-independent):**
 
@@ -696,28 +717,155 @@ the drift guard.
   (expected-fail) with a comment naming the root cause. The baseline stays honestly green
   on the *known* bug, a real NEW regression is still visible, and the case flips **red**
   (unexpected pass) the instant the template ships the fix — the cue to remove the marker.
-  Live example: the 6 doc-name-enforcement cases (the epic-scoped `<slug>` defect below).
+  **Worked example (now closed):** the 6 doc-name-enforcement cases carried this marker for
+  the epic-scoped `<slug>` defect; the post-v1.2.0 template shipped the fix, they flipped to
+  unexpected-passes, and the markers were removed (see the resolved-defect note below). That
+  full loop — mark → ship → flip red → remove — is exactly how the convention is meant to end.
 - **`test:target` needs a CommonJS marker.** `run-target.cjs` / `compare-targets.cjs`
   clone the template into `.targets/`, which sits inside this suite (`"type":"module"`).
   `helpers/targets.cjs → ensureTargetsDir()` drops `{"type":"commonjs"}` at `.targets/`
   so the template's CommonJS scripts load as CJS, not ESM. Without it every
   script-spawning test breaks with `require is not defined`.
 
-**Known template defect (open, to be filed upstream):** epic-scoped doc-name enforcement
-is a silent no-op — the hook/validator `dirGlobToRegex` translates `*` but not the
-`<slug>` placeholder, so `generated-docs/epics/<slug>/` never matches a real epic dir.
-Present on both channels since ≤ v1.1.0. The one-line fix: also translate `<...>` →
-`[^/]*` in `dirGlobToRegex` (both `enforce-generated-doc-names.js` and
-`validate-generated-doc-names.js`). The 6 tests that catch it are `it.fails()` until the
-template fixes it.
+**Resolved template defect (fixed post-v1.2.0):** epic-scoped doc-name enforcement was a
+silent no-op — the hook/validator `dirGlobToRegex` translated `*` but not the `<slug>`
+placeholder, so `generated-docs/epics/<slug>/` never matched a real epic dir. Present on
+both channels since ≤ v1.1.0; the suite pinned it with 6 `it.fails()` cases. The
+post-v1.2.0 cut ships the fix (changelog: *"Misnamed workflow documents are now caught"*) —
+`dirGlobToRegex` now translates the `<slug>` placeholder, so drift is correctly blocked
+(hook exit 2) and flagged (validator exit 1). The 6 `it.fails()` markers were removed on
+branch `S8-129`; the cases now assert the corrected behaviour directly. **Caveat for
+older targets:** these cases are plain `it` (not feature-detected), so aiming the suite at a
+genuine pre-fix archive (exact v1.1.0/v1.2.0) will legitimately turn them red — the defect
+really is present there. If cross-version-clean is wanted, gate them on a behaviour probe.
+
+### Planned coverage for the post-v1.2.0 changes
+
+The `[Unreleased]` cut adds and reshapes real surfaces. Each planned test below follows
+every rule in [section 2](#2-the-rules-every-test-follows) — a good **and** a broken case,
+isolated, and **feature-detected** (`skipIf`/`describe.skipIf` on the surface being present)
+so it activates on the versions that have it and skips — never fails — on those that don't.
+Nothing here is written yet; this is the spec. Report generation lives in **scripts**
+(`generate-build-report-html.js --audience maintainer|stakeholders`, `generate-build-effort.mjs`,
+`collect-build-report-data.js`) — there are no `/build-report*` slash commands in this cut,
+so the tests target the scripts and their output, not commands.
+
+| # | Change (from the changelog) | Surface under test | Tier | Good case | Broken case (must go red) |
+|---|-----------------------------|--------------------|:----:|-----------|----------------------------|
+| 1 | **Two reports, one location** | `generate-build-report-html.js` `AUDIENCES` → both write under `REPORTS_DIR_REL` (`generated-docs/reports/`) | 1 | maintainer + stakeholders HTML land in `generated-docs/reports/` | a report written to the old root `generated-docs/` path → flagged |
+| 2 | **Old report commands gone** | absence canary over `.claude/commands/` + refs | 1 | no `/build-report`, `/workflow-insights`, or the three older report commands exist | any of them reappears (file or reference) → flagged |
+| 3 | **`import-prototype` removed** | absence canary: script absent **and** unreferenced across `.claude/` | 1 | `import-prototype.js` gone and zero references | the script or a caller/command re-appears → flagged |
+| 4 | **Stakeholders "Decisions you signed off"** | `generate-build-report-html.js --audience stakeholders` over seeded decision records | 1 | signed-off decisions render in plain language **with dates**, drawn only from the record | a decision not in the record appears (invented) → flagged |
+| 5 | **Maintainer decisions summary** | maintainer render over seeded decision records | 1 | leads with #decisions-asked, typical answer time, #no-input phases; then logs each question + chosen option | counts don't move with the input (hard-coded) → flagged |
+| 6 | **Effort benchmarks + sizing calculator** | `generate-build-effort.mjs` (has co-located `*.tests.js` — add cross-checks only) | 1 | per-screen-type / per-feature medians computed from real build records; calculator sizes a screen mix | figures fabricated when records are absent → flagged |
+| 7 | **Part-built feature excluded** | effort/benchmark aggregation | 1 | a fully-measured feature counts toward the "typical feature" figure | a feature with only some stories finished is **excluded** and marked *partly measured*, not counted → (broken = it drags the average) |
+| 8 | **Per-project cost scoping** | `collect-build-report-data.js` over sibling folders `my-app`, `my-app-QA` | 1 | only the project's own git-owned work is counted | a sibling's work folded into the totals → flagged |
+| 9 | **Missing figure → dash, not a lost page** | `generate-build-report-html.js` fed a data file with a missing/leftover figure | 1 | page still generates; the unreadable figure shows as `—` | one missing figure aborts the whole page → flagged |
+| 10 | **Report before `/start` → guidance** | `collect-build-report-data.js` on a no-project tree (extend the existing collector-status test) | 1 | returns a "run `/start`" pointer, not a report | a no-project tree treated as a one-detail-missing report → flagged |
+| 11 | **No PR comments from CI** | static check over `.github/workflows/*.yml` | 1 | no PR-comment step (`createComment`/`github-script` commenting / `issues: write` for comments) | a PR-comment step present → flagged |
+| 12 | **Cross-platform browser open** | whichever script opens the dashboard/approval/report in a browser | 1 | has a darwin/linux branch (`open`/`xdg-open`) alongside Windows | Windows-only open path → flagged |
+| 13 | **Build from an existing design** | `scan-doc.js` over design inputs in `documentation/` (tokens.css, an HTML mockup, an OpenAPI yaml); intake-manifest schema accepts a design source | 1 | design files under `documentation/` are recognised/scanned; the manifest validates with a design source | a design source the manifest rejects, or a design file `scan-doc` mis-types → flagged |
+| 14 | **Design ingestion read back at Intake** | live behaviour — Claude reads `documentation/` design, states the screens/colours/wording (incl. what it couldn't work out) **before** building, to confirm | 3 | intake read-back names the design-derived facts and asks to confirm | it builds from the design without a confirmable read-back → noted |
+| 15 | **Update design mid-project** | live behaviour — "rebuild these screens to match my updated design" changes only the named screens; prior decisions preserved; a contradiction **asks which wins** | 3 | only named screens change; kept decisions survive; conflict prompts | an un-named screen changes, or a prior decision is silently overwritten → noted |
+
+**Implemented so far (branch `S8-129`):** #1–5, #9–13 are built and green against the
+post-v1.2.0 archive —
+- **#4** → [`tier-1-unit/scripts/stakeholder-decisions.test.ts`] — end-to-end `--audience
+  stakeholders`: the "Decisions you signed off" section renders each decision + choice + date
+  from the authored record; teeth = nothing invented, and the section vanishes with no record.
+- **#5** → [`tier-1-unit/scripts/maintainer-involvement.test.ts`] — end-to-end `--audience
+  maintainer`: a populated `build-cost-data.json` surfaces the unattended-phase count, the
+  typical answer time, and the verbatim logged question; teeth = an unlogged question never appears.
+- **#1** → [`tier-1-unit/scripts/report-output-location.test.ts`] — maintainer + stakeholders
+  both write under `generated-docs/reports/`; teeth = neither leaks to the old root path.
+- **#12** → [`tier-1-unit/scripts/open-page-cross-platform.test.ts`] — `open-page.js`
+  `openerCandidates()` resolves a real opener for win32 / darwin / linux (macOS `open`, Linux
+  `xdg-open`); teeth = no platform returns an empty no-op list.
+- **#13** → [`tier-1-unit/consistency/design-digest-contract.test.ts`] — the design feature is
+  deliberately AI-driven/schema-free (its *reading* is Tier-3, #14/#15), so the plan's original
+  scan-doc/manifest angle didn't fit. What IS deterministic is the **wiring**: `design-interpreter`
+  emits `generated-docs/design/digest.md`, a `.claude/templates/design-digest.md` shapes it, and
+  downstream agents read that path (cross-doc drift check, not prose). Teeth = a made-up digest
+  path is referenced nowhere.
+- **#11** → [`tier-1-unit/consistency/ci-no-pr-comments.test.ts`] — scans `.github/workflows/*.yml`;
+  teeth over the real matcher.
+- **#9** → [`tier-1-unit/scripts/report-missing-figure-resilience.test.ts`] — end-to-end subprocess
+  proof the CLI writes a whole page (exit 0, no `NaN`) on a partial **and** a corrupt data file.
+- **#2** → [`tier-1-unit/consistency/retired-report-surfaces.test.ts`] — the retired `/build-report`,
+  `/workflow-insights` and `build-report-all|cost|effort` skills are gone; gated on the maintainer
+  skill (the positive split marker), teeth via the replacement skills being present.
+- **#3** → [`tier-1-unit/consistency/import-prototype-removed.test.ts`] — clean-removal canary:
+  `skipIf` the script is present, else assert zero dangling references under `.claude/`; teeth via
+  the same scanner finding a live script's references.
+- **#10** → [`tier-1-unit/scripts/report-no-project-guidance.test.ts`] — the collector returns
+  `/start` guidance on a no-project tree, and a real report once a project exists (teeth).
+
+**#8 is deliberately NOT added here** — the sibling-scoping rule is already covered by the
+template's own co-located `lib/report-core.tests.js` (it drives `discoverTranscriptDirs()`
+directly). Duplicating it in this suite would break §13.6 ("don't duplicate a script's
+co-located tests; add only the cross-repo/drift/smoke checks those can't cover"), so it's
+left where it lives.
+
+**#6 and #7 are deliberately NOT added here** — the effort benchmarks / sizing calculator (#6)
+and the part-built-feature exclusion (#7) live in `generate-build-effort.mjs` and `renderEffort()`,
+both **heavily covered by the template's co-located `generate-build-effort.tests.js` /
+`generate-build-report-html.tests.js`** (medians, one-feature-indicative, partial-epic exclusion,
+graceful degradation, the rate reaching every figure). The maintainer subprocess wiring is already
+exercised end-to-end by #9. Re-testing them here would duplicate co-located coverage (§13.6), so
+they're left where they live.
+
+The remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
+update-design-mid-project), which need a real AI run.
+
+**#14/#15 — live capture DONE (branch `S8-129`); all six traces PASS.** A real Opus build of the
+`design-taskboard` benchmark was run and captured. Deterministic traces are asserted over the
+captured artifacts (digests + Phase-2 diff) by [`tier-1-unit/design/design-capture-replay.test.ts`]
+(reads `fixtures/design-capture/`). The two live cores (`design-readback-confirmed`,
+`design-conflict-asks`) were eyeballed and recorded in `tier-3-automated/DESIGN-CAPTURE-LOG.md`.
+**The live run also tightened a check:** `decisionsPreserved` matched decisions verbatim, which
+mis-flagged a legitimately *reconciled* decision ("New task" → "Add task") as dropped — now it
+matches on the decision's stable topic/label, so reconciled wording passes and only a
+genuinely-dropped topic fails.
+
+Following the `/plan` three-tier split (§8), the deterministic traces are done and green:
+- **assertion functions** → [`helpers/design-digest.ts`] — `digestReadyForIntake` (a filled digest
+  vs the unfilled template), `decisionsPreserved` (a re-read never drops a recorded decision),
+  `changesScopedTo` (a design update touches only the named screens).
+- **Tier-1 good/broken** → [`tier-1-unit/design/design-traces.test.ts`] — over synthetic scaffolds
+  and the REAL `.claude/templates/design-digest.md` as the canonical unfilled case; feature-detected
+  on the design-interpreter agent.
+- **benchmark fixture** → [`benchmark-files/design-taskboard/`] — a design (mockup + tokens +
+  notes) with a deliberate Uncertainty and a Phase-2 update that renames/moves/adds and conflicts
+  (purple vs the recorded blue).
+- **capture checklist + rule ids** → [`tier-3-automated/DESIGN-SCENARIO.md`].
+
+The live capture (above) exercised those functions over a real run; a `-Scenario design` still isn't
+wired into the runner, so re-capturing is manual per the checklist. **All six acceptance criteria are
+now covered** (AC1/AC2 record-only rules, AC3 navigability, AC4 real-backend exact-paths, AC5/AC6
+hardened checks) — see [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md).
+The design **content** traces (digest ready, decisions preserved, navigability, exact API paths, the
+AC5 can't-use case) gate via the `fixtures/design-capture/` replays. The Tier-2 golden run is a
+separate `/plan` run (see [section 7](#7-tier-2--invariants-over-a-recorded-run) / the golden-run
+README) — the design-taskboard run is not the golden run.
+
+> **Coverage map, evidence corrections, and the prioritised gap plan** for the six build-from-design
+> acceptance criteria live in [`tier-3-automated/DESIGN-COVERAGE.md`](tier-3-automated/DESIGN-COVERAGE.md)
+> — a council audit confirmed all six labels but corrected the evidence behind AC3/AC5/AC6 (checks
+> credited with more than they do). Start there to continue the work (AC4 real-backend benchmark is
+> the one true hole).
+
+**Tier-2 additions** (activate when the golden run is re-recorded on this cut): the two
+reports land under `generated-docs/reports/`; the **absence canaries** grow to include
+`import-prototype.js` and the retired report commands; and — if the recorded run carried a
+design in `documentation/` — the design-derived intake facts are present.
 
 **Open work:**
 
-- **Capture the golden run** — a one-time manual Team-Task-Manager run into
-  `fixtures/golden-run/`; the only thing between the Tier-2 scaffold and a live tier.
-  Needs a real workflow run, not code. **The run should also plan one epic ahead with
-  `/plan`** (parked at `READY-TO-BUILD`, never built) so the parked-epic invariants
-  ([section 7](#7-tier-2--invariants-over-a-recorded-run)) activate rather than skip.
+- **Golden run — fully captured; all three Tier-2 blocks gate.** A real **build-one-park-one** run
+  (`minimal-concurrent`: Notes built + merged, Tasks parked at `READY-TO-BUILD`) is committed at
+  `fixtures/golden-run/repo.bundle` (~900 KB, carries `generated-docs/` + git history). The Tier-2
+  **artifact**, **git-topology**, *and* **`/plan` parked-epic** invariants all now gate (14/14, none
+  skipping). Nothing dormant remains ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
   the collector's statuses), and **both live scenarios are now built** in
@@ -796,7 +944,9 @@ npm run compare:targets -- --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0   #
 | Legacy migration | An old-shape project can't be upgraded to the epic-branch model |
 | Quality-checks runner | A real failure is reported as a pass |
 | Dashboard | The dashboard goes stale, shows work too early, or a dashboard error stops the workflow |
-| Import / scan / setup utilities | A prototype stops being detected, a doc isn't scanned, or a preference isn't saved |
+| Scan / setup utilities | A doc isn't scanned, or a preference isn't saved (`import-prototype` retired post-v1.2.0) |
+| Report generation & scoping | A report lands outside `generated-docs/reports/`, folds a sibling project's costs in, or a single missing figure loses the whole page |
+| CI noise | The automated checks start commenting on PRs again (three emails per PR) |
 | Bash permission hook | A dangerous command slips past the filter |
 | Doc-name hook | A generated file lands at the wrong name or place |
 | `workflow-guard.ps1` | A build request isn't steered into the workflow |

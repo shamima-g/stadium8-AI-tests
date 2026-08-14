@@ -31,13 +31,12 @@ describe('validate-generated-doc-names.js', () => {
   beforeEach(() => { project = createTempProject(); seedConventions(project.root); });
   afterEach(() => { project.cleanup(); });
 
-  // KNOWN TEMPLATE DEFECT (shared with the enforce hook): validate-generated-doc-names.js
-  // uses the same dirGlobToRegex, which doesn't translate the literal `<slug>` placeholder,
-  // so epic-scoped files are misclassified `ungoverned` instead of counted/flagged. These
-  // two cases exercise epic-scoped paths and so fail on the bug. Marked `it.fails` to keep
-  // the baseline honestly green on the KNOWN defect and flip RED when the template is fixed
-  // (unexpected pass). Fix: also translate `<...>` → `[^/]*` in dirGlobToRegex. Remove the marker on fix.
-  it.fails('PASS: a correctly-named tree reports "ok" with zero drift (exit 0) [KNOWN DEFECT]', () => {
+  // Epic-scoped classification is now correct (shared with the enforce hook): the
+  // template's dirGlobToRegex translates the literal `<slug>` placeholder, so epic-scoped
+  // files are classified/counted instead of falling through as `ungoverned`. Fixed in the
+  // post-v1.2.0 template cut; these two cases previously carried an `it.fails` marker to
+  // pin the known defect on v1.1.0/v1.2.0 and now assert the corrected behavior directly.
+  it('PASS: a correctly-named tree reports "ok" with zero drift (exit 0)', () => {
     project.write('generated-docs/project.md', '# Project\n');
     project.write('generated-docs/epics/task-browsing/state.json', '{}');
     project.write('generated-docs/epics/task-browsing/stories/story-3-nav.md', '# Story 3\n');
@@ -51,7 +50,7 @@ describe('validate-generated-doc-names.js', () => {
     expect(json.counts.ok).toBeGreaterThanOrEqual(4);
   });
 
-  it.fails('FAIL: a drift-named epic file is reported (status "drift", exit 1) [KNOWN DEFECT]', () => {
+  it('FAIL: a drift-named epic file is reported (status "drift", exit 1)', () => {
     project.write('generated-docs/project.md', '# Project\n');
     project.write('generated-docs/epics/task-browsing/epic-state.json', '{}'); // drift: should be state.json
     project.write('generated-docs/epics/task-browsing/stories/story-3.md', '# Story 3\n'); // drift: missing slug

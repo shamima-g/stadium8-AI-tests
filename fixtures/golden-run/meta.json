@@ -1,0 +1,10 @@
+{
+  "scenario": "minimal-concurrent",
+  "kind": "/plan build-one-park-one (Notes built + merged, Tasks planned + parked)",
+  "form": "repo.bundle (generated-docs + git topology + a /plan-parked epic)",
+  "epicSlug": "notes",
+  "capturedAt": "2026-08-12",
+  "templateVersion": "post-v1.2.0 (s8-129 test line)",
+  "epics": ["notes (COMPLETE)", "tasks (READY-TO-BUILD, parked, dependsOn notes)"],
+  "note": "Active Tier-2 golden run. ALL THREE blocks gate: artifact invariants, git-topology, AND the /plan parked-epic invariants (Tasks parked at READY-TO-BUILD). Spec-driven (no design digest); the design-specific traces gate separately via fixtures/design-capture/ replays. Replaces the earlier design-taskboard golden run — a build-one-park-one recording per workflow-tests.md §7."
+}

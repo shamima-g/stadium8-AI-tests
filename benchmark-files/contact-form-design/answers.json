@@ -1,0 +1,33 @@
+{
+  "_comment": "Pre-written answers for a SMALL build-from-design run (contact form) — a quick, clean golden run for the AC3 navigability trace and the Tier-2 promotion. Requirements come from the DESIGN in documentation/design/ (mockup.html, tokens.css, design-notes.md). Front-end only, one epic, one story.",
+
+  "benchmark": "contact-form-design",
+  "designDriven": true,
+
+  "intake": {
+    "pitch": "ContactPage — a single-page contact form. Build it to match the design in documentation/design/: one screen at / with Name, Email and Message fields (all required, email validated client-side), a 'Send message' button, and — on valid submit — a 'Thanks, we'll be in touch.' confirmation shown on the same page.",
+    "roles": "No roles / no sign-in — it's a public single-page form.",
+    "signIn": "None — the page is public, no authentication.",
+    "dataSource": "No backend and no API calls. Front-end only; the form does not send anywhere.",
+    "compliance": "No regulated data.",
+    "styling": "Use the design's tokens verbatim (documentation/design/tokens.css): primary #2563eb, Inter. Do not invent a palette."
+  },
+
+  "designReadback": {
+    "_comment": "Confirm the read-back at Intake; approve these.",
+    "screensExpected": ["Contact"],
+    "confirm": "Yes — the single Contact screen, its fields, colours and copy match the design. Proceed.",
+    "uncertaintyToConfirm": "Where the submitted message goes is unspecified; there is no backend — it is not sent anywhere. Confirmed front-end only."
+  },
+
+  "scope": {
+    "_comment": "Keep it to ONE epic with a SINGLE story — a small, fast, clean run.",
+    "epics": 1,
+    "stories": 1
+  },
+
+  "navigability": {
+    "_comment": "For the AC3 navigability trace: which designed screen lives at which route. Used by unroutedScreens() over the built app's routes.",
+    "screenRoutes": { "Contact": "/" }
+  }
+}
