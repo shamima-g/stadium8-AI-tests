@@ -682,9 +682,12 @@ least one failure path.
 | Collector project-status agreement | ✅ | — | dashboard ↔ build-report cross-script smoke |
 | `/upgrade` deletion-safety (`apply-template.js`) | ✅ | dev only | end-to-end smoke: retired files pruned, user work kept |
 
-**Reconciled to v1.2.0 (2026-08-03).** The contracts and `VERSION` were reconciled to
-v1.2.0, which added the READY-TO-BUILD stage (the `/plan` park-ahead) — pinned in both
-contracts and the drift guard.
+**Baselined to v1.3.0 (2026-08-14).** The suite `VERSION` is `v1.3.0` and the release contract is
+reconciled to it. Validated against the real released template: `test:target --target release --ref
+v1.3.0` → 425 passed / 0 failed / 5 skipped, and `reconcile:check` (QA_TARGET=release) → nothing to
+update. v1.3.0 is the post-v1.2.0 cut this branch (S8-129) re-baselined to — the build-from-design
+feature, the report split, the removed `import-prototype`, and the doc-name fix. (v1.2.0 added the
+READY-TO-BUILD stage for `/plan`, still pinned.)
 
 **Re-baselined for a post-v1.2.0 (`[Unreleased]`) cut (branch `S8-129`).** A template
 archive labelled `v1.2.0` but carrying later `[Unreleased]` changelog work was run through
