@@ -87,7 +87,11 @@ describe('stakeholders report — Decisions you signed off (post-v1.2.0)', () =>
     expect(html, 'the chosen option is rendered').toContain(CHOICE);
     expect(html, 'the decision date is rendered').toContain(WHEN);
 
-    // Broken case / teeth: only what's in the record appears — no invented decision.
+    // Broken case / teeth: the rendered COUNT equals the one record — the section reports exactly
+    // "1 decision recorded". An invented or duplicated row would make the generator count 2+ and
+    // this would read "2 decisions recorded", turning the assertion red. This is the real
+    // anti-fabrication guard: it catches extra rows the single decision/choice strings can't.
+    expect(html, 'the sign-off reports exactly the one recorded decision').toContain('1 decision recorded');
     expect(html, 'a decision not in the record must not appear').not.toContain('Two-factor authentication');
   });
 

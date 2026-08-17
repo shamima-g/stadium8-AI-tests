@@ -53,6 +53,9 @@ const QUESTION = 'Which sign-in method should launch use';
 
 // A minimal but valid build-cost-data.json: enough for readInsightsSummary (needs `grand`) to
 // return a populated summary that renders the involvement panel and the verbatim decision log.
+// The involvement figures are chosen so their RENDERED values are pinnable: two unattended
+// buckets over one costed bucket → the "phases run unattended" stat reads exactly `2 / 1`, and a
+// 45 000 ms median answer time → the "typical answer" reads exactly `45s`.
 const COST_FIXTURE = {
   generatedAt: '2026-05-01T00:00:00Z',
   grand: { costUsd: 12.5, totalTokens: 120000, output: 40000, calls: 200, cacheHit: 0.5 },
@@ -68,6 +71,19 @@ const COST_FIXTURE = {
       tokens: { costUsd: 5 },
       decisions: [{ header: 'Sign-in', question: QUESTION, answer: 'Email and password', resolved: true, waitMs: 45000 }],
     },
+  ],
+};
+
+// A DIFFERENT set of involvement figures: three unattended buckets over two costed buckets
+// (`3 / 2`) and a 90 000 ms median answer time (`1m 30s`). Rendering this instead of COST_FIXTURE
+// must move both figures — the guard against a hard-coded / placeholder count or time.
+const COST_FIXTURE_VARIED = {
+  ...COST_FIXTURE,
+  answerStatsTotal: { medianMs: 90000, maxMs: 180000, samples: 5 },
+  unattendedBuckets: ['BUILD story-1', 'BUILD story-2', 'BUILD story-3'],
+  buckets: [
+    { label: 'INTAKE', questionsAsked: 1, tokens: { costUsd: 5 }, decisions: [] },
+    { label: 'BUILD', questionsAsked: 0, tokens: { costUsd: 7 }, decisions: [] },
   ],
 };
 
@@ -91,8 +107,27 @@ describe('maintainer report — user-involvement summary + decision log (post-v1
     // Involvement summary: how many phases ran with no input, and the typical answer time.
     expect(html, 'the unattended-phases stat is present').toContain('phases run unattended');
     expect(html, 'the typical answer time is shown').toContain('typical answer');
+    // …and the VALUES are the ones from the cost file, not just the labels — two unattended
+    // buckets over one costed bucket, and a 45s median answer. A hard-coded figure fails here.
+    expect(html, 'the unattended-phase count is computed from the file (2 / 1)').toContain('2 / 1');
+    expect(html, 'the typical answer time is computed from the file (45s)').toContain('typical answer 45s');
     // Verbatim decision log: the question surfaces from the cost file.
     expect(html, 'the logged question surfaces verbatim').toContain(QUESTION);
+  });
+
+  // Teeth: the involvement FIGURES move with the input. Rendering a different cost file yields
+  // different rendered values (3 / 2, 1m 30s) and none of the first file's values — proving the
+  // count and time are data-derived, not a hard-coded or placeholder string.
+  it.skipIf(!BR_PRESENT)('PASS (teeth): the unattended count and answer time change with the cost file', () => {
+    seedBuiltProject(project);
+    project.write(COST_DATA, JSON.stringify(COST_FIXTURE_VARIED));
+    const r = runScript(BUILD_REPORT, ['--root', project.root, '--no-insights'], { cwd: project.root });
+    expect(r.exitCode, r.stderr).toBe(0);
+    const html = project.read(REPORT_HTML);
+    expect(html, 'the new fixture renders its own unattended count').toContain('3 / 2');
+    expect(html, 'the new fixture renders its own answer time').toContain('typical answer 1m 30s');
+    expect(html, "the first fixture's count must not appear").not.toContain('2 / 1');
+    expect(html, "the first fixture's answer time must not appear").not.toContain('typical answer 45s');
   });
 
   // Teeth: the content is data-driven — a question NOT in the file never appears, so the PASS

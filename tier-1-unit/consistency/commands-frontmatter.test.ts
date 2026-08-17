@@ -48,31 +48,62 @@ describe('command frontmatter — model field valid', () => {
   }
 });
 
-describe('CLAUDE.md → commands cross-reference', () => {
-  it('PASS: every /command referenced in CLAUDE.md exists under .claude/commands/', () => {
-    const claudeMd = fs.readFileSync(path.join(REPO_ROOT, 'CLAUDE.md'), 'utf8');
-    const available = new Set(
-      listCommandFiles().map(f => '/' + f.replace(/\.md$/, ''))
-    );
+// Slash-command surfaces a user can invoke: a `.claude/commands/<name>.md` file OR a
+// `.claude/skills/<name>/` directory (skills are invoked as `/<name>` too — e.g. post-v1.2.0 the
+// build-report commands became `/build-report-maintainer` / `-stakeholders` skills). CLAUDE.md
+// references either kind, so the cross-reference must resolve against BOTH.
+function listSkillNames(): string[] {
+  const dir = path.join(REPO_ROOT, '.claude', 'skills');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true }).filter(d => d.isDirectory()).map(d => d.name);
+}
 
-    // Collect /command references from CLAUDE.md
+// Claude Code built-ins have no file in this repo — they resolve globally, so exclude them.
+const BUILT_INS = new Set(['/help', '/clear', '/context', '/feedback']);
+
+describe('CLAUDE.md → commands cross-reference', () => {
+  it('PASS: every /command referenced in CLAUDE.md resolves to a command file or a skill', () => {
+    const claudeMd = fs.readFileSync(path.join(REPO_ROOT, 'CLAUDE.md'), 'utf8');
+    const available = new Set([
+      ...listCommandFiles().map(f => '/' + f.replace(/\.md$/, '')),
+      ...listSkillNames().map(n => '/' + n),
+    ]);
+
+    // Every command-shaped token in CLAUDE.md — NOT a hardcoded allowlist (which silently skipped
+    // real references like /plan and /upgrade). A reference is `/name` where name is ≥2 chars and
+    // does not end in `-`, sitting at a word boundary. The lead boundary (start / space / backtick
+    // / bracket) excludes path segments like `web/src` and `@/lib`; the trailing exclusion of
+    // `[\w/*-]` excludes multi-segment paths (`/v1/users`) and globs (`/build-report-*`).
     const referenced = new Set<string>();
-    for (const m of claudeMd.matchAll(/`?\/([a-z][a-z0-9-]+)`?/g)) {
-      const cmd = '/' + m[1];
-      if (['/help', '/clear', '/context', '/feedback', '/start', '/continue', '/status',
-           '/dashboard', '/quality-check', '/migrate-legacy', '/api-status', '/api-mock-refresh',
-           '/api-go-live'].includes(cmd)) {
-        referenced.add(cmd);
-      }
+    for (const m of claudeMd.matchAll(/(?:^|[\s`([])\/([a-z][a-z0-9-]*[a-z0-9])(?![\w/*-])/gm)) {
+      referenced.add('/' + m[1]);
     }
 
-    // Filter to commands that should resolve in THIS repo (exclude built-ins)
-    const builtIns = new Set(['/help', '/clear', '/context', '/feedback']);
     const missing: string[] = [];
     for (const cmd of referenced) {
-      if (builtIns.has(cmd)) continue;
+      if (BUILT_INS.has(cmd)) continue;
       if (!available.has(cmd)) missing.push(cmd);
     }
-    expect(missing, `CLAUDE.md references commands that don't exist: ${missing.join(', ')}`).toEqual([]);
+    expect(
+      missing,
+      `CLAUDE.md references commands/skills that don't exist: ${missing.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  // Teeth: the extractor + resolver actually catch a dangling reference — a made-up command that
+  // is neither a command file nor a skill is reported. Without this, a matcher that stopped
+  // matching (or an over-eager built-in filter) could let the check pass vacuously.
+  it('PASS (teeth): a command referenced but absent on disk is detected', () => {
+    const available = new Set([
+      ...listCommandFiles().map(f => '/' + f.replace(/\.md$/, '')),
+      ...listSkillNames().map(n => '/' + n),
+    ]);
+    const sample = 'Run `/definitely-not-a-real-command` to frobnicate.';
+    const referenced = new Set<string>();
+    for (const m of sample.matchAll(/(?:^|[\s`([])\/([a-z][a-z0-9-]*[a-z0-9])(?![\w/*-])/gm)) {
+      referenced.add('/' + m[1]);
+    }
+    expect(referenced.has('/definitely-not-a-real-command'), 'the extractor found the token').toBe(true);
+    expect(available.has('/definitely-not-a-real-command'), 'and it resolves to nothing').toBe(false);
   });
 });

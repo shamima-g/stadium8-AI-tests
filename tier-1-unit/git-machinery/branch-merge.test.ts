@@ -150,3 +150,54 @@ describe('git-machinery — auto-combine vs. conflict substrate', () => {
     git.git('merge', '--abort');
   });
 });
+
+// A shared tool/dependency manifest two epics might each want at a different version — the "same
+// outside tool, two versions" case the workflow must halt on rather than silently pick a winner.
+// The pinned version sits on its own line so an edit to it is a clean single-line change.
+function pkgJson(shadcnVersion: string): string {
+  return JSON.stringify(
+    { name: 'web', private: true, dependencies: { next: '16.0.0', react: '19.0.0', shadcn: shadcnVersion } },
+    null,
+    2,
+  ) + '\n';
+}
+
+const PKG = 'web/package.json';
+
+describe('git-machinery — same tool, two versions conflicts (halt trigger)', () => {
+  let project: TempProject;
+  let git: GitSandbox;
+  beforeEach(() => {
+    project = createTempProject();
+    git = gitSandbox(project.root);
+    seedProjectMd(project.root);
+    project.write(PKG, pkgJson('2.1.0'));
+    git.commit('base: pin shadcn 2.1.0');
+    git.git('branch', '-M', 'main');
+  });
+  afterEach(() => { project.cleanup(); });
+
+  it('FAIL: two epics pinning the SAME tool to different versions conflict, surfacing both', () => {
+    // epic/e wants shadcn 2.2.0; epic/f (from the same base) wants 2.3.0 — the SAME line.
+    git.git('checkout', '-q', '-b', 'epic/e');
+    project.write(PKG, pkgJson('2.2.0'));
+    git.commit('epic e: shadcn → 2.2.0');
+
+    git.git('checkout', '-q', 'main');
+    git.git('checkout', '-q', '-b', 'epic/f');
+    project.write(PKG, pkgJson('2.3.0'));
+    git.commit('epic f: shadcn → 2.3.0');
+
+    git.git('checkout', '-q', 'main');
+    expect(git.git('merge', '--no-ff', 'epic/e', '-m', 'merge e').exitCode).toBe(0);
+    const mergeF = git.git('merge', '--no-ff', 'epic/f', '-m', 'merge f');
+    expect(mergeF.exitCode).not.toBe(0); // conflict — git won't guess which version wins
+
+    // Both requested versions are surfaced inside the conflict markers — neither is silently lost.
+    const conflicted = project.read(PKG);
+    expect(conflicted, 'conflict markers present').toContain('<<<<<<<');
+    expect(conflicted, "epic e's version is surfaced").toContain('2.2.0');
+    expect(conflicted, "epic f's version is surfaced").toContain('2.3.0');
+    git.git('merge', '--abort');
+  });
+});

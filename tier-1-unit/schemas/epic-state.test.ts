@@ -75,6 +75,37 @@ describe('state.json schema — valid documents', () => {
       p.cleanup();
     }
   });
+
+  // Determinism: two `--init` runs with the same name/branch produce the SAME state.json once the
+  // only-legitimately-varying fields (the createdAt/lastUpdated timestamps) are set aside. The
+  // workflow relies on a fresh epic starting from an identical, predictable shape every time — a
+  // stray env-dependent default or field-ordering wobble would break resume/replay downstream.
+  it('PASS: `--init` is deterministic (identical state.json modulo timestamps)', () => {
+    const initOnce = () => {
+      const p = createTempProject();
+      try {
+        const r = runScript(
+          '.claude/scripts/epic-state.js',
+          ['--init', '--name', 'Task Browsing', '--branch', 'epic/task-browsing', '--root', p.root],
+          { cwd: p.root },
+        );
+        expect(r.exitCode, r.stderr).toBe(0);
+        const state = JSON.parse(p.read('generated-docs/epics/task-browsing/state.json')) as {
+          epic: { createdAt?: unknown }; lastUpdated?: unknown;
+        };
+        // Prove the timestamps were actually present (so stripping them isn't hiding a diff),
+        // then normalise them away — a record of *when*, not part of the initial shape.
+        expect(typeof state.epic.createdAt, 'createdAt is stamped').toBe('string');
+        expect(typeof state.lastUpdated, 'lastUpdated is stamped').toBe('string');
+        state.epic.createdAt = '<ts>';
+        state.lastUpdated = '<ts>';
+        return JSON.stringify(state);
+      } finally {
+        p.cleanup();
+      }
+    };
+    expect(initOnce()).toBe(initOnce());
+  });
 });
 
 describe('state.json schema — invalid documents are rejected', () => {
@@ -117,6 +148,25 @@ describe('state.json — transition graph is well-formed', () => {
 
   it('FAIL: PLAN → MANUAL-TEST is NOT a valid transition (proves the graph is restrictive)', () => {
     expect(VALID_TRANSITIONS['PLAN'] ?? []).not.toContain('MANUAL-TEST');
+  });
+
+  // The WHOLE allowed-move set, pinned to a hand-written literal (the human tripwire, like the
+  // EPIC_PHASES pin below). This is what gives "only valid stage moves are accepted" real teeth:
+  // every legal edge is enumerated, so adding a skip-a-stage edge (e.g. PLAN → COMPLETE) or
+  // dropping the READY-TO-BUILD park fails here and forces a deliberate hand-edit + doc update.
+  // NB this pins the transition TABLE the template exports; enforcing it at runtime (refusing a
+  // move whose inputs aren't ready, and the per-story BUILD loop) is the orchestrator's job and is
+  // exercised in Tier 3 — epic-state.js itself only writes the initial state via `--init`.
+  it('PASS: VALID_TRANSITIONS equals the documented epic-branch graph', () => {
+    expect(VALID_TRANSITIONS).toEqual({
+      'PLAN': ['READY-TO-BUILD', 'BUILD'],
+      'READY-TO-BUILD': ['BUILD'],
+      'BUILD': ['EPIC-END'],
+      'EPIC-END': ['MANUAL-TEST', 'BUILD'],
+      'MANUAL-TEST': ['COMPLETE-ON-BRANCH', 'BUILD'],
+      'COMPLETE-ON-BRANCH': ['COMPLETE'],
+      'COMPLETE': [],
+    });
   });
 });
 

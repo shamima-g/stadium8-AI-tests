@@ -24,9 +24,13 @@ const exists = (rel: string): boolean => fs.existsSync(path.join(REPO_ROOT, rel)
 // Positive marker for the split: the two audience skills that replaced the old surfaces.
 const NEW_REPORTS = exists('.claude/skills/build-report-maintainer');
 
+// The literal surfaces the split retired. NOTE on `/workflow-insights`: it only ever shipped as a
+// SKILL directory (`.claude/skills/workflow-insights/`, present through v1.2.0), never as a
+// `.claude/commands/*.md` — an earlier version of this canary watched the wrong (command) path, so
+// a lingering workflow-insights skill would not have been caught. Watch the real skill dir.
 const RETIRED = [
   '.claude/commands/build-report.md',
-  '.claude/commands/workflow-insights.md',
+  '.claude/skills/workflow-insights',
   '.claude/skills/build-report-all',
   '.claude/skills/build-report-cost',
   '.claude/skills/build-report-effort',

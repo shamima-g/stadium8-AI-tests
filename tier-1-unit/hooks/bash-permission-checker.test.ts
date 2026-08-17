@@ -7,8 +7,11 @@
  *  - Exit 0 with "allow" → auto-approved
  *  - Exit 2 → denied
  *
- * Table-driven test covers 40+ commands from the real deny/allow matrix plus
- * an adversarial fuzz suite of ~30 variants.
+ * Table-driven test covers the real deny/allow matrix (the enumerated dangerous
+ * commands are hard-asserted to DENY) plus an adversarial fuzz suite — whitespace,
+ * split/long flags, shell wrappers, command chains, and encoded (base64/hex/octal)
+ * payloads — each asserted only to never be auto-APPROVED (fallthrough to a human
+ * prompt is acceptable; auto-approving any of them would be the security bug).
  */
 
 import { it, expect } from 'vitest';
@@ -96,6 +99,13 @@ describe('bash-permission-checker — fuzz (adversarial input)', () => {
     ' rm -rf /',                      // leading space
     'cat ~/.ssh/id_rsa && true',      // command chain
     'true || cat /etc/shadow',        // command chain
+    // Encoded payloads — the destructive command is disguised so a literal-string matcher can't
+    // see it. The hook is not expected to DECODE these (that's why fallthrough is acceptable), but
+    // it must never auto-APPROVE them either.
+    'echo cm0gLXJmIC8= | base64 -d | sh',                     // base64 of "rm -rf /"
+    "printf '\\x72\\x6d\\x20\\x2d\\x72\\x66\\x20\\x2f' | sh",  // hex-escaped "rm -rf /"
+    "echo -e '\\162\\155 -rf /' | sh",                        // octal-escaped "rm"
+    'eval "$(echo cm0gLXJmIH4= | base64 -d)"',                // base64 of "rm -rf ~" via eval
   ];
 
   it.each(FUZZ_CASES)('FAIL: must not ALLOW %s outright', (command) => {
