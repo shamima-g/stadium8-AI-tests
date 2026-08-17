@@ -104,7 +104,7 @@ test — the promises themselves hold across versions.)
 | # | The thing | The promise |
 |---|-----------|-------------|
 | A | **The stage machine** | Every epic moves through the template's stages **in order**, tracked in the epic's own `state.json`, never skipping a stage whose inputs aren't ready. The valid stages/order are read live from `epic-state.js` (`EPIC_PHASES`). |
-| B | **The branch-and-merge machinery** | Each epic is built on its own `epic/<slug>` branch; the epic reaches `main` **only after you approve**; non-conflicting overlaps combine on their own, real conflicts stop and ask |
+| B | **The branch-and-merge machinery** | Each epic is built on its own `epic/<slug>` branch; non-conflicting overlaps combine on their own and real conflicts stop and ask (both proven over the git substrate in Tier 1); the epic reaches `main` **only after you approve** — a running-workflow gate confirmed with a person driving (Tier 3), not by the Tier-1 git sandbox, which merges directly |
 | C | **The approvals** | Nothing important happens without you seeing it first — each approval shows the content *before* the question, never a "naked" approval |
 | D | **The autonomy tiers** | Small choices are made quietly; notable ones are jotted in the epic's notebook; ones that matter later are filed in the right place; only genuinely risky decisions stop and ask you |
 | E | **The quality checks** | The automatic checks run light per story and in full over the whole epic, and report pass/fail **truthfully** — a real failure is never dressed up as a pass |
@@ -112,8 +112,9 @@ test — the promises themselves hold across versions.)
 | G | **The generated code and app tests** | The code follows the standing policies (no error suppressions, exact API paths, Shadcn-only UI, one central place for styling, a role on every story, plain-language checklists), and the test layers cover each behaviour exactly once |
 
 **Why most of this is testable.** A, B, E, and F are predictable — a stage move is
-legal or it isn't, a merge happened through a request or it didn't, a command is
-blocked or it isn't. G is predictable to *check* even though the way Claude *writes*
+legal or it isn't, two edits combine cleanly or they conflict, a command is
+blocked or it isn't. (The *approve-before-merge* half of B is a running-workflow
+behaviour, so it's confirmed in Tier 3, not the git sandbox — see §6.) G is predictable to *check* even though the way Claude *writes*
 the code isn't — we check the finished code against the rules. C and D are behaviours
 of the *running* workflow, so we prove the pieces on their own (Tier 1), prove they
 left the right traces in a recorded run (Tier 2), and confirm the whole thing feels
@@ -134,6 +135,11 @@ releases.
 | **1** | Unit tests of the scripts, hooks, schemas, docs, git machinery, and generated-code rules | Yes | No | `tier-1-unit/` |
 | **2** | Invariant checks over a **recorded real run** — its branches, commits, and `generated-docs/` output | Yes | No (recorded once by hand) | `tier-2-recorded-run/` |
 | **3** | A person runs the real workflow with a real AI and confirms it behaves | No (manual) | Yes | The human walkthrough |
+
+**Each tier has its own file.** The shared rules — the ones in this document — hold for
+all three tiers. The detail for each tier lives on its own so you can work on one tier
+without loading the rest: [tier-1.md](tier-1.md), [tier-2.md](tier-2.md), and
+[tier-3.md](tier-3.md). Sections 6, 7, and 8 below are short signposts into those files.
 
 **Why three tiers and not just unit tests.** A unit test can prove that
 `epic-state.js` does the right thing when you call it. It **cannot** prove the AI
@@ -194,244 +200,48 @@ the Tier-3 walkthrough:
 
 ## 6. Tier 1 — automated unit tests
 
-Standard Vitest (JavaScript) and Pester (PowerShell) tests. They run on every change
-and finish in seconds. A few areas get extra care:
+**The full Tier 1 detail now lives in its own file: [tier-1.md](tier-1.md).** It covers
+the fast, automated Vitest and Pester tests of the scripts, hooks, schemas, git
+machinery, and generated-code rules. It was moved out so you can work on one tier
+without loading the whole document; the shared rules it relies on stay here in this hub.
 
-- **Epic-state machine.** `epic-state.js` only accepts valid stage moves (the
-  template's own stages, in order, plus BUILD's per-story loop), refuses to advance a
-  stage whose inputs aren't ready (e.g. BUILD before the story list is approved), and
-  creating a fresh epic's `state.json` produces the same file every time.
-  `mark-epic-complete.js` freezes an epic's record correctly, and
-  `resolve-state-path.js` finds the right state file for the branch you're on. These
-  exact operations get the most care because the workflow relies on them being
-  perfectly repeatable.
-- **Branch & merge machinery (git sandbox).** In a throwaway repo, we prove: an epic
-  branch is named `epic/<slug>`; two epics that touch the central style file or the
-  stand-in data in *non-conflicting* ways combine cleanly on their own; two epics that
-  change the *same* code conflictingly, or want different versions of the same outside
-  tool, **stop and surface both versions** instead of guessing; and a merge into
-  `main` only happens through a request, never a silent direct push.
-- **Permission-hook fuzzing.** `bash-permission-checker.js` decides which shell
-  commands are allowed. It's security-critical, so it's tested against a big table of
-  real commands plus adversarial inputs (`rm -rf /` variants, encoded strings,
-  whitespace tricks). One dangerous command slipping through is the failure we most
-  want to catch.
-- **Generated-doc-name enforcement.** `enforce-generated-doc-names.js` (via
-  `validate-generated-doc-names.js`) must allow a file written to the correct
-  epic-scoped place (`generated-docs/epics/<epic>/…`) and block one with the wrong
-  name or location.
-- **Doc and config drift.** The biggest rot in a template is documentation that no
-  longer matches the files. So we check: every agent file has valid frontmatter and
-  appears in the agents `README.md`; every `/command` mentioned in `CLAUDE.md` exists;
-  every hook command in `settings.json` points at a real file; and the agent list
-  matches what's on disk.
-- **JSON schema checks.** The per-epic `state.json` schema **single-sources** its
-  stage/status enums from the template's own `epic-state.js` (`EPIC_PHASES` etc.), so
-  it can't drift from the producer.
-- **Generated-code linting.** The rules in [section 5](#5-what-we-test--the-surface-area),
-  proven on samples and then run over the real output when it exists.
+In short: Tier 1 runs on every change, finishes in seconds, and proves each script,
+hook, and schema does the right thing on its own — with extra care for the epic-state
+machine, the branch-and-merge git sandbox, the security-critical permission hook, and
+doc/config drift.
 
 ---
 
 ## 7. Tier 2 — invariants over a recorded run
 
-> **Status: scaffolded; skips until a golden run is captured.** The harness is built
-> (`tier-2-recorded-run/recorded-run.test.ts` + `helpers/golden-run.ts`) — its
-> invariants **skip visibly** until a real run is recorded into `fixtures/golden-run/`,
-> then activate automatically. The artifact invariants run on a `generated-docs/`
-> tree; the git-topology invariants additionally need a `repo.bundle`.
+**The full Tier 2 detail now lives in its own file: [tier-2.md](tier-2.md).** It covers
+the checks that run over one recorded real run — its branches, commits, and
+`generated-docs/` output — with no live AI at test time. It was moved out so you can
+work on one tier without loading the whole document; the shared rules it relies on stay
+here in this hub.
 
-This is the bridge between "each script works" (Tier 1) and "needs a live AI"
-(Tier 3). It reads the traces one real run leaves behind and checks the things that
-only make sense across a whole epic.
-
-**How it works:**
-
-1. **Record once, by hand.** A person runs the workflow end-to-end for the Team Task
-   Manager (see [section 11](#11-test-inputs-and-fixtures)), building at least one epic
-   through to a merge **and planning one more ahead with `/plan`** (parked at
-   `READY-TO-BUILD`, never built) so the parked-epic invariants activate. The result — a
-   git bundle of the `epic/<slug>` branch, the merge into `main`, and the parked epic's
-   `docs(plan)` commit, plus a copy of the `generated-docs/` tree — is saved into
-   `fixtures/golden-run/`.
-2. **Replay automatically.** The Tier 2 tests load that bundle and tree — no AI is
-   needed at test time.
-3. **Check the invariants** (all read from git + files, no AI):
-
-- **One branch per epic, correctly named** — the recorded branch is `epic/<slug>`, and
-  the finished work reached `main` through a merge, not a direct push.
-- **One commit per story** — each story maps to its own commit, subject
-  `feat(epic-<N>-story-<M>): <title>`, with a body recording the notable decisions.
-- **The state file is well-formed and ordered** — `state.json` validates against the
-  schema, and the stages it recorded never skip or go backwards.
-- **The plan covers the request** — `epic-plan.md` lists the epics with dependencies
-  and a coverage note accounting for every part of the request.
-- **Every story is complete on paper** — each story file has a non-empty role and
-  testable acceptance criteria.
-- **The notebook and registry are real** — each built epic records a decision trail: a non-empty
-  `journal.md`, or — for a design-driven run — the design digest's "Your Decisions" (a minimal
-  design epic keeps its decisions there rather than a per-epic journal; a present-but-empty journal
-  still fails). `architecture.md` registry entries are well-formed; any "please double-check" items
-  exist and were floated ahead of the merge.
-- **The app tests line up with the stories** — every routable story has a live
-  Playwright spec (`web/e2e/epic-<N>-story-<M>-<slug>.spec.ts`); a non-routable one
-  has a spec marked `test.fixme()` with a one-line reason (and that marker is **not**
-  allowed on a routable one).
-- **The absence canaries** — none of the retired machinery has crept back (telemetry
-  ledger, session logs, a `project-brief.md`, a `code-reviewer` agent, retired stage
-  names). A freshness canary warns if the recording is older than the orchestrator
-  rules or `settings.json`.
-- **The parked-epic (`/plan`) traces** — an epic planned ahead and parked at
-  `READY-TO-BUILD` already carries its **approved story list** (on disk *and* in
-  `state.json`), has **no `epic/<slug>` branch** and started **no build** (the whole point
-  of parking), left **no `plan/<slug>` worktree** behind, is reachable on `main` via its
-  `docs(plan)` commit, and — if blocked — recorded its `dependsOn`. Only these
-  deterministic *traces* live in Tier 2; the `/plan` behaviours with an irreducible live
-  core (the story approval firing, the mid-flow redirect, the merge-block across two live
-  sessions) stay in Tier 3 — see [section 8](#8-tier-3--the-human-walkthrough). The block is
-  **feature-detected off the recording**: a run with no parked epic (an older version, or a
-  capture that skipped `/plan`) **skips visibly**, it never fails.
-
-> **When to re-record.** The recording is a committed fixture. Re-record it after any
-> change that alters how the workflow runs (orchestrator rules, agent prompts,
-> settings, hooks): run the Tier 3 walkthrough once and copy the fresh bundle and tree
-> over the old one.
+In short: Tier 2 is the bridge between "each script works" (Tier 1) and "needs a live
+AI" (Tier 3). A person records one full run by hand; the tests then replay that
+recording and check the things that only make sense across a whole epic — one branch
+per epic, one commit per story, a well-formed ordered state file, a real decision
+trail, matching app tests, absence canaries, and the parked-epic `/plan` traces.
 
 ---
 
 ## 8. Tier 3 — the human walkthrough
 
-A person runs the real workflow with a real AI and confirms each behaviour — the
-final word before a release, and each clean pass is a good moment to re-record the
-Tier 2 fixture.
+**The full Tier 3 detail now lives in its own file: [tier-3.md](tier-3.md).** It covers
+the manual, live-AI walkthrough — the final word before a release — including the
+version-independent behaviours to confirm by hand and the `/plan` plan-ahead scenarios.
+It was moved out so you can work on one tier without loading the whole document; the
+shared rules it relies on stay here in this hub.
 
-**Ground the walkthrough in the version under test — not in this doc.** Before you
-start, read that version's own workflow docs so you're checking against what it
-actually promises: `<template>/.claude/WORKFLOWS.md` and
-`<template>/.template-docs/users/` (Getting-Started, Agent-Workflow-Guide,
-Quality-Gates). The stages, gates, and commands you'll see are whatever that version
-defines. What follows is the **version-independent craft** the walkthrough confirms —
-the things no unit test can judge — framed so they apply whatever the exact stage
-names are.
-
-**Workflow behaviours to confirm by hand:**
-
-- **`/start` flows straight into work** — setup installs what's missing and continues
-  into the first question in one go; it doesn't stall on "setup complete".
-- **The stages happen in the template's defined order**, on the epic's own branch,
-  with `/continue` picking up wherever you left off after a close-and-return.
-- **Every approval shows the content first** — the facts/plan, the story list, the
-  hands-on checklist, the merge — never a "naked" approval with nothing to review.
-- **Sign-in is always asked openly** — the options are shown with their trade-offs and
-  never silently inferred.
-- **Building runs on its own** and only stops for a genuinely risky (Level 4) decision
-  — a new dependency, a data-shape or auth change, an endpoint the description doesn't
-  cover — surfacing the options instead of guessing.
-- **The autonomy tiers leave the right trail** — small choices mentioned with the
-  saved work, notable ones in the notebook, external unknowns on the "please
-  double-check" list before the merge.
-- **The end-of-epic checks, the built-in review, and the browser tests all run**, and
-  any failure is routed back through the responsible story (at most three tries, then
-  it asks you).
-- **The hands-on check is genuinely hands-on** — the checklist opens in the browser
-  with the double-check items on top and one-click sign-ins; "found a problem" leads to
-  a fix and a re-ask (only the affected items un-ticked).
-- **The merge waits for you** — it never merges on its own.
-- **Recovery is painless** — with the state file gone, checking out the branch and
-  running `/continue` still carries on from the right spot (and a hook restores
-  bearings after the AI's memory is auto-trimmed).
-
-**Generated-code craft to confirm** (the same rules Tier 1 lints, spot-checked live —
-detection recipes in [section 5](#5-what-we-test--the-surface-area)): tests are
-written *before* the code and fail first; the code makes them pass; UI primitives come
-from `@/components/ui/`; data calls go through the shared client with exact API paths,
-never a raw `fetch()`; no error suppressions; user-facing checklists stay in plain
-language; each routable story has a real browser test.
-
-> **L6 / grade-by-version rule.** When grading the app Claude builds, grade against the
-> rules that shipped **with the version under test** — read them from that version's
-> own docs and live values, never from today's. File the result under the version +
-> the suite version used (see [section 12](#12-testing-any-template-any-version)).
-
-### `/plan` — planning an epic ahead (feature-detected; v1.2.0's park-ahead command)
-
-Some versions add a **plan-ahead** command that breaks the *next* epic down and parks it
-**ready to build** without building it — and that's meant to run in a **second live
-session, concurrently with a build**. In the current template this is `/plan`, which parks
-an epic at the `READY-TO-BUILD` stage. These are behaviours of the *running* workflow across
-*two* live sessions, so — like the rest of Tier 3 — they're confirmed live and **recorded,
-never used to fail the run**. Gate this whole area on the surface being present (is a
-park-ahead command live? does the stage machine include a ready-to-build stage?), not on a
-version number — a version without it **skips**, never fails.
-
-**The good/broken discipline still holds** ([section 2](#2-the-rules-every-test-follows),
-[section 9](#9-good-case--broken-case--the-discipline)). Each check is a small pure function
-that reads the traces a run leaves (git refs, `state.json`, `generated-docs/`), and it gets
-its **good *and* broken case as a Tier-1 unit test** over synthetic scaffolds (a parked epic
-vs. one still at BUILD; a clean worktree teardown vs. a leftover `plan/<slug>`). The **live
-run exercises** those same functions and records the result. So the broken case lives where
-it can be proven cheaply and repeatably; the live tier proves the behaviour actually happens.
-
-Two live scenarios drive it, each filed in its own results world so its numbers never mix
-with a straight build:
-
-- **PLAN-A — one session, sequential** (runs without a shared remote, using the command's
-  single-session local-git fallback): `/start` → build the first epic → plan the next
-  (one already outlined at setup, one brand-new) → plan one that depends on an unbuilt epic
-  → check `/status` + dashboard → `/start` the parked epic and confirm it builds.
-- **PLAN-B — two sessions, concurrent** (needs a shared remote — a bare `origin` added to
-  the scaffold): one process builds an epic while a second plans the next, and we check
-  neither disturbs the other and `main` stays consistent.
-
-**What each acceptance criterion maps to** (rule id = how it lands in the run's `rulesMissed`
-list, record-only):
-
-| Behaviour to confirm | Scenario | What the deterministic assertion reads | Rule id |
-|----------------------|:--------:|-----------------------------------------|---------|
-| Planning starts **no build work** | A | planned epic at ready-to-build with **no `epic/<slug>` branch** and **zero `feat()` commits** for its slug | `plan-no-build-started` |
-| Epic is **broken down + approved** while planning | A | story files written and recorded in `state.json`, phase advanced past PLAN *(approval interaction is live — driven from the answers file's story approval)* | `plan-stories-approved` |
-| Planning works for an **epic outlined at setup** | A | the epic already in `epic-plan.md` after `/start` is now parked, brief unchanged | `plan-outlined-epic` |
-| Planning works for a **brand-new epic** | A | an epic **absent** from the post-`/start` `epic-plan.md` now has a brief + new plan row + parked state (diff before/after) | `plan-new-epic` |
-| Planned epic is **parked ready to build** | A | phase `READY-TO-BUILD` on `main` via a `docs(plan)` commit; no leftover `plan/<slug>` worktree or branch | `plan-parked` |
-| Continuing it **resumes straight into BUILD**, no re-planning | A | `/start` on the parked epic moves ready-to-build → BUILD with stories **unchanged** (no second approval) and a fresh `epic/<slug>` cut from `main` | `plan-resumes-to-build` |
-| Parked epic shows **distinct** in status + dashboard | A | `/status` recap + `collect-dashboard-data` over the real tree *(largely already Tier-1 — this is the live confirmation)* | `plan-distinct-status` |
-| **Two sessions at once** — one building, one planning | B | interleaved traces: epic-1 `feat()` commits **and** epic-2 parked, overlapping in wall-clock | `plan-concurrent-ran` |
-| Neither session **disturbs the other's** files/branch/state | B | epic-1 branch HEAD holds only session-1 commits, its state untouched; session-2 wrote only in its throwaway worktree + pushed to `main` | `plan-no-cross-disturb` |
-| Workflow **guides the user into a separate session** | A | running the plan command **mid-flow** yields the redirect and creates **no worktree** *(the guard rule's presence is also a Tier-1 doc check)* | `plan-midflow-guard` |
-| **Shared records on `main`** stay consistent | B | `git fsck` clean; `epic-plan.md` holds **both** rows (additive-union, renumbered); parked records intact | `plan-main-consistent` |
-| **Project facts + epic plan** stay consistent | B | `project.md` unchanged by planning (it never edits project-level facts); both epic rows coherent | `plan-facts-consistent` |
-| **No session loses in-progress work** | B | all epic-1 commits present on its branch; epic-2 plan present on `main`; the resume/progress trail intact | `plan-no-lost-work` |
-| A **blocked epic** (depends on an unbuilt one) can still be planned | A | parked with `dependsOn` recorded and status `blocked`, not `ready` | `plan-blocked-ahead` |
-| That epic stays **blocked from merging until its dependency merges** | B | *(ordering rule is primarily Tier-1 — the merge machinery + `dependsOn`; B confirms it live if a run reaches a merge)* | `plan-blocked-until-dep` |
-
-**Three of these have an irreducible live core** (the same reason C/D in
-[section 3](#3-what-the-template-promises) are Tier-3): the story **approval** itself
-(`plan-stories-approved` proves only the trace), the mid-flow **redirect actually firing**
-(`plan-midflow-guard`), and **live enforcement** of the merge-block across two real sessions
-(`plan-blocked-until-dep`). Their deterministic halves live in Tier 1; the live run is what
-confirms the behaviour. And **two are already substantially Tier-1** from the v1.2.0 work —
-the parked-epic dashboard/status distinctness (`plan-distinct-status`) and the ordering half
-of the dependency block — so here Tier 3 adds live confirmation, not net-new coverage.
-
-**Where each half runs — the three-tier split for `/plan`.** The deterministic *traces* a
-parked epic leaves are asserted in **two** places, and they are the only halves that gate:
-
-- **Tier 1** proves each pure/real-git assertion function good **and** broken over *synthetic*
-  scaffolds (a parked epic vs. one still at BUILD; a clean worktree teardown vs. a leftover
-  `plan/<slug>`).
-- **Tier 2** asserts those same traces over the **one real recording** — parked story list
-  present (`plan-stories-approved` trace), no `epic/<slug>` branch and no build
-  (`plan-no-build-started`), no leftover `plan/<slug>` and on-`main`-via-`docs(plan)`
-  (`plan-parked`), `dependsOn` recorded when blocked (`plan-blocked-ahead`). These are
-  **pass/fail** Tier-2 invariants, feature-detected off the recording (no parked epic →
-  skip, never fail) — see [section 7](#7-tier-2--invariants-over-a-recorded-run).
-- **Tier 3** is reserved for the **irreducible live cores** above (the approval firing, the
-  mid-flow redirect, the two-session merge-block), which stay **record-only** in the live
-  run — they never gate.
-
-So a rule id like `plan-parked` is *record-only* when observed live in Tier 3, but the same
-trace is a *gating* invariant when replayed over the golden run in Tier 2. Nothing is
-double-counted: Tier 2 gates the traces; Tier 3 confirms only what can't be replayed.
+In short: a person runs the real workflow with a real AI and confirms the behaviours no
+unit test can judge — the stages happening in order, every approval showing its content
+first, building stopping only for genuinely risky choices, the hands-on check being
+truly hands-on, and the merge always waiting for you. Tier 3 is **not** an npm command;
+it's run before a release, and each clean pass is a good moment to re-record the Tier 2
+fixture.
 
 ---
 
@@ -760,9 +570,9 @@ so the tests target the scripts and their output, not commands.
 | 6 | **Effort benchmarks + sizing calculator** | `generate-build-effort.mjs` (has co-located `*.tests.js` — add cross-checks only) | 1 | per-screen-type / per-feature medians computed from real build records; calculator sizes a screen mix | figures fabricated when records are absent → flagged |
 | 7 | **Part-built feature excluded** | effort/benchmark aggregation | 1 | a fully-measured feature counts toward the "typical feature" figure | a feature with only some stories finished is **excluded** and marked *partly measured*, not counted → (broken = it drags the average) |
 | 8 | **Per-project cost scoping** | `collect-build-report-data.js` over sibling folders `my-app`, `my-app-QA` | 1 | only the project's own git-owned work is counted | a sibling's work folded into the totals → flagged |
-| 9 | **Missing figure → dash, not a lost page** | `generate-build-report-html.js` fed a data file with a missing/leftover figure | 1 | page still generates; the unreadable figure shows as `—` | one missing figure aborts the whole page → flagged |
+| 9 | **Missing figure → no lost page** | `generate-build-report-html.js` fed a partial/corrupt data file | 1 | page still generates end-to-end (exit 0, page written, no `NaN`/`undefined` in rendered text) | one bad figure throws and aborts the whole page → flagged (the `—` dash-rendering itself is covered at the pure `renderEffort()` level co-located, per §13.6) |
 | 10 | **Report before `/start` → guidance** | `collect-build-report-data.js` on a no-project tree (extend the existing collector-status test) | 1 | returns a "run `/start`" pointer, not a report | a no-project tree treated as a one-detail-missing report → flagged |
-| 11 | **No PR comments from CI** | static check over `.github/workflows/*.yml` | 1 | no PR-comment step (`createComment`/`github-script` commenting / `issues: write` for comments) | a PR-comment step present → flagged |
+| 11 | **No PR comments from CI** | static check over `.github/workflows/*.ya?ml` | 1 | no concrete PR/issue-comment step (`createComment`/`updateComment`/`createReviewComment`, comment marketplace actions, `gh pr/issue comment`) | a comment step present → flagged (concrete mechanisms only — a bare `issues: write` permission is deliberately not flagged) |
 | 12 | **Cross-platform browser open** | whichever script opens the dashboard/approval/report in a browser | 1 | has a darwin/linux branch (`open`/`xdg-open`) alongside Windows | Windows-only open path → flagged |
 | 13 | **Build from an existing design** | `scan-doc.js` over design inputs in `documentation/` (tokens.css, an HTML mockup, an OpenAPI yaml); intake-manifest schema accepts a design source | 1 | design files under `documentation/` are recognised/scanned; the manifest validates with a design source | a design source the manifest rejects, or a design file `scan-doc` mis-types → flagged |
 | 14 | **Design ingestion read back at Intake** | live behaviour — Claude reads `documentation/` design, states the screens/colours/wording (incl. what it couldn't work out) **before** building, to confirm | 3 | intake read-back names the design-derived facts and asks to confirm | it builds from the design without a confirmable read-back → noted |
@@ -772,10 +582,15 @@ so the tests target the scripts and their output, not commands.
 post-v1.2.0 archive —
 - **#4** → [`tier-1-unit/scripts/stakeholder-decisions.test.ts`] — end-to-end `--audience
   stakeholders`: the "Decisions you signed off" section renders each decision + choice + date
-  from the authored record; teeth = nothing invented, and the section vanishes with no record.
+  from the authored record; teeth = the section **vanishes** with no record (so it's data-driven,
+  not an always-on block) **and the rendered count equals the record** ("1 decision recorded") —
+  an invented or duplicated row moves the count and fails.
 - **#5** → [`tier-1-unit/scripts/maintainer-involvement.test.ts`] — end-to-end `--audience
   maintainer`: a populated `build-cost-data.json` surfaces the unattended-phase count, the
-  typical answer time, and the verbatim logged question; teeth = an unlogged question never appears.
+  typical answer time, and the verbatim logged question; teeth = an unlogged question never
+  appears, **and the count/time VALUES move with the input** — a second fixture renders `3 / 2` /
+  `1m 30s` and *not* the first's `2 / 1` / `45s`, so a hard-coded figure fails (proven by a
+  mutation that hard-codes the count → red).
 - **#1** → [`tier-1-unit/scripts/report-output-location.test.ts`] — maintainer + stakeholders
   both write under `generated-docs/reports/`; teeth = neither leaks to the old root path.
 - **#12** → [`tier-1-unit/scripts/open-page-cross-platform.test.ts`] — `open-page.js`
@@ -787,13 +602,19 @@ post-v1.2.0 archive —
   emits `generated-docs/design/digest.md`, a `.claude/templates/design-digest.md` shapes it, and
   downstream agents read that path (cross-doc drift check, not prose). Teeth = a made-up digest
   path is referenced nowhere.
-- **#11** → [`tier-1-unit/consistency/ci-no-pr-comments.test.ts`] — scans `.github/workflows/*.yml`;
-  teeth over the real matcher.
+- **#11** → [`tier-1-unit/consistency/ci-no-pr-comments.test.ts`] — scans `.github/workflows/*.ya?ml`
+  for **concrete** comment mechanisms (octokit `createComment`/`updateComment`/`createReviewComment`,
+  comment marketplace actions, `gh pr/issue comment`) — not `permissions:` grants; teeth over the
+  real matcher (a github-script `createComment` step is caught).
 - **#9** → [`tier-1-unit/scripts/report-missing-figure-resilience.test.ts`] — end-to-end subprocess
-  proof the CLI writes a whole page (exit 0, no `NaN`) on a partial **and** a corrupt data file.
-- **#2** → [`tier-1-unit/consistency/retired-report-surfaces.test.ts`] — the retired `/build-report`,
-  `/workflow-insights` and `build-report-all|cost|effort` skills are gone; gated on the maintainer
-  skill (the positive split marker), teeth via the replacement skills being present.
+  proof the CLI writes a whole page (exit 0, page written, no `NaN`/`undefined` in rendered text) on
+  a partial **and** a corrupt data file. (The `—`-for-an-unreadable-figure rendering is covered at
+  the pure `renderEffort()` level by the template's co-located tests, per §13.6.)
+- **#2** → [`tier-1-unit/consistency/retired-report-surfaces.test.ts`] — the retired `/build-report`
+  command, the `workflow-insights` **skill** (`.claude/skills/workflow-insights/` — the real
+  surface; an earlier cut of this canary watched a non-existent command path), and the
+  `build-report-all|cost|effort` skills are gone; gated on the maintainer skill (the positive split
+  marker), teeth via the replacement skills being present.
 - **#3** → [`tier-1-unit/consistency/import-prototype-removed.test.ts`] — clean-removal canary:
   `skipIf` the script is present, else assert zero dangling references under `.claude/`; teeth via
   the same scanner finding a live script's references.
