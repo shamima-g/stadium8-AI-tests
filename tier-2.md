@@ -6,11 +6,14 @@
 > and the coverage picture — stays in the hub: [workflow-tests.md](workflow-tests.md).
 > This file covers **Tier 2 only**.
 
-> **Status: scaffolded; skips until a golden run is captured.** The harness is built
-> (`tier-2-recorded-run/recorded-run.test.ts` + `helpers/golden-run.ts`) — its
-> invariants **skip visibly** until a real run is recorded into `fixtures/golden-run/`,
-> then activate automatically. The artifact invariants run on a `generated-docs/`
-> tree; the git-topology invariants additionally need a `repo.bundle`.
+> **Status: active — a golden run is captured and all invariants gate.** The harness
+> (`tier-2-recorded-run/recorded-run.test.ts` + `helpers/golden-run.ts`) replays the
+> committed `fixtures/golden-run/repo.bundle` (a build-one-park-one `minimal-concurrent`
+> run): the artifact, git-topology, **and** `/plan` parked-epic invariants all run —
+> 14/14, none skipping. The design remains capture-driven, so with no fixture present the
+> invariants **skip visibly** (never a vacuous green): the artifact invariants need a
+> `generated-docs/` tree, the git-topology and parked-epic invariants additionally need a
+> `repo.bundle`.
 
 This is the bridge between "each script works" (Tier 1) and "needs a live AI"
 (Tier 3). It reads the traces one real run leaves behind and checks the things that
@@ -29,34 +32,40 @@ only make sense across a whole epic.
    needed at test time.
 3. **Check the invariants** (all read from git + files, no AI):
 
-- **One branch per epic, correctly named** — the recorded branch is `epic/<slug>`, and
-  the finished work reached `main` through a merge, not a direct push.
-- **One commit per story** — each story maps to its own commit, subject
-  `feat(epic-<N>-story-<M>): <title>`, with a body recording the notable decisions.
-- **The state file is well-formed and ordered** — `state.json` validates against the
-  schema, and the stages it recorded never skip or go backwards.
-- **The plan covers the request** — `epic-plan.md` lists the epics with dependencies
-  and a coverage note accounting for every part of the request.
-- **Every story is complete on paper** — each story file has a non-empty role and
-  testable acceptance criteria.
-- **The notebook and registry are real** — each built epic records a decision trail: a non-empty
+- **At least one `epic/<slug>` branch, merged not pushed** — the recording carries a
+  correctly-named `epic/<slug>` branch, and the finished work reached `main` through a
+  **merge commit**, not a direct push. (Tier 2 asserts a branch *exists* and merged; it
+  does not assert one-branch-per-epic uniqueness — that cardinality is a Tier-3 judgement.)
+- **A commit per story, correctly named** — each story in a built epic has its own commit
+  with the subject `feat(<slug>/story-<N>): …` on the epic branch. (Tier 2 asserts that
+  per-story subject *and* that the branch's commit count is at least the story count; it does
+  not read commit bodies — the decision trail is checked via `journal.md`, below.)
+- **The state file is well-formed, with real phases** — `state.json` validates against the
+  schema, and every recorded `phase` is a current `EPIC_PHASE` (no retired stage names),
+  graded against the recording's *own* `epic-state.js`. (Phase *ordering* over a run — no
+  skips/rewinds — has no phase-history to read from a single `state.json`, so it stays a
+  Tier-3 judgement.)
+- **Every story is complete on paper** — each story file has a non-empty role and an
+  **Acceptance Criteria** section (a heading or a checklist), not merely any bullet.
+- **The decision trail is real** — each built epic records its decisions: a non-empty
   `journal.md`, or — for a design-driven run — the design digest's "Your Decisions" (a minimal
   design epic keeps its decisions there rather than a per-epic journal; a present-but-empty journal
-  still fails). `architecture.md` registry entries are well-formed; any "please double-check" items
-  exist and were floated ahead of the merge.
-- **The app tests line up with the stories** — every routable story has a live
-  Playwright spec (`web/e2e/epic-<N>-story-<M>-<slug>.spec.ts`); a non-routable one
-  has a spec marked `test.fixme()` with a one-line reason (and that marker is **not**
-  allowed on a routable one).
-- **The absence canaries** — none of the retired machinery has crept back (telemetry
-  ledger, session logs, a `project-brief.md`, a `code-reviewer` agent, retired stage
-  names). A freshness canary warns if the recording is older than the orchestrator
-  rules or `settings.json`.
+  still fails). *(The `architecture.md` registry and the pre-merge "please double-check" list are
+  checked in Tier 1 / Tier 3, not here — Tier 2 asserts only the decision trail.)*
+- **The app tests line up with the stories** — every story in a built epic has a matching
+  spec `web/e2e/epic-<slug>-story-<N>-*.spec.ts`, and that spec is real: it carries a live
+  `test(...)` or a justified `test.fixme(...)`, never an empty file. (The stricter
+  routable→live / non-routable→`test.fixme()` distinction is a Tier-1 rule — §9.)
+- **The absence canaries** — none of the retired machinery has crept back: no telemetry
+  ledger (`context/telemetry.ndjson`) or `specs/project-brief.md` in the tree; and, when the
+  recording carries its `.claude/`, no retired `code-reviewer` agent (superseded by
+  `code-review-runner`) and no `.claude/logs/` session-log directory. *(There is no automated
+  freshness canary — re-recording after a workflow change is the manual routine below.)*
 - **The parked-epic (`/plan`) traces** — an epic planned ahead and parked at
   `READY-TO-BUILD` already carries its **approved story list** (on disk *and* in
   `state.json`), has **no `epic/<slug>` branch** and started **no build** (the whole point
-  of parking), left **no `plan/<slug>` worktree** behind, is reachable on `main` via its
-  `docs(plan)` commit, and — if blocked — recorded its `dependsOn`. Only these
+  of parking), left **no `plan/<slug>` branch** behind, is reachable on `main` via a
+  `docs(plan)` commit, and — if it records a `dependsOn` — that dependency is well-formed. Only these
   deterministic *traces* live in Tier 2; the `/plan` behaviours with an irreducible live
   core (the story approval firing, the mid-flow redirect, the merge-block across two live
   sessions) stay in Tier 3 — see [tier-3.md](tier-3.md). The block is

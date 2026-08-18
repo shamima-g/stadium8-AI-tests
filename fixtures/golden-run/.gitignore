@@ -4,8 +4,10 @@
 !.gitignore
 !README.md
 
-# The ACTIVE golden run: a real design-driven build (design-taskboard), committed as a
-# repo.bundle (~1 MB, carries generated-docs + git topology) + meta. Small enough to commit;
-# activates BOTH the artifact and git-topology invariants. See README.md.
+# The ACTIVE golden run: a spec-driven build-one-park-one run (minimal-concurrent — Notes
+# built + merged, Tasks parked at READY-TO-BUILD), committed as a repo.bundle (~900 KB,
+# carries generated-docs + git topology + a /plan-parked epic) + meta. Small enough to
+# commit; activates all three invariant blocks (artifact, git-topology, /plan). It replaced
+# the earlier design-taskboard run. See README.md + meta.json.
 !repo.bundle
 !meta.json

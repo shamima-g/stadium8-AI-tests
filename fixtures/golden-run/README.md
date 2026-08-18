@@ -51,22 +51,24 @@ merge-not-direct-push) skip because there's no history.
 }
 ```
 
-`capturedAt` powers the freshness canary (warns if the recording is older than the
-orchestrator rules / settings it should reflect).
+`capturedAt` records when the run was captured, so a reviewer can tell at a glance whether
+the recording predates a workflow change and should be re-recorded (the "When to re-capture"
+routine below). It is metadata only — there is no automated freshness assertion.
 
 ## What Tier 2 checks (once this exists)
 
-- One branch per epic named `epic/<slug>`; the epic reached `main` via a **merge**, not a
-  direct push.
-- One commit per story, each with a descriptive subject.
-- Every `state.json` validates against the epic-state schema; recorded phases are all real
-  `EPIC_PHASES` (no retired four-phase names).
-- The epic plan covers the request; every story has a role and acceptance criteria; the
-  journal has entries.
-- Routable stories have a live Playwright spec; non-routable ones use `test.fixme()` with a
-  reason.
-- **Absence canaries:** no `telemetry.ndjson`, no `.claude/logs/`, no `project-brief.md`, no
-  performance gate, no `code-reviewer`.
+- At least one `epic/<slug>` branch exists; the epic reached `main` via a **merge commit**,
+  not a direct push.
+- Each story in a built epic has its own `feat(<slug>/story-<N>): …` commit, and the epic
+  branch's commit count is at least the story count.
+- Every `state.json` validates against the epic-state schema; every recorded phase is a real
+  `EPIC_PHASE` (graded against the recording's own `epic-state.js` — catches retired stage names).
+- Every story has a non-empty role and an **Acceptance Criteria** section; each built epic has a
+  decision trail (non-empty `journal.md`, or the design digest's "Your Decisions").
+- Each story in a built epic has a matching `web/e2e/epic-<slug>-story-<N>-*.spec.ts` that
+  carries a live `test(...)` or a justified `test.fixme(...)`.
+- **Absence canaries:** no `context/telemetry.ndjson`, no `specs/project-brief.md`; and — when
+  the recording carries `.claude/` — no retired `code-reviewer` agent and no `.claude/logs/`.
 - **Parked epics (`/plan`):** an epic parked at `READY-TO-BUILD` carries its approved story
   list (on disk + in `state.json`), has **no `epic/<slug>` branch** and started no build,
   left **no `plan/<slug>` worktree**, is reachable on `main` via its `docs(plan)` commit, and
@@ -84,8 +86,8 @@ prompts, settings, hooks). Run the Tier 3 walkthrough once and refresh the bundl
 > exception. Drop a `repo.bundle` to activate the git-topology invariants — it stays local unless
 > you add an exception for it too.
 
-> **Note.** The active run above (docs-only) does not carry git topology. When the §7 doc mentions
-> `feat(epic-<N>-story-<M>)` commit subjects, that's descriptive — the Tier-2 git-topology invariants
-> assert commit **count ≥ stories** and a merge-into-main, not a subject format. The
-> design-specific *content* traces (digest ready, decisions preserved, navigability) gate separately
-> via `fixtures/design-capture/` + `tier-1-unit/design/*replay*.test.ts`.
+> **Note.** The active run above is a **`repo.bundle`**, so it carries full git topology and the
+> git-topology invariants run (not skip). The real per-story commit subject is `feat(<slug>/story-<N>)`
+> (e.g. `feat(notes/story-1)`), and the Tier-2 invariants assert exactly that subject, a merge-into-main,
+> and commit **count ≥ stories**. The design-specific *content* traces (digest ready, decisions
+> preserved, navigability) gate separately via `fixtures/design-capture/` + `tier-1-unit/design/*replay*.test.ts`.

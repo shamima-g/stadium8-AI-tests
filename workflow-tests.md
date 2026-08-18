@@ -222,9 +222,11 @@ here in this hub.
 
 In short: Tier 2 is the bridge between "each script works" (Tier 1) and "needs a live
 AI" (Tier 3). A person records one full run by hand; the tests then replay that
-recording and check the things that only make sense across a whole epic — one branch
-per epic, one commit per story, a well-formed ordered state file, a real decision
-trail, matching app tests, absence canaries, and the parked-epic `/plan` traces.
+recording and check the things that only make sense across a whole epic — an
+`epic/<slug>` branch merged (not pushed) to `main`, a `feat(<slug>/story-<N>)` commit
+per built story, a schema-valid state file whose phases are all real stages, a real
+decision trail, an e2e spec per built story, absence canaries, and the parked-epic
+`/plan` traces.
 
 ---
 
@@ -685,8 +687,10 @@ design in `documentation/` — the design-derived intake facts are present.
 - **Golden run — fully captured; all three Tier-2 blocks gate.** A real **build-one-park-one** run
   (`minimal-concurrent`: Notes built + merged, Tasks parked at `READY-TO-BUILD`) is committed at
   `fixtures/golden-run/repo.bundle` (~900 KB, carries `generated-docs/` + git history). The Tier-2
-  **artifact**, **git-topology**, *and* **`/plan` parked-epic** invariants all now gate (14/14, none
-  skipping). Nothing dormant remains ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
+  **artifact**, **git-topology**, *and* **`/plan` parked-epic** invariants all now gate (**19/19, none
+  skipping** — a 2026-08-18 council added the per-story `feat(<slug>/story-<N>)` commit, phase-validity,
+  e2e-spec-per-story, and code-reviewer/`.claude/logs` canaries). Nothing dormant remains
+  ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
   the collector's statuses), and **both live scenarios are now built** in
@@ -780,10 +784,10 @@ npm run compare:targets -- --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0   #
 | Artifact lint — API paths | Generated endpoints use guessed paths, or a raw `fetch()` |
 | Artifact lint — Shadcn / styling | A hand-rolled primitive or a scattered colour code appears |
 | Artifact lint — role / plain language | A story loses its role, or jargon leaks into a user checklist |
-| Recorded-run — branch & commits | One-branch-per-epic or one-commit-per-story stops holding |
-| Recorded-run — plan & stories | The plan stops covering the request, or a story loses its criteria |
-| Recorded-run — notebook / registry / double-check | The decision trail or the pre-merge double-check list goes missing |
-| Recorded-run — absence canaries | A retired feature (telemetry, code-reviewer, old phases) creeps back |
+| Recorded-run — branch & commits | The epic branch stops merging to main, or a built story loses its `feat(<slug>/story-<N>)` commit |
+| Recorded-run — stories & specs | A story loses its role/acceptance-criteria, or a built story loses its e2e spec |
+| Recorded-run — decision trail | The per-epic decision trail (journal, or the design digest) goes missing |
+| Recorded-run — absence canaries | A retired feature (telemetry, project-brief, code-reviewer, old phases, session logs) creeps back |
 | Channel resolution | A named template can't be aimed at, or an unknown name silently defaults to the wrong repo |
 | Per-version contract | A version is judged against the wrong recipe, so it fails just for being ahead or behind |
 | Version marker & gap | The version under test is unknown, or a suite-vs-template gap is hidden |

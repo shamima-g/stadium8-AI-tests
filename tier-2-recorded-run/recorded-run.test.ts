@@ -78,6 +78,50 @@ function parkedEpics(docsDir: string): EpicRecord[] {
   return epicRecords(docsDir).filter((e) => e.state?.phase === PARKED_PHASE);
 }
 
+/** True for an epic that has actually been built (past PLAN and not parked ahead). */
+function isBuilt(e: EpicRecord): boolean {
+  return e.state?.phase !== 'PLAN' && e.state?.phase !== PARKED_PHASE;
+}
+
+/** Story numbers declared on disk for an epic, parsed from `story-<N>-*.md`. */
+function storyNumbers(epicDir: string): string[] {
+  return storyFiles(epicDir)
+    .map((f) => /^story-(\d+)-/.exec(path.basename(f))?.[1])
+    .filter((n): n is string => Boolean(n));
+}
+
+/**
+ * The `EPIC_PHASES` the RECORDING itself was produced with, parsed straight from its own
+ * `.claude/scripts/lib/epic-state.js`. This grades recorded phases against the version that
+ * produced them (not the suite's target), so a retired stage name is caught while a newer
+ * legitimate stage is not mis-flagged. Null when the recording carries no template (a
+ * docs-only capture) — the phase-validity check then skips visibly.
+ */
+function recordedEpicPhases(): string[] | null {
+  if (!golden.root) return null;
+  const lib = path.join(golden.root, '.claude', 'scripts', 'lib', 'epic-state.js');
+  if (!fs.existsSync(lib)) return null;
+  const m = /EPIC_PHASES\s*=\s*Object\.freeze\(\s*\[([\s\S]*?)\]/.exec(fs.readFileSync(lib, 'utf8'));
+  if (!m) return null;
+  const phases = [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
+  return phases.length ? phases : null;
+}
+
+const recordedPhases = golden.present ? recordedEpicPhases() : null;
+const e2eDir = golden.present && golden.root ? path.join(golden.root, 'web', 'e2e') : '';
+const hasE2eDir = Boolean(e2eDir) && fs.existsSync(e2eDir);
+const claudeDir = golden.present && golden.root ? path.join(golden.root, '.claude') : '';
+const hasClaudeDir = Boolean(claudeDir) && fs.existsSync(claudeDir);
+
+if (golden.present && !recordedPhases) {
+  // eslint-disable-next-line no-console -- intentional visible skip notice
+  console.warn(`\n[tier-2 recorded-run] phase-validity check SKIPPED — the recording carries no .claude/scripts/lib/epic-state.js (docs-only capture)\n`);
+}
+if (golden.present && !hasE2eDir) {
+  // eslint-disable-next-line no-console -- intentional visible skip notice
+  console.warn(`\n[tier-2 recorded-run] app-tests check SKIPPED — the recording has no web/e2e/ tree (docs-only capture)\n`);
+}
+
 // ---------------------------------------------------------------------------
 // Harness meta-checks — ALWAYS run (keep the file non-vacuous even with no fixture)
 // ---------------------------------------------------------------------------
@@ -116,6 +160,20 @@ describe.skipIf(!golden.present)('recorded run — artifact invariants', () => {
     }
   });
 
+  it.skipIf(!recordedPhases)('PASS: every recorded phase is a current EPIC_PHASE — no retired stage names', () => {
+    // Graded against the recording's OWN epic-state.js, so a retired four-phase name (or any
+    // stage the producing version didn't define) fails, while a legitimately newer stage does
+    // not get mis-flagged. Skips visibly on a docs-only capture (no template in the recording).
+    const valid = new Set(recordedPhases as string[]);
+    const offenders: string[] = [];
+    for (const e of epicRecords(docsDir)) {
+      if (typeof e.state?.phase !== 'string' || !valid.has(e.state.phase)) {
+        offenders.push(`${e.slug}: phase ${JSON.stringify(e.state?.phase)} is not a current EPIC_PHASE [${[...valid].join(', ')}]`);
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
   it('PASS: every story declares a role and carries acceptance criteria', () => {
     const offenders: string[] = [];
     for (const dir of epicDirs(docsDir)) {
@@ -123,9 +181,12 @@ describe.skipIf(!golden.present)('recorded run — artifact invariants', () => {
         const content = fs.readFileSync(file, 'utf8');
         const role = roleViolation(content);
         if (role) offenders.push(`${file}: ${role}`);
-        // Tolerant acceptance-criteria signal (tighten to the real format once captured).
-        const hasAC = /acceptance|criteri/i.test(content) || /^\s*[-*]\s+/m.test(content);
-        if (!hasAC) offenders.push(`${file}: no acceptance criteria / checklist found`);
+        // Acceptance criteria: require a real "Acceptance Criteria" section heading OR a
+        // checklist (`- [ ]` / `- [x]`) — not merely any bullet, which the tolerant
+        // pre-capture signal accepted. The captured stories carry a `## Acceptance Criteria`
+        // heading, so a story that loses it now fails.
+        const hasAC = /^#{1,6}\s*acceptance criteria\b/im.test(content) || /^\s*[-*]\s+\[[ xX]\]\s+/m.test(content);
+        if (!hasAC) offenders.push(`${file}: no "Acceptance Criteria" section or checklist found`);
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
@@ -153,6 +214,59 @@ describe.skipIf(!golden.present)('recorded run — artifact invariants', () => {
   it('PASS: absence canaries — no retired telemetry ledger or project-brief', () => {
     expect(fs.existsSync(path.join(docsDir, 'context', 'telemetry.ndjson'))).toBe(false);
     expect(fs.existsSync(path.join(docsDir, 'specs', 'project-brief.md'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Repo-level absence canaries — run only when the recording carries its .claude/
+// (bundle capture). A docs-only capture has no .claude, so these SKIP VISIBLY.
+// ---------------------------------------------------------------------------
+
+describe.skipIf(!hasClaudeDir)('recorded run — repo absence canaries (retired machinery)', () => {
+  it('PASS: no retired code-reviewer agent (superseded by code-review-runner)', () => {
+    // The old `code-reviewer` agent was retired; the current surface is `code-review-runner`.
+    // Match the exact retired basename so `code-review-runner.md` is NOT a false positive.
+    expect(fs.existsSync(path.join(claudeDir, 'agents', 'code-reviewer.md'))).toBe(false);
+  });
+
+  it('PASS: no .claude/logs/ session-log directory', () => {
+    expect(fs.existsSync(path.join(claudeDir, 'logs'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// App tests line up with the stories — run only when the recording carries a
+// web/e2e/ tree (bundle capture). A docs-only capture SKIPS VISIBLY.
+//
+// Tier 2 asserts a spec EXISTS per built story and is real (a live test() or a
+// justified test.fixme()). The stricter routable→live / non-routable→fixme
+// distinction is a Tier-1 rule (workflow-tests.md §9).
+// ---------------------------------------------------------------------------
+
+describe.skipIf(!hasE2eDir)('recorded run — app tests line up with the stories', () => {
+  const docsDir = golden.docsDir as string;
+  const specs = fs.readdirSync(e2eDir).filter((f) => /\.spec\.[jt]sx?$/.test(f));
+
+  it('PASS: every story in a built epic has a matching, non-empty e2e spec', () => {
+    const offenders: string[] = [];
+    for (const e of epicRecords(docsDir)) {
+      if (!isBuilt(e)) continue; // a parked / PLAN epic has legitimately not produced specs yet
+      for (const n of storyNumbers(e.dir)) {
+        const spec = specs.find((s) => s.startsWith(`epic-${e.slug}-story-${n}-`));
+        if (!spec) {
+          offenders.push(`${e.slug} story ${n}: no web/e2e/epic-${e.slug}-story-${n}-*.spec.ts`);
+          continue;
+        }
+        const body = fs.readFileSync(path.join(e2eDir, spec), 'utf8');
+        // A live `test(` — not `.test(` (a regex/method call) and not `test.fixme(`/`test.skip(`.
+        const hasLiveTest = /(^|[^.\w])test\s*\(/m.test(body);
+        const hasJustifiedFixme = /test\.fixme\s*\(/.test(body) && /reason|because|\/\//i.test(body);
+        if (!hasLiveTest && !hasJustifiedFixme) {
+          offenders.push(`${e.slug} story ${n}: ${spec} has neither a live test() nor a justified test.fixme()`);
+        }
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });
 
@@ -187,6 +301,23 @@ describe.skipIf(!golden.present || !golden.hasGit)('recorded run — git topolog
     const epicDir = path.join(docsDir, 'epics', slug);
     const stories = fs.existsSync(epicDir) ? storyFiles(epicDir).length : 0;
     expect(commitCount, `epic ${slug} should have ≥ ${stories} commits`).toBeGreaterThanOrEqual(stories);
+  });
+
+  it('PASS: each story in a built epic has its own feat(<slug>/story-<N>) commit', () => {
+    const docsDir = golden.docsDir as string;
+    const offenders: string[] = [];
+    for (const e of epicRecords(docsDir)) {
+      if (!isBuilt(e)) continue; // a parked / PLAN epic has legitimately not committed a build
+      const ref = epicRefs().find((r) => r.endsWith(`epic/${e.slug}`)) ?? 'main';
+      const subjects = git('log', '--format=%s', ref).stdout;
+      for (const n of storyNumbers(e.dir)) {
+        const re = new RegExp(`^feat\\(${e.slug}/story-${n}\\b`, 'm');
+        if (!re.test(subjects)) {
+          offenders.push(`${e.slug} story ${n}: no feat(${e.slug}/story-${n}) commit found on ${ref}`);
+        }
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });
 
@@ -271,15 +402,19 @@ describe.skipIf(!hasParkedEpic || !golden.hasGit)('recorded run — /plan parked
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
-  it('PASS: a parked epic is parked on main (its state.json is committed on the default branch)', () => {
-    // plan-parked: the parked record lands on main via a docs(plan) commit, so main's history
-    // touches it. (Tightening to the exact docs(plan) subject is deferred until a golden run
-    // with a parked epic is captured — matching this file's tolerant-until-recorded stance.)
+  it('PASS: a parked epic is parked on main via a docs(plan) commit', () => {
+    // plan-parked: the parked record lands on main via a `docs(plan)` commit. Assert both that
+    // main's history touches the state file AND that a touching commit's subject is `docs(plan)`
+    // — a parked epic that arrived via a feat/wip/other commit is not a clean `/plan` parking.
     const offenders: string[] = [];
     for (const e of parkedEpics(docsDir)) {
       const rel = path.posix.join('generated-docs', 'epics', e.slug, 'state.json');
-      if (!git('log', '--oneline', 'main', '--', rel).stdout.trim()) {
+      const subjects = git('log', '--format=%s', 'main', '--', rel).stdout
+        .split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      if (subjects.length === 0) {
         offenders.push(`${e.slug}: no commit on main touches ${rel} — parked epic is not on main`);
+      } else if (!subjects.some((s) => /^docs\(plan\)/.test(s))) {
+        offenders.push(`${e.slug}: ${rel} is on main but via no docs(plan) commit (subjects: ${subjects.join(' | ')})`);
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
