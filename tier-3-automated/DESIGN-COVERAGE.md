@@ -2,19 +2,24 @@
 
 The six acceptance criteria (ACs) for the build-from-design feature, the honest state of test
 coverage after a council audit (2026-08-11, branch `S8-129`), and the prioritised plan to close
-the gaps. The audit **confirmed all six coverage labels**; it corrected the *evidence* behind three
-of them (below) — i.e. some checks were credited with doing more than they actually do.
+the gaps.
 
-## Corrected coverage map
+> **STATUS NOW (2026-08-12 → confirmed 2026-08-18): all six ACs covered.** The work plan below
+> landed all six tasks; the table immediately below is the **pre-work 2026-08-11 snapshot** kept for
+> the record — read the "Status now" column (and the work plan) for the current state. Two ACs (AC1,
+> AC2) are covered by **record-only operator-eyeball** rules, not by an automated suite assertion —
+> called out explicitly in the table and in DESIGN-SCENARIO.md.
 
-| AC | Criterion (plain) | Label | What actually backs it |
-|----|-------------------|:-----:|------------------------|
-| 1 | Design is the **only** input; no written spec added | Partial | Fixture is design-only + `#13` proves the digest *wiring* — **but nothing asserts a spec didn't creep into `documentation/`**. |
-| 2 | Design → running app via **normal approvals only** (no renaming/fixing/coding) | Partial | An answers-driven run completed and built green — **but no rule (even record-only) asserts the human didn't hand-fix**. Weakest partial. |
-| 3 | Built app has the **screens + is navigable** | Partial | Suite checks screen *existence* + scoped rebuild (`design-capture-replay.test.ts`). **Navigability is checked nowhere by the suite.** |
-| 4 | Runs against the **real backend**; stand-in data → **real calls** | **Not covered** | `design-taskboard` is mock-only by design; no benchmark pairs a design with a real backend. **Largest hole.** |
-| 5 | Anything it **can't use is shown**, not dropped | Covered | Held up by `design-capture-replay.test.ts` over the real run (Uncertainties non-empty + names the due-date). **Closest call.** |
-| 6 | Usual **quality checks pass** before done | Covered (workflow) | The workflow's CI gate genuinely blocks (security/tsc/eslint/prettier/build/vitest). |
+## Coverage map (pre-work snapshot 2026-08-11 → status now)
+
+| AC | Criterion (plain) | Label (2026-08-11) | What actually backed it then | Status now |
+|----|-------------------|:-----:|------------------------|-----------|
+| 1 | Design is the **only** input; no written spec added | Partial | Fixture is design-only + `#13` proves the digest *wiring* — **but nothing asserts a spec didn't creep into `documentation/`**. | **Covered (record-only)** — `design-only-input` in DESIGN-SCENARIO.md (operator eyeball; no automated assert). |
+| 2 | Design → running app via **normal approvals only** (no renaming/fixing/coding) | Partial | An answers-driven run completed and built green — **but no rule (even record-only) asserts the human didn't hand-fix**. Weakest partial. | **Covered (record-only)** — `design-no-manual-intervention` in DESIGN-SCENARIO.md (operator eyeball; can't be auto-asserted from traces). |
+| 3 | Built app has the **screens + is navigable** | Partial | Suite checks screen *existence* + scoped rebuild (`design-capture-replay.test.ts`). **Navigability is checked nowhere by the suite.** | **Covered** — `contact-navigability-replay.test.ts` maps each digest screen → a route and asserts no unrouted screens. |
+| 4 | Runs against the **real backend**; stand-in data → **real calls** | **Not covered** | `design-taskboard` is mock-only by design; no benchmark pairs a design with a real backend. **Largest hole.** | **Covered** — `feedback-api-design` benchmark + `feedback-api-replay.test.ts` runs the exact-path matcher over real captured `api-spec.yaml`+`endpoints.ts` (gates, doesn't skip). |
+| 5 | Anything it **can't use is shown**, not dropped | Covered | Held up by `design-capture-replay.test.ts` over the real run (Uncertainties non-empty + names the due-date). | **Covered (hardened)** — `digestReadyForIntake` now requires ≥1 real Uncertainties item; `design-traces.test.ts` has present-but-empty + can't-use good/broken. |
+| 6 | Usual **quality checks pass** before done | Covered (workflow) | The workflow's CI gate genuinely blocks (security/tsc/eslint/prettier/build/vitest). | **Covered (hardened)** — `quality-gates.test.ts` now drives the real runner (`--checks lint`), proving pass-when-green / fail-when-red. |
 
 ## Evidence corrections (things previously over-stated)
 
@@ -24,12 +29,16 @@ of them (below) — i.e. some checks were credited with doing more than they act
    ignores). Real suite coverage for AC3 is screen *existence* + scoping only — **not navigability**.
    *(Since resolved — see the progress note above: a `/plan` run is now the active golden run so Tier-2
    gates, and a navigability trace was added.)*
-2. **AC5 — the stated gate is inert.** `digestReadyForIntake` requires the Uncertainties **section to
-   exist**, not to contain anything (`ok` depends on screens + palette, never Uncertainties content),
-   so an empty section passes. The real teeth are the replay asserts over the captured run.
-3. **AC6 — two mis-citations.** Playwright is **not** a quality gate (absent from `quality-gates.yml`).
-   `quality-gates.test.ts` is a `--help` **smoke test**, not a truthfulness verifier — it never runs a
-   real gate green/red. AC6 holds on the workflow's CI gate, not on suite coverage.
+2. **AC5 — the stated gate WAS inert.** `digestReadyForIntake` required the Uncertainties **section to
+   exist**, not to contain anything (`ok` depended on screens + palette, never Uncertainties content),
+   so an empty section passed. *(Since resolved — `digestReadyForIntake` now requires ≥1 real
+   Uncertainties item, with a present-but-empty broken case; the gate is no longer inert. See work
+   plan task 5.)*
+3. **AC6 — two mis-citations, now addressed.** Playwright is **not** a quality gate (absent from
+   `quality-gates.yml`) — still true. `quality-gates.test.ts` **was** a `--help` smoke test that never
+   ran a real gate green/red. *(Since resolved — it now drives the real runner (`--checks lint`,
+   `scriptLocation:'temp'`) and proves pass-when-green / fail-when-red. See work plan task 6.)* AC6 also
+   holds on the workflow's own CI gate.
 
 ---
 
@@ -58,9 +67,11 @@ of them (below) — i.e. some checks were credited with doing more than they act
 > - **3 (AC2)** ✅ and **4 (AC1)** ✅ — record-only rules `design-no-manual-intervention` and
 >   `design-only-input` added to `DESIGN-SCENARIO.md` (table + capture checklist).
 >
-> **All tasks landed.** Every AC is covered; the Tier-2 golden run (a `/plan` run) has all three
-> invariant blocks gating; and the missing-journal finding was refined into a decision-trail check
-> (`epicHasDecisionTrail` + `tier-1-unit/design/decision-trail.test.ts`).
+> **All tasks landed.** Every AC is covered — with the honest caveat that **AC1 and AC2 are
+> record-only** (operator-eyeball rules `design-only-input` / `design-no-manual-intervention` in
+> DESIGN-SCENARIO.md), not automated suite assertions; AC3–AC6 are automated. The Tier-2 golden run
+> (a `/plan` run) has all three invariant blocks gating; and the missing-journal finding was refined
+> into a decision-trail check (`epicHasDecisionTrail` + `tier-1-unit/design/decision-trail.test.ts`).
 
 The original plan is kept below as the record of what was done. (Ordered so the biggest,
 most-isolated hole came first; each task lists where it lives and what "done" meant.)

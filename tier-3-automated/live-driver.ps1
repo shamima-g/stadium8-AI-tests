@@ -861,7 +861,7 @@ function Get-Tier3PlanEpicSlugs {
 
 # Pure + testable: given the facts a PLAN-A run left behind, the plan rule ids it violated.
 # Facts shape (see Get-Tier3PlanFacts):
-#   parkedEpics          @({ slug; storyCount; dependsOn=@(); onMain; hasEpicBranch; hasBuildCommits })
+#   parkedEpics          @({ slug; storyCount; dependsOn=@(); onMain; onMainViaDocsPlan; hasEpicBranch; hasBuildCommits })
 #   leftoverPlanBranches @()  leftoverWorktrees @()  projectFactsChanged bool
 #   plannedNewEpic bool  resumedToBuild bool  expectNewEpic/expectBlocked/expectResume bool
 function Get-Tier3PlanRulesMissed {
@@ -877,6 +877,8 @@ function Get-Tier3PlanRulesMissed {
         if ($e.hasBuildCommits)       { $missed.Add('plan-build-committed') }      # AC1 — story code committed
         if ([int]$e.storyCount -le 0) { $missed.Add('plan-stories-missing') }      # AC2 — no story breakdown
         if (-not $e.onMain)           { $missed.Add('plan-not-on-main') }          # AC4 — not parked on main
+        # Only meaningful once it IS on main — otherwise plan-not-on-main already covers it.
+        if ($e.onMain -and -not $e.onMainViaDocsPlan) { $missed.Add('plan-not-docs-plan') }  # AC4 — on main, but not via a docs(plan) commit
     }
 
     if (@($Facts.leftoverPlanBranches).Count -gt 0 -or @($Facts.leftoverWorktrees).Count -gt 0) {
@@ -908,6 +910,20 @@ function Test-Tier3OnRef {
     [CmdletBinding()]
     param([string]$Scaffold, [string]$Ref, [string]$RelPath)
     try { & git -C $Scaffold cat-file -e "${Ref}:${RelPath}" 2>$null; return ($LASTEXITCODE -eq 0) } catch { return $false }
+}
+
+# Best-effort: did a `docs(plan)` commit put this path on the ref? A clean `/plan` parking lands
+# the record on main via a docs(plan) commit (the same trace Tier 2 gates over the golden run); a
+# path that arrived via a feat/wip/other commit is not a clean parking. Returns $false when the
+# path is absent or arrived under any other subject.
+function Test-Tier3ParkedViaDocsPlan {
+    [CmdletBinding()]
+    param([string]$Scaffold, [string]$Ref, [string]$RelPath)
+    try {
+        $subjects = & git -C $Scaffold log --format=%s $Ref -- $RelPath 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $subjects) { return $false }
+        return (@($subjects | Where-Object { $_ -match '^\s*docs\(plan\)' }).Count -gt 0)
+    } catch { return $false }
 }
 
 # Best-effort: gather the facts a PLAN-A run leaves (git refs + generated-docs). Never throws
@@ -985,10 +1001,12 @@ function Get-Tier3PlanFacts {
             $dependsOn = if ($epicObj) { @(Get-JsonProp $epicObj 'dependsOn' @()) } else { @() }
             $hasBuild = $buildSlugs.Contains($d.Name)
             if ($phase -eq 'READY-TO-BUILD') {
-                $onMain = Test-Tier3OnRef -Scaffold $Scaffold -Ref $parkedRef -RelPath "generated-docs/epics/$($d.Name)/state.json"
+                $rel = "generated-docs/epics/$($d.Name)/state.json"
+                $onMain = Test-Tier3OnRef -Scaffold $Scaffold -Ref $parkedRef -RelPath $rel
                 $parked.Add(@{
                     slug = $d.Name; storyCount = $storyCount; dependsOn = @($dependsOn)
                     onMain = $onMain
+                    onMainViaDocsPlan = ($onMain -and (Test-Tier3ParkedViaDocsPlan -Scaffold $Scaffold -Ref $parkedRef -RelPath $rel))
                     hasEpicBranch = (@($epicBranches | Where-Object { $_ -eq "epic/$($d.Name)" }).Count -gt 0)
                     hasBuildCommits = $hasBuild
                 })

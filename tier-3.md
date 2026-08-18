@@ -91,11 +91,13 @@ version number — a version without it **skips**, never fails.
 
 **The good/broken discipline still holds** ([the rules every test follows](workflow-tests.md#2-the-rules-every-test-follows),
 [good case / broken case](workflow-tests.md#9-good-case--broken-case--the-discipline)). Each check is a small pure function
-that reads the traces a run leaves (git refs, `state.json`, `generated-docs/`), and it gets
-its **good *and* broken case as a Tier-1 unit test** over synthetic scaffolds (a parked epic
-vs. one still at BUILD; a clean worktree teardown vs. a leftover `plan/<slug>`). The **live
-run exercises** those same functions and records the result. So the broken case lives where
-it can be proven cheaply and repeatably; the live tier proves the behaviour actually happens.
+(`Get-Tier3PlanRulesMissed` / `Get-Tier3ConcurrentRulesMissed` in `live-driver.ps1`) that reads
+the traces a run leaves (git refs, `state.json`, `generated-docs/`), and it gets its **good *and*
+broken case as a Pester unit test** in `tier-3-automated/tests/live-driver.Tests.ps1` — over
+synthetic scaffolds (a parked epic vs. one still at BUILD; a clean worktree teardown vs. a leftover
+`plan/<slug>`). These run in the non-AI **Pester** suite (`npm run test:tier3-unit`), not the vitest
+Tier-1 suite. The **live run exercises** those same functions and records the result. So the broken
+case lives where it can be proven cheaply and repeatably; the live tier proves the behaviour actually happens.
 
 Two live scenarios drive it, each filed in its own results world so its numbers never mix
 with a straight build:
@@ -108,42 +110,50 @@ with a straight build:
   the scaffold): one process builds an epic while a second plans the next, and we check
   neither disturbs the other and `main` stays consistent.
 
-**What each acceptance criterion maps to** (rule id = how it lands in the run's `rulesMissed`
-list, record-only):
+**What each acceptance criterion maps to.** The rule ids below are the **exact strings the
+harness pushes to the run's `rulesMissed` list** (`live-driver.ps1`), so they are the
+*negative / "missed"* form — a **clean run lists none of them**. (An earlier version of this
+table listed positive names like `plan-parked`; those were never emitted. The ids here are what
+you actually grep a run's `rulesMissed` for.) Record-only: they never gate.
 
-| Behaviour to confirm | Scenario | What the deterministic assertion reads | Rule id |
-|----------------------|:--------:|-----------------------------------------|---------|
-| Planning starts **no build work** | A | planned epic at ready-to-build with **no `epic/<slug>` branch** and **zero `feat()` commits** for its slug | `plan-no-build-started` |
-| Epic is **broken down + approved** while planning | A | story files written and recorded in `state.json`, phase advanced past PLAN *(approval interaction is live — driven from the answers file's story approval)* | `plan-stories-approved` |
-| Planning works for an **epic outlined at setup** | A | the epic already in `epic-plan.md` after `/start` is now parked, brief unchanged | `plan-outlined-epic` |
-| Planning works for a **brand-new epic** | A | an epic **absent** from the post-`/start` `epic-plan.md` now has a brief + new plan row + parked state (diff before/after) | `plan-new-epic` |
-| Planned epic is **parked ready to build** | A | phase `READY-TO-BUILD` on `main` via a `docs(plan)` commit; no leftover `plan/<slug>` worktree or branch | `plan-parked` |
-| Continuing it **resumes straight into BUILD**, no re-planning | A | `/start` on the parked epic moves ready-to-build → BUILD with stories **unchanged** (no second approval) and a fresh `epic/<slug>` cut from `main` | `plan-resumes-to-build` |
-| Parked epic shows **distinct** in status + dashboard | A | `/status` recap + `collect-dashboard-data` over the real tree *(largely already Tier-1 — this is the live confirmation)* | `plan-distinct-status` |
-| **Two sessions at once** — one building, one planning | B | interleaved traces: epic-1 `feat()` commits **and** epic-2 parked, overlapping in wall-clock | `plan-concurrent-ran` |
-| Neither session **disturbs the other's** files/branch/state | B | epic-1 branch HEAD holds only session-1 commits, its state untouched; session-2 wrote only in its throwaway worktree + pushed to `main` | `plan-no-cross-disturb` |
-| Workflow **guides the user into a separate session** | A | running the plan command **mid-flow** yields the redirect and creates **no worktree** *(the guard rule's presence is also a Tier-1 doc check)* | `plan-midflow-guard` |
-| **Shared records on `main`** stay consistent | B | `git fsck` clean; `epic-plan.md` holds **both** rows (additive-union, renumbered); parked records intact | `plan-main-consistent` |
-| **Project facts + epic plan** stay consistent | B | `project.md` unchanged by planning (it never edits project-level facts); both epic rows coherent | `plan-facts-consistent` |
-| **No session loses in-progress work** | B | all epic-1 commits present on its branch; epic-2 plan present on `main`; the resume/progress trail intact | `plan-no-lost-work` |
-| A **blocked epic** (depends on an unbuilt one) can still be planned | A | parked with `dependsOn` recorded and status `blocked`, not `ready` | `plan-blocked-ahead` |
-| That epic stays **blocked from merging until its dependency merges** | B | *(ordering rule is primarily Tier-1 — the merge machinery + `dependsOn`; B confirms it live if a run reaches a merge)* | `plan-blocked-until-dep` |
+| Behaviour to confirm | Scenario | What the deterministic assertion reads | Rule id(s) emitted on failure |
+|----------------------|:--------:|-----------------------------------------|-------------------------------|
+| Something was actually parked | A | at least one epic at `READY-TO-BUILD` | `plan-no-parked-epic` |
+| Planning starts **no build work** | A | for the parked slug: **no `epic/<slug>` branch** (`plan-created-epic-branch`) and **no `feat(<slug>…)` commits** (`plan-build-committed`) | `plan-created-epic-branch`, `plan-build-committed` |
+| Epic is **broken down** while planning | A | story files on disk for the parked epic *(the approval interaction itself is live — see live cores below)* | `plan-stories-missing` |
+| Planning works for a **brand-new epic** | A | the scenario drove the brand-new-epic path (`plannedNewEpic`) *(the outlined-at-setup path is exercised by the run but not separately asserted)* | `plan-new-epic-missing` |
+| Planned epic is **parked ready to build** | A | phase `READY-TO-BUILD`; its `state.json` is present on `main` (`plan-not-on-main`) **and arrived via a `docs(plan)` commit** (`plan-not-docs-plan`); no leftover `plan/<slug>` worktree/branch (`plan-worktree-leftover`) | `plan-not-on-main`, `plan-not-docs-plan`, `plan-worktree-leftover` |
+| Continuing it **resumes into BUILD** | A | a planned epic (has stories) later produced `feat` commits *(reads the resume trace only — not "stories unchanged / no second approval", which is a live judgement)* | `plan-resume-missing` |
+| **Two sessions at once** — one building, one planning | B | both sessions ran with **overlapping wall-clock** | `plan-concurrent-ran` |
+| Neither session **disturbs the other's** branch | B | the planner never committed onto the builder's epic branch | `plan-cross-disturb` |
+| **Shared records on `main`** stay consistent | B | `git fsck` clean **and** both a built epic and a planned epic are present on `main` | `plan-main-inconsistent` |
+| **Project facts** stay consistent | B / A | `project.md` unchanged by the planner (`git diff --quiet`) | `plan-facts-changed` |
+| **No session loses in-progress work** | B | builder commits preserved **and** planner's plan on `main` | `plan-lost-work` |
+| A **blocked epic** (depends on an unbuilt one) can still be planned | A | at least one parked epic carries a non-empty `dependsOn` *(reads `dependsOn`; it does not read a separate `blocked` status field)* | `plan-blocked-ahead-missing` |
+| That epic stays **blocked from merging until its dependency merges** | B | scored **only when a run actually reaches the dependent merge** (`expectBlocked` and `blockedMergeRefused == false`); otherwise not scored | `plan-blocked-until-dep` |
 
-**Three of these have an irreducible live core** (the same reason C/D in
-[what the template promises](workflow-tests.md#3-what-the-template-promises) are Tier-3): the story **approval** itself
-(`plan-stories-approved` proves only the trace), the mid-flow **redirect actually firing**
-(`plan-midflow-guard`), and **live enforcement** of the merge-block across two real sessions
-(`plan-blocked-until-dep`). Their deterministic halves live in Tier 1; the live run is what
-confirms the behaviour. And **two are already substantially Tier-1** from the v1.2.0 work —
-the parked-epic dashboard/status distinctness (`plan-distinct-status`) and the ordering half
-of the dependency block — so here Tier 3 adds live confirmation, not net-new coverage.
+**Behaviours confirmed live only — no deterministic rule id.** Three behaviours from the AC set
+have **no assertion in `live-driver.ps1`** and are confirmed by eye during the live run, not by a
+`rulesMissed` entry:
+- **The story approval firing** — the trace (stories on disk) is `plan-stories-missing`; the
+  approval *interaction* itself is a live judgement.
+- **The mid-flow redirect actually firing** (running the plan command mid-build yields the
+  redirect and creates no worktree) — live-only; the guard's *presence* is a Tier-1 doc check.
+- **The parked epic showing distinct in status + dashboard** — already covered deterministically
+  in **Tier 1** (`collect-dashboard-data` + the epic-picker legend), so Tier 3 adds nothing here.
+
+**Note on `plan-blocked-until-dep`.** The id is emitted, but in a normal PLAN-B run the gathered
+facts hard-set `blockedMergeRefused = $null` (meaning "not exercised"), so it fires only over
+synthetic Pester facts, or a future run wired to actually attempt the dependent merge. Its live
+coverage today is nil — the row above is honest that it scores "only when a run reaches the merge".
 
 **Where each half runs — the three-tier split for `/plan`.** The deterministic *traces* a
 parked epic leaves are asserted in **two** places, and they are the only halves that gate:
 
-- **Tier 1** proves each pure/real-git assertion function good **and** broken over *synthetic*
-  scaffolds (a parked epic vs. one still at BUILD; a clean worktree teardown vs. a leftover
-  `plan/<slug>`).
+- **The non-AI Pester unit suite** (`tier-3-automated/tests/live-driver.Tests.ps1`, run by
+  `npm run test:tier3-unit`) proves each pure/real-git assertion function good **and** broken over
+  *synthetic* scaffolds (a parked epic vs. one still at BUILD; a clean worktree teardown vs. a
+  leftover `plan/<slug>`). (These sit in the Tier-3 directory, not the vitest `tier-1-unit/` suite.)
 - **Tier 2** asserts those same traces over the **one real recording** — parked story list
   present (`plan-stories-approved` trace), no `epic/<slug>` branch and no build
   (`plan-no-build-started`), no leftover `plan/<slug>` and on-`main`-via-`docs(plan)`

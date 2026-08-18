@@ -134,7 +134,7 @@ releases.
 |------|------------|---------------------|------------------|----------------|
 | **1** | Unit tests of the scripts, hooks, schemas, docs, git machinery, and generated-code rules | Yes | No | `tier-1-unit/` |
 | **2** | Invariant checks over a **recorded real run** — its branches, commits, and `generated-docs/` output | Yes | No (recorded once by hand) | `tier-2-recorded-run/` |
-| **3** | A person runs the real workflow with a real AI and confirms it behaves | No (manual) | Yes | The human walkthrough |
+| **3** | The real workflow run against a real AI — confirmed by hand and/or driven by the `tier-3-automated/` harness (`Run-QATests.ps1`); its non-AI assertion functions have a Pester unit suite (`npm run test:tier3-unit`) | The live run is script-driven but needs an AI; the Pester unit checks run automatically | Yes (live run) / No (Pester unit checks) | `tier-3.md` + `tier-3-automated/` |
 
 **Each tier has its own file.** The shared rules — the ones in this document — hold for
 all three tiers. The detail for each tier lives on its own so you can work on one tier
@@ -238,12 +238,16 @@ version-independent behaviours to confirm by hand and the `/plan` plan-ahead sce
 It was moved out so you can work on one tier without loading the whole document; the
 shared rules it relies on stay here in this hub.
 
-In short: a person runs the real workflow with a real AI and confirms the behaviours no
-unit test can judge — the stages happening in order, every approval showing its content
-first, building stopping only for genuinely risky choices, the hands-on check being
-truly hands-on, and the merge always waiting for you. Tier 3 is **not** an npm command;
-it's run before a release, and each clean pass is a good moment to re-record the Tier 2
-fixture.
+In short: the real workflow runs against a real AI and confirms the behaviours no unit test
+can judge — the stages happening in order, every approval showing its content first, building
+stopping only for genuinely risky choices, the hands-on check being truly hands-on, and the
+merge always waiting for you. It runs two ways: by hand (a person drives it), **or** through the
+`tier-3-automated/` harness (`Run-QATests.ps1 -IncludeTier3`), which drives the live AI, times and
+scores the run, and files a report — the score is **record-only, it never fails the run**. The
+**live** run needs an AI, so it isn't part of `npm test`; but its non-AI assertion functions (the
+`/plan` trace checks and the artifact-lint scoring) **do** have an npm-runnable Pester unit suite,
+`npm run test:tier3-unit`. Tier 3 is run before a release, and each clean pass is a good moment to
+re-record the Tier 2 fixture.
 
 ---
 
@@ -640,11 +644,14 @@ they're left where they live.
 The remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
 update-design-mid-project), which need a real AI run.
 
-**#14/#15 — live capture DONE (branch `S8-129`); all six traces PASS.** A real Opus build of the
-`design-taskboard` benchmark was run and captured. Deterministic traces are asserted over the
-captured artifacts (digests + Phase-2 diff) by [`tier-1-unit/design/design-capture-replay.test.ts`]
-(reads `fixtures/design-capture/`). The two live cores (`design-readback-confirmed`,
-`design-conflict-asks`) were eyeballed and recorded in `tier-3-automated/DESIGN-CAPTURE-LOG.md`.
+**#14/#15 — live capture DONE (branch `S8-129`); all six traces confirmed — 4 automated, 2 eyeballed.**
+A real Opus build of the `design-taskboard` benchmark was run and captured. **Four** of the six traces
+are asserted automatically over the captured artifacts (digests + Phase-2 diff) by
+[`tier-1-unit/design/design-capture-replay.test.ts`] (reads `fixtures/design-capture/`):
+`design-digest-written`, `design-uncertainties-surfaced`, `design-update-scoped`,
+`design-decisions-preserved`. The remaining **two are live cores with no deterministic assertion**
+(`design-readback-confirmed`, `design-conflict-asks`) — they were **eyeballed by a human** and
+recorded in `tier-3-automated/DESIGN-CAPTURE-LOG.md`, not machine-verified.
 **The live run also tightened a check:** `decisionsPreserved` matched decisions verbatim, which
 mis-flagged a legitimately *reconciled* decision ("New task" → "Add task") as dropped — now it
 matches on the decision's stable topic/label, so reconciled wording passes and only a

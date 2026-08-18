@@ -57,9 +57,10 @@ a straight build's.
 > builds of AI time, and it needs Git on PATH for the shared remote. Reach for it when you
 > specifically want the concurrency + shared-`main` guarantees; PLAN-A covers the rest cheaply.
 
-It runs in the background — you get your machine back while it works. If the PC is
-switched off partway, just run the same command again and it carries on from where it
-stopped.
+The live build takes a while (it drives a real AI). If the PC is switched off partway, resume
+the same run with **`-Resume`** (`./Run-QATests.ps1 -IncludeTier3 -Resume`) — it finds the
+incomplete run and carries on from where it stopped. Re-running **without** `-Resume` starts a
+fresh run from scratch, it does not continue the old one.
 
 ---
 
@@ -133,7 +134,7 @@ epic — alongside the time-taken, most-flagged-rules, and last-10-per-model cha
 |---|---|
 | `-IncludeTier3` | Turn the live AI run on (off by default). |
 | `-Tier3Model <name>` | Pick the AI model (e.g. `opus`, `sonnet`). Default: `opus`. |
-| `-Benchmark <name>` | Pick which example app to build. Default: the only one there. |
+| `-Benchmark <name>` | Pick which example app to build (folders under `benchmark-files/` — e.g. `transactions`, `e-commerce`, `contact-form`, `design-taskboard`, `feedback-api-design`, `minimal-concurrent`). Default: `transactions`. |
 | `-Scenario <name>` | `build` (default) — straight build; `plan` — PLAN-A `/plan` park-ahead; `concurrent` — PLAN-B two-session build-while-planning (see above). |
 | `-Target <name>` | Build against a template channel from `targets.json` (`dev` or `release`) instead of the local one. Clones it into `.targets/`. |
 | `-Ref <tag\|branch>` | The version to build against with `-Target` (e.g. `v1.1.0`). Default: the repo's default branch. |

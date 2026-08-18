@@ -488,8 +488,8 @@ Describe 'PLAN-A — plan conformance rules (record-only)' {
         function New-CleanPlanFacts {
             return @{
                 parkedEpics          = @(
-                    @{ slug = 'user-settings'; storyCount = 2; dependsOn = @();               onMain = $true; hasEpicBranch = $false; hasBuildCommits = $false },
-                    @{ slug = 'saved-views';   storyCount = 2; dependsOn = @('user-settings'); onMain = $true; hasEpicBranch = $false; hasBuildCommits = $false }
+                    @{ slug = 'user-settings'; storyCount = 2; dependsOn = @();               onMain = $true; onMainViaDocsPlan = $true; hasEpicBranch = $false; hasBuildCommits = $false },
+                    @{ slug = 'saved-views';   storyCount = 2; dependsOn = @('user-settings'); onMain = $true; onMainViaDocsPlan = $true; hasEpicBranch = $false; hasBuildCommits = $false }
                 )
                 leftoverPlanBranches = @()
                 leftoverWorktrees    = @()
@@ -530,6 +530,16 @@ Describe 'PLAN-A — plan conformance rules (record-only)' {
     It 'FAIL-guard: a parked epic not on main => plan-not-on-main (AC4)' {
         $f = New-CleanPlanFacts; $f.parkedEpics[0].onMain = $false
         Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-not-on-main'
+    }
+
+    It 'FAIL-guard: on main but not via a docs(plan) commit => plan-not-docs-plan (AC4)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[0].onMainViaDocsPlan = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-not-docs-plan'
+    }
+
+    It 'PASS: a parked epic NOT on main does not also report plan-not-docs-plan (no double-flag)' {
+        $f = New-CleanPlanFacts; $f.parkedEpics[0].onMain = $false; $f.parkedEpics[0].onMainViaDocsPlan = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Not -Contain 'plan-not-docs-plan'
     }
 
     It 'FAIL-guard: a leftover throwaway worktree/branch => plan-worktree-leftover (AC4)' {

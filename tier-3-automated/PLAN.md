@@ -24,15 +24,16 @@ Tier 3 works by handing the AI a set of documents describing an app, and letting
 build that app. We want the test to be **flexible**: it should be able to run against
 **more than one** set of documents, and **you choose which set** to run each time.
 
-**Today there is one set**, already in the `benchmark-files/` folder: a **Transaction
-Import & Approval System**, where one kind of user (an *Importer*) uploads files of
-transactions, and another (an *Approver*) reviews and approves or rejects them. It
-comes with a brief, requirements, a design look-and-feel, two API descriptions, and a
-sample spreadsheet. These documents become the **instructions we hand to the AI** — it
-reads them and builds the app, exactly as if a real customer had handed them over.
+**Several sets now live in the `benchmark-files/` folder** (each its own sibling folder with
+an `answers.json`): `transactions`, `e-commerce`, `contact-form`, `singlepage-epic-test`,
+`minimal-concurrent`, `contact-form-design`, `design-taskboard`, and `feedback-api-design`.
+The default is **`transactions`** — a **Transaction Import & Approval System**, where one kind
+of user (an *Importer*) uploads files of transactions, and another (an *Approver*) reviews and
+approves or rejects them. It comes with a brief, requirements, a design look-and-feel, two API
+descriptions, and a sample spreadsheet. These documents become the **instructions we hand to the
+AI** — it reads them and builds the app, exactly as if a real customer had handed them over.
 
-**You plan to add two more sets in future.** So we build the test to handle *any
-number* of sets from day one — with just the one there now, and room to drop in more
+The test handles *any number* of sets — pick one with `-Benchmark <name>` — with room to drop in more
 whenever you like.
 
 ### How the sets are organised
@@ -55,8 +56,8 @@ benchmark-files/
 
 ### You pick which one to run
 
-When you start a run you say **which set to use**. If you don't say, it uses a sensible
-default (the Transaction set — and while it's the only one, it's simply always used).
+When you start a run you say **which set to use** (`-Benchmark <name>`). If you don't say, it
+uses a sensible default — the **Transaction** set.
 Full option details are in "How you start it" below; the short version is a
 `-Benchmark` choice:
 
@@ -435,10 +436,11 @@ can add one — but by default nothing is combined.
 > build.
 >
 > **Part 3 — conformance scoring: ✅ Built.** After the build, the run judges the app with
-> the **real tier-1 artifact-lint rules** (no-suppressions, Shadcn-only, exact API paths,
-> centralised styling, role-per-story, plain-language) by running them with `REPO_ROOT`
-> pointed at the scaffold (`Get-Tier3Conformance` + `ConvertFrom-VitestArtifactJson`) —
-> single source of truth, not a re-implementation. Rules the app misses land in
+> the **real tier-1 artifact-lint rules** (the five that exist as artifact-lint tests:
+> no-suppressions, Shadcn-only, exact API paths, role-per-story, plain-language) by running them
+> with `REPO_ROOT` pointed at the scaffold (`Get-Tier3Conformance` + `ConvertFrom-VitestArtifactJson`,
+> via `$ArtifactRuleMap`) — single source of truth, not a re-implementation. (There is no
+> `central-styling` artifact-lint test, so it is not among the scored rules.) Rules the app misses land in
 > `rulesMissed`, the §2.1 reason, and §3.1 with fixes. Still **record-only** — a missed
 > rule never fails the run; conforming = built AND no rules missed.
 >
@@ -517,10 +519,10 @@ Everything above stays separated per benchmark, exactly like the rest.
 
 ### Part 3 — Finishing touches
 
-- **Scoring** the finished app against rules the suite already checks (no code
-  shortcuts, correct data addresses, standard building blocks, colours kept in one
-  place, a role on every screen, plain-language checklists). The score is **written
-  down** in the report and history but **never turns the run red**.
+- **Scoring** the finished app against the five artifact-lint rules the suite has tests for
+  (no code shortcuts, correct data addresses, standard building blocks, a role on every screen,
+  plain-language checklists — there is no central-styling lint test, so it is not scored). The
+  score is **written down** in the report and history but **never turns the run red**.
 - Adding each Tier 3 run to **that benchmark's own master list** (`index.md` inside the
   app's folder), newest first — not to a shared, mixed list.
 
