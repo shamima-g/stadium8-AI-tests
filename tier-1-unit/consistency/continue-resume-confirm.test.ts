@@ -13,8 +13,8 @@
  * These are doc/structure checks over Step 1a — the instruction the orchestrator
  * follows. The live behaviour (the prompt actually firing, a real decline honoured) is
  * a Tier-3 eyeball; the deterministic, regression-prone part — the phase partition, the
- * plain-language warning, the inert decline, and the confirm-before-sync ORDERING — is
- * proven here. Each predicate is asserted good (real continue.md) AND broken (a tampered
+ * plain-language warning, the inert decline, and the ORDERING (the confirm must precede
+ * every state-changing step: the id backfill and the main-sync) — is proven here. Each predicate is asserted good (real continue.md) AND broken (a tampered
  * copy) per workflow-tests.md §2 rule 1. Feature-detected on the Step 1a surface, so
  * templates without it (≤ v1.2.0) SKIP, never fail (§14). The working/waiting partition
  * is read live from the Step 1a table, not hard-coded (§2 rule 7). RB: temp-project only.
@@ -49,11 +49,20 @@ const waitingPhasesSkipPrompt = (s: string) =>
 /** (f) Declining leaves the branch/state untouched. */
 const declineIsInert = (s: string) =>
   /no rebase/i.test(s) && /no push/i.test(s) && /no phase change/i.test(s);
-/** (f) The confirm gates BEFORE the §6.1 sync (rebase/force-push) — else a decline already mutated. */
-const confirmBeforeSync = (s: string) => {
+/** (f) The confirm gates BEFORE any state-changing step in Step 1a — the id backfill (a
+ * state.json edit) and the §6.1 sync (rebase/force-push) — else a decline has already
+ * changed the branch or its state. */
+const confirmBeforeMutations = (s: string) => {
   const auq = s.search(/AskUserQuestion/);
+  if (auq === -1) return false;
   const sync = s.search(/git rebase|force-with-lease/i);
-  return auq !== -1 && sync !== -1 && auq < sync;
+  if (sync === -1 || sync < auq) return false;         // the sync must exist and follow the confirm
+  // Match the backfill ACTION ("mint the missing ids"), not the word "id backfill" — the
+  // latter also appears in the "run this before the id backfill…" pointer that precedes the
+  // confirm, which would be a false match on a forward reference rather than the real step.
+  const backfill = s.search(/mint (?:the )?missing ids/i);
+  if (backfill !== -1 && backfill < auq) return false; // if an id backfill exists, it must follow too
+  return true;
 };
 /** (d) The user-facing warning avoids dev jargon. */
 function questionText(s: string): string {
@@ -84,8 +93,8 @@ describeTemplate('/continue resume confirm — Step 1a warns before overwriting 
     expect(declineIsInert(SECTION)).toBe(true);
   });
 
-  it.skipIf(!PRESENT)('PASS: the confirm gates BEFORE the §6.1 sync (rebase/force-push)', () => {
-    expect(confirmBeforeSync(SECTION)).toBe(true);
+  it.skipIf(!PRESENT)('PASS: the confirm gates BEFORE any state change (id backfill + the main-sync)', () => {
+    expect(confirmBeforeMutations(SECTION)).toBe(true);
   });
 });
 
@@ -150,6 +159,20 @@ describe('/continue resume confirm — broken cases are caught', () => {
       '',
       '### Step 1b',
     ].join('\n'));
-    expect(confirmBeforeSync(s)).toBe(false);
+    expect(confirmBeforeMutations(s)).toBe(false);
+  });
+
+  it('FAIL: a confirm placed AFTER the id backfill is caught (a decline would already edit state)', () => {
+    const s = sectionOf([
+      '### Step 1a: Confirm',
+      '',
+      'Id backfill: mint the missing ids via Edit.',
+      '',
+      'Then AskUserQuestion: continue building (BUILD/EPIC-END)? overwrite warning.',
+      'Sync with `main`: git rebase origin/main, then git push --force-with-lease.',
+      '',
+      '### Step 1b',
+    ].join('\n'));
+    expect(confirmBeforeMutations(s)).toBe(false);
   });
 });
