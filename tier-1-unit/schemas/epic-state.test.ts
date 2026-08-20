@@ -80,7 +80,7 @@ describe('state.json schema — valid documents', () => {
   // only-legitimately-varying fields (the createdAt/lastUpdated timestamps) are set aside. The
   // workflow relies on a fresh epic starting from an identical, predictable shape every time — a
   // stray env-dependent default or field-ordering wobble would break resume/replay downstream.
-  it('PASS: `--init` is deterministic (identical state.json modulo timestamps)', () => {
+  it('PASS: `--init` is deterministic (identical state.json modulo timestamps and minted ids)', () => {
     const initOnce = () => {
       const p = createTempProject();
       try {
@@ -91,14 +91,23 @@ describe('state.json schema — valid documents', () => {
         );
         expect(r.exitCode, r.stderr).toBe(0);
         const state = JSON.parse(p.read('generated-docs/epics/task-browsing/state.json')) as {
-          epic: { createdAt?: unknown }; lastUpdated?: unknown;
+          epic: { createdAt?: unknown; epicId?: unknown }; lastUpdated?: unknown;
         };
-        // Prove the timestamps were actually present (so stripping them isn't hiding a diff),
-        // then normalise them away — a record of *when*, not part of the initial shape.
+        // Prove the legitimately-varying fields were actually present (so stripping them isn't
+        // hiding a diff), then normalise them away — the createdAt/lastUpdated timestamps are a
+        // record of *when*, not part of the initial shape.
         expect(typeof state.epic.createdAt, 'createdAt is stamped').toBe('string');
         expect(typeof state.lastUpdated, 'lastUpdated is stamped').toBe('string');
         state.epic.createdAt = '<ts>';
         state.lastUpdated = '<ts>';
+        // epicId is a freshly-minted UUID (the build-metrics identifier, minted once per epic and
+        // never regenerated) — legitimately varies run-to-run, so normalise it away too. Feature-
+        // detected: older templates (≤ v1.2.0) don't mint one, and must stay green (§12 — grade by
+        // the version's own rules), so only assert-and-scrub when the field is present.
+        if (state.epic.epicId !== undefined) {
+          expect(typeof state.epic.epicId, 'epicId is minted').toBe('string');
+          state.epic.epicId = '<id>';
+        }
         return JSON.stringify(state);
       } finally {
         p.cleanup();
