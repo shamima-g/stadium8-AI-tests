@@ -12,6 +12,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import Ajv from 'ajv';
 import { loadGoldenRun } from '../helpers/golden-run';
 import { epicStateSchema } from '../helpers/schemas/epic-state.schema';
@@ -46,6 +47,8 @@ function storyFiles(epicDir: string): string[] {
 
 /** An epic parked ahead by `/plan` waits at this phase (between PLAN and BUILD). */
 const PARKED_PHASE = 'READY-TO-BUILD';
+/** The collector's DERIVED plan status for a parked epic (distinct from the state phase above). */
+const PARKED_STATUS = 'ready-to-build';
 
 interface EpicStateShape {
   phase?: string;
@@ -416,6 +419,77 @@ describe.skipIf(!hasParkedEpic || !golden.hasGit)('recorded run — /plan parked
       } else if (!subjects.some((s) => /^docs\(plan\)/.test(s))) {
         offenders.push(`${e.slug}: ${rel} is on main but via no docs(plan) commit (subjects: ${subjects.join(' | ')})`);
       }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The state report (what /continue, /status and /dashboard show) — run the
+// recording's OWN collect-dashboard-data.js over the recording and check the data
+// those three commands share. /continue Step 1b and /status both print this
+// collector's `--format=text` output as-is, and /dashboard renders its JSON — so
+// the report cannot name a different set of epics than the dashboard, and a parked
+// epic must be reported ready-to-build (with a name) for /continue to name it.
+//
+// The deterministic Tier-1 checks assert the WIRING (continue.md/status.md run the
+// same collector command); this asserts the collector produces the right data over a
+// REAL recording. Graded by the recording's own collector (§12), like the phase check.
+//
+// Needs the recording's collector + git (a bundle capture). A docs-only capture, or a
+// recording whose template predates the collector, SKIPS VISIBLY.
+// ---------------------------------------------------------------------------
+
+const recordedCollector = golden.present && golden.hasGit && golden.root
+  ? path.join(golden.root, '.claude', 'scripts', 'collect-dashboard-data.js')
+  : '';
+const hasRecordedCollector = Boolean(recordedCollector) && fs.existsSync(recordedCollector);
+
+if (golden.present && golden.hasGit && !hasRecordedCollector) {
+  // eslint-disable-next-line no-console -- intentional visible skip notice
+  console.warn(`\n[tier-2 recorded-run] state-report checks SKIPPED — the recording carries no .claude/scripts/collect-dashboard-data.js\n`);
+}
+
+interface CollectorEpic { slug: string; name?: string; status?: string }
+interface CollectorData { status: string; plan?: CollectorEpic[]; merged?: CollectorEpic[]; inFlight?: CollectorEpic[] }
+
+function runRecordedCollector(format: 'json' | 'text'): { exitCode: number; stdout: string } {
+  const res = spawnSync('node', [recordedCollector, '--root', golden.root as string, `--format=${format}`], {
+    cwd: golden.root as string, encoding: 'utf8',
+  });
+  return { exitCode: typeof res.status === 'number' ? res.status : 1, stdout: res.stdout ?? '' };
+}
+
+describe.skipIf(!hasRecordedCollector)('recorded run — the state report (/continue, /status, /dashboard)', () => {
+  const docsDir = golden.docsDir as string;
+
+  it('PASS: every epic the collector names appears by name in the /status text (report ↔ dashboard cannot drift)', () => {
+    const json = runRecordedCollector('json');
+    const text = runRecordedCollector('text');
+    expect(json.exitCode, 'collector --format=json should exit 0 over the recording').toBe(0);
+    expect(text.exitCode, 'collector --format=text should exit 0 over the recording').toBe(0);
+
+    const data = JSON.parse(json.stdout) as CollectorData;
+    // The plan is the set /continue Step 1b and the epic picker report; the dashboard JSON is
+    // the same object. Every named plan epic must appear verbatim in the text output — the two
+    // renderings come from one collect() call, so a name in one but not the other is drift.
+    const names = (data.plan ?? []).map((e) => e.name).filter((n): n is string => Boolean(n));
+    expect(names.length, 'the recording should name at least one planned epic').toBeGreaterThan(0);
+    const missing = names.filter((n) => !text.stdout.includes(n));
+    expect(missing, `named in the dashboard JSON but absent from /status text: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it.skipIf(!hasParkedEpic)('PASS: a parked epic is reported ready-to-build, by name (so /continue can name it)', () => {
+    const json = runRecordedCollector('json');
+    expect(json.exitCode, 'collector --format=json should exit 0 over the recording').toBe(0);
+    const plan = (JSON.parse(json.stdout) as CollectorData).plan ?? [];
+
+    const offenders: string[] = [];
+    for (const e of parkedEpics(docsDir)) {
+      const row = plan.find((p) => p.slug === e.slug);
+      if (!row) { offenders.push(`${e.slug}: parked epic missing from the report's plan`); continue; }
+      if (row.status !== PARKED_STATUS) offenders.push(`${e.slug}: reported "${row.status}", not "${PARKED_STATUS}"`);
+      if (!row.name || row.name.length === 0) offenders.push(`${e.slug}: has no name in the report (can't be named to the user)`);
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
   });

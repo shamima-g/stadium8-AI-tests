@@ -9,8 +9,8 @@
 > **Status: active — a golden run is captured and all invariants gate.** The harness
 > (`tier-2-recorded-run/recorded-run.test.ts` + `helpers/golden-run.ts`) replays the
 > committed `fixtures/golden-run/repo.bundle` (a build-one-park-one `minimal-concurrent`
-> run): the artifact, git-topology, **and** `/plan` parked-epic invariants all run —
-> 14/14, none skipping. The design remains capture-driven, so with no fixture present the
+> run): the artifact, git-topology, `/plan` parked-epic, **and** state-report invariants all
+> run — 21/21, none skipping. The design remains capture-driven, so with no fixture present the
 > invariants **skip visibly** (never a vacuous green): the artifact invariants need a
 > `generated-docs/` tree, the git-topology and parked-epic invariants additionally need a
 > `repo.bundle`.
@@ -71,6 +71,14 @@ only make sense across a whole epic.
   sessions) stay in Tier 3 — see [tier-3.md](tier-3.md). The block is
   **feature-detected off the recording**: a run with no parked epic (an older version, or a
   capture that skipped `/plan`) **skips visibly**, it never fails.
+- **The state report `/continue` shows with no epic to resume** — running the recording's own
+  `collect-dashboard-data.js` over the recording, a parked epic is reported ready-to-build **by
+  name** (the data `/continue` prints so it can name it), and every epic the collector names
+  appears in the `--format=text` output too — so what `/continue` and `/status` print (both that
+  text) and what the dashboard renders (the same JSON) can't name a different set. This gates the
+  *data* behind the report; the Tier-1 checks gate the *wiring* (that `continue.md` and
+  `status.md` call the same collector). **Feature-detected off the recording**: a docs-only
+  capture, or a recording whose template predates the collector, **skips visibly**.
 
 > **When to re-record.** The recording is a committed fixture. Re-record it after any
 > change that alters how the workflow runs (orchestrator rules, agent prompts,

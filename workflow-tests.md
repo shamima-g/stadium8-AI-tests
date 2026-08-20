@@ -509,9 +509,11 @@ building on its own. The second covers picking up a piece that's only part-built
 warns, in plain words, that carrying on could overwrite work already underway and asks first,
 and choosing not to continue leaves everything exactly as it was; a piece that's merely
 waiting on the user carries on with no extra question. Each check has a working example and a
-broken one, and both step aside on older templates that don't have this yet. The parts that
-only show up in a real run — the question actually appearing, the right piece of work being
-named — are confirmed by hand in the walkthrough (Tier 3).
+broken one, and both step aside on older templates that don't have this yet. The report is
+also checked against a recorded real run (Tier 2): a piece of work that was planned and left
+waiting shows up as ready to build, by name, and what the progress view and the dashboard show
+line up. The parts that only appear in a live run — the question actually showing on screen,
+the right piece of work being named — are confirmed by hand in the walkthrough (Tier 3).
 
 **Baselined to v1.3.0 (2026-08-14).** The suite `VERSION` is `v1.3.0` and the release contract is
 reconciled to it. Validated against the real released template: `test:target --target release --ref
@@ -706,12 +708,14 @@ design in `documentation/` — the design-derived intake facts are present.
 
 **Open work:**
 
-- **Golden run — fully captured; all three Tier-2 blocks gate.** A real **build-one-park-one** run
+- **Golden run — fully captured; the Tier-2 blocks gate.** A real **build-one-park-one** run
   (`minimal-concurrent`: Notes built + merged, Tasks parked at `READY-TO-BUILD`) is committed at
   `fixtures/golden-run/repo.bundle` (~900 KB, carries `generated-docs/` + git history). The Tier-2
-  **artifact**, **git-topology**, *and* **`/plan` parked-epic** invariants all now gate (**19/19, none
-  skipping** — a 2026-08-18 council added the per-story `feat(<slug>/story-<N>)` commit, phase-validity,
-  e2e-spec-per-story, and code-reviewer/`.claude/logs` canaries). Nothing dormant remains
+  **artifact**, **git-topology**, **`/plan` parked-epic**, *and* **state-report** invariants all now gate
+  (**21/21, none skipping** — a 2026-08-18 council added the per-story `feat(<slug>/story-<N>)` commit,
+  phase-validity, e2e-spec-per-story, and code-reviewer/`.claude/logs` canaries; the state-report pair —
+  a parked epic reported ready-to-build **by name**, and the report naming the same epics `/status` shows —
+  was added for the `/continue` no-epic report). Nothing dormant remains
   ([section 7](#7-tier-2--invariants-over-a-recorded-run)).
 - **`/plan` live behaviours (Tier 3)** — the two deterministic Tier-1 gaps are **closed**
   (the dashboard's *ready-to-build / parked* rendering and the *epic-picker* legend agree with
