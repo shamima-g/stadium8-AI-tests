@@ -497,6 +497,21 @@ least one failure path.
 | Report XSS-escaping (dashboard + build-report) | ✅ | partial | `esc()` over real generated HTML |
 | Collector project-status agreement | ✅ | — | dashboard ↔ build-report cross-script smoke |
 | `/upgrade` deletion-safety (`apply-template.js`) | ✅ | dev only | end-to-end smoke: retired files pruned, user work kept |
+| `/continue` — what it says with no epic, and its check before overwriting a build | ✅ | — | reads the wording in `continue.md`; the real run is checked by hand |
+
+**What `/continue` tells the user (v1.3.0).** Two checks read `continue.md` and confirm
+how `/continue` behaves when someone runs it to pick their work back up. The first covers
+the case where there's no epic in progress on the current branch: instead of a dead-end
+message, `/continue` now shows where the project actually stands — which pieces of work are
+planned and ready to build, which are being built, and which are still rough drafts — points
+a ready-to-build piece at `/start` (never at something the user can't open), and never starts
+building on its own. The second covers picking up a piece that's only part-built: `/continue`
+warns, in plain words, that carrying on could overwrite work already underway and asks first,
+and choosing not to continue leaves everything exactly as it was; a piece that's merely
+waiting on the user carries on with no extra question. Each check has a working example and a
+broken one, and both step aside on older templates that don't have this yet. The parts that
+only show up in a real run — the question actually appearing, the right piece of work being
+named — are confirmed by hand in the walkthrough (Tier 3).
 
 **Baselined to v1.3.0 (2026-08-14).** The suite `VERSION` is `v1.3.0` and the release contract is
 reconciled to it. Validated against the real released template: `test:target --target release --ref
