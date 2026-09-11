@@ -42,7 +42,10 @@ function confirmSection(md: string): string {
 // Predicates — each asserted true over the real doc and false over a tampered one.
 /** (d) A working-phase resume (BUILD/EPIC-END) warns about overwriting and asks to confirm. */
 const warnsAndConfirms = (s: string) =>
-  /AskUserQuestion/.test(s) && /overwrite/i.test(s) && /BUILD/.test(s) && /EPIC-END/.test(s);
+  // `(?<!-)\bBUILD\b` matches the standalone BUILD phase but NOT the BUILD inside
+  // `READY-TO-BUILD` (a waiting phase) — else a table listing only READY-TO-BUILD would
+  // wrongly satisfy the working-phase check.
+  /AskUserQuestion/.test(s) && /overwrite/i.test(s) && /(?<!-)\bBUILD\b/.test(s) && /EPIC-END/.test(s);
 /** (e) Any other phase resumes with no prompt, and MANUAL-TEST is never mapped to a prompt. */
 const waitingPhasesSkipPrompt = (s: string) =>
   /any other phase\s*\|?\s*no\b/i.test(s) && !/MANUAL-TEST[^\n]*\byes\b/i.test(s);
@@ -147,6 +150,34 @@ describe('/continue resume confirm — broken cases are caught', () => {
       '### Step 1b',
     ].join('\n'));
     expect(declineIsInert(s)).toBe(false);
+  });
+
+  it('FAIL: a table listing only READY-TO-BUILD (no standalone BUILD) is caught', () => {
+    // Guards the substring trap: `BUILD` inside `READY-TO-BUILD` must not satisfy the
+    // working-phase check — a waiting phase is not the mid-build phase.
+    const s = sectionOf([
+      '### Step 1a: Confirm',
+      '',
+      '| Epic state | Prompt? |',
+      '| `READY-TO-BUILD` or `EPIC-END` | **Yes** |',
+      '',
+      'Ask via AskUserQuestion; continuing may overwrite work.',
+      '',
+      '### Step 1b',
+    ].join('\n'));
+    expect(warnsAndConfirms(s)).toBe(false);
+  });
+
+  it('FAIL: a jargon-laden warning question is caught (plain-language guard)', () => {
+    const s = sectionOf([
+      '### Step 1a: Confirm',
+      '',
+      'Ask via AskUserQuestion:',
+      '**Question:** "Resume the rebase and force-with-lease on epic/<slug>?"',
+      '',
+      '### Step 1b',
+    ].join('\n'));
+    expect(questionIsPlain(questionText(s))).toBe(false);
   });
 
   it('FAIL: a confirm placed AFTER the §6.1 sync is caught (ordering regression)', () => {

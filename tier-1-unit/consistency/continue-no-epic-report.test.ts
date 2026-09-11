@@ -34,13 +34,18 @@ const CONTINUE_MD = fs.existsSync(CONTINUE) ? fs.readFileSync(CONTINUE, 'utf8') 
 
 /** Step 1b — the "no epic on this branch" report, from its heading to the next rule/section. */
 function noEpicSection(md: string): string {
-  const m = md.match(/###\s*Step 1b\b[\s\S]*?(?=\n---|\n## )/i);
+  // Terminate at the next sub-heading (`### `) too, not just a rule/section — else the
+  // capture bleeds into a following `### Step 1c`/`###` and the substring predicates can
+  // match text that belongs to that later section (a false PASS).
+  const m = md.match(/###\s*Step 1b\b[\s\S]*?(?=\n###\s|\n---|\n## )/i);
   return m ? m[0] : '';
 }
 
 // Predicates — each is asserted true over the real doc and false over a tampered one.
-/** (report/g) The no-epic path reports state via the shared collector. */
-const reportsRealState = (s: string) => /collect-dashboard-data\.js\s+--format=text/.test(s);
+/** (report/g) The no-epic path reports state via the shared collector. Tolerates
+ * other flags between `.js` and `--format=text` (e.g. `--root .`) so a valid
+ * invocation with reordered args isn't missed. */
+const reportsRealState = (s: string) => /collect-dashboard-data\.js\b[^\n]*--format=text/.test(s);
 /** (c) It never starts a build; only /start builds. */
 const neverBuilds = (s: string) => /never start a build/i.test(s) && /\/start\b/.test(s);
 /** (a) It names the parked epic and routes it to /start. */
@@ -49,9 +54,12 @@ const namesParkedWithStart = (s: string) => /parked/i.test(s) && /\/start\b/.tes
 const noParkedCheckout = (s: string) => /never offer a checkout for a parked epic/i.test(s);
 
 const SECTION = noEpicSection(CONTINUE_MD);
-// Feature-detect on the report surface itself: a template that only emits the generic
-// "not on an epic branch" line (≤ v1.2.0) has no Step 1b report → SKIP, never fail.
-const PRESENT = reportsRealState(SECTION);
+// Feature-detect on the PRESENCE of the Step 1b section (its heading), independent of any
+// assertion: a template that only emits the generic "not on an epic branch" line
+// (≤ v1.2.0) has no Step 1b → SKIP, never fail. Gating on the section — not on
+// reportsRealState — means a Step 1b that drops the collector call FAILS the report check
+// rather than silently skipping the whole suite (and masking the routing/no-build checks).
+const PRESENT = SECTION.length > 0;
 
 describeTemplate('/continue no-epic report — Step 1b reports real state (dev@main)', () => {
   it.skipIf(!PRESENT)('PASS: the no-epic path reports project state via the shared collector', () => {
@@ -72,9 +80,8 @@ describeTemplate('/continue no-epic report — Step 1b reports real state (dev@m
 
   it.skipIf(!PRESENT)('PASS: the report is the same collector output /status shows (cannot drift)', () => {
     const status = fs.existsSync(STATUS) ? fs.readFileSync(STATUS, 'utf8') : '';
-    const cmd = /collect-dashboard-data\.js\s+--format=text/;
-    expect(cmd.test(SECTION), '/continue Step 1b runs the collector').toBe(true);
-    expect(cmd.test(status), '/status runs the same collector + format').toBe(true);
+    expect(reportsRealState(SECTION), '/continue Step 1b runs the collector').toBe(true);
+    expect(reportsRealState(status), '/status runs the same collector + format').toBe(true);
   });
 });
 
