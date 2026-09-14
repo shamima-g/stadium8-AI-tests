@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       'tier-1-unit/**/*.test.ts',
       'tier-2-recorded-run/**/*.test.ts',
+      'tier-3-automated/judge/**/*.test.ts', // deterministic judge logic (Pester covers the rest of tier-3)
     ],
     exclude: [
       'node_modules/**',
