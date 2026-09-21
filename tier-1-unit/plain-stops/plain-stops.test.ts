@@ -29,6 +29,8 @@ import {
   extractMarkdownLinks,
   isResolvableLinkTarget,
   hasTickPersistence,
+  hasProgressMarkerConvention,
+  giveUpMessageIssues,
 } from './stops';
 
 // ---------------------------------------------------------------------------
@@ -156,6 +158,17 @@ describe('links + tick-persistence', () => {
     expect(hasTickPersistence('…uncheck only the tests the fix affected…')).toBe(true);
     expect(hasTickPersistence('everything resets each time')).toBe(false);
   });
+  it('hasProgressMarkerConvention detects the "N of M" marker anchored to its rule', () => {
+    expect(hasProgressMarkerConvention('a count of finished work is fine ("Story 3 of 6 built")')).toBe(true);
+    expect(hasProgressMarkerConvention('narrate every internal step as it happens')).toBe(false);
+    // semantic-flip / stray example must NOT keep it green — the guidance sentence must be present.
+    expect(hasProgressMarkerConvention('for example, "Story 3 of 6 built", but never show a running count')).toBe(false);
+  });
+
+  it('giveUpMessageIssues flags developer phrasing / slug in a give-up message', () => {
+    expect(giveUpMessageIssues('Sign in couldn\'t be finished after a few tries — keep trying, or move on?')).toEqual([]);
+    expect(giveUpMessageIssues('HALT: 3 manual-test fix cycles on story-2-<slug>').length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -172,6 +185,7 @@ it('the template under test is present when EXPECT_TEMPLATE is set', () => {
 
 const read = (p: string) => fs.readFileSync(p, 'utf8');
 const CONTINUE = path.join(TEMPLATE_DIR, 'commands', 'continue.md');
+const ORCH_RULES = path.join(TEMPLATE_DIR, 'shared', 'orchestrator-rules.md');
 const CLAUDE_USER = path.join(TARGET_ROOT, 'CLAUDE.user.md');
 const HELP_DIR = path.join(TARGET_ROOT, '.template-docs', 'users', 'Help');
 const PEER_CMDS = ['start', 'plan', 'migrate-legacy']
@@ -217,6 +231,10 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — stops in continue.md', () => 
 
   it('tick-persistence rule survives (must-survive)', () => {
     expect(hasTickPersistence(read(CONTINUE))).toBe(true);
+  });
+
+  it('the "N of M" progress-marker convention survives (must-survive)', () => {
+    expect(hasProgressMarkerConvention(read(ORCH_RULES))).toBe(true);
   });
 });
 
@@ -264,6 +282,32 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — user-facing docs (AC3)', () =
     expect(broken, broken.join('\n')).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tier 3 — behavioural (PENDING). Registered as todos so they are tracked in the suite.
+// Blocked on: a live-run harness (drive /continue, delete files mid-run, force repeated
+// failures, answer prompts turn-by-turn) AND the message-tagging (audience/role) that lets a
+// test tell the user's messages from internal chatter. These cannot be honestly built until
+// that infra lands — see plain-language-stops-test-plan.md, Tier 3.
+// ---------------------------------------------------------------------------
+
+describe('Tier 3 — behavioural (pending live-run harness + message-tagging)', () => {
+  it.todo('AC1 self-repair: delete brief + next story → /continue restores them silently (no question, no technical output), next message is the "Story N of M built" hand-back, tree clean, only normal story commits');
+  it.todo('AC1 positive surface: a genuine user-environment failure surfaces as exactly ONE plain line');
+  it.todo('AC1 boundary: deleting state.json surfaces the plain "run /start" line, not a technical error');
+  // The give-up message's PLAINNESS half is now testable now (giveUpMessageIssues, tested above);
+  // only the live parts remain — the actual message from a real run, its option count, and that
+  // it names the story in plan words.
+  it.todo('AC2 give-up (live): the real give-up message names the story in the user\'s plan words, re-evaluates, and offers >=2 non-developer options');
+  it.todo('AC2 keep-trying: choosing "keep trying" runs one more round; check-off page returns with only the affected test unticked, previously-passed still ticked');
+  it.todo('AC2 other-option: reporting again and choosing a different option continues as expected');
+});
+
+// Two open items are DECISIONS, not deferred tests, so they live in the plan/tracker, not here
+// (a `.todo` implies a test will be written; these aren't tests until the decision is made):
+//   - whether a user-facing "unexpected stop" help entry should exist (none does today), and
+//   - whether start.md is user-facing (→ a prose vocab check) or internal like WORKFLOWS.md.
+// See plain-language-stops-test-plan.md § Implementation status.
 
 if (!TEMPLATE_PRESENT) {
   // eslint-disable-next-line no-console

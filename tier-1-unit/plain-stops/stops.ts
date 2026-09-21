@@ -244,3 +244,28 @@ export function isResolvableLinkTarget(target: string): boolean {
 export function hasTickPersistence(continueMd: string): boolean {
   return /uncheck only the tests the fix affected/i.test(continueMd) || /carry those ticks forward/i.test(continueMd);
 }
+
+/**
+ * The "N of M" finished-work progress-marker convention (orchestrator-rules.md) — the hand-back
+ * the user sees after self-repair. Must survive the rework. Anchored to the guidance sentence
+ * ("a count of finished work is fine … Story N of M"), not a bare "N of M" token, so a semantic
+ * flip (keeping the example while inverting the rule) or a stray example elsewhere can't keep it
+ * green. NOTE: a shared-convention guard over a verbosity-owned file — a red here may be a
+ * verbosity-side edit, not a plain-stops one.
+ */
+export function hasProgressMarkerConvention(orchestratorRulesMd: string): boolean {
+  return /count of finished work is fine[^.]*story\s+\d+\s+of\s+\d+/i.test(orchestratorRulesMd);
+}
+
+/**
+ * Deterministic plainness issues in a give-up / stop message (AC2). Reusable for a captured
+ * give-up message once live capture exists; tested now against fixtures. Covers the mechanical
+ * half only — "names the story in plan words", "re-evaluates", and "≥2 options" are structural/
+ * semantic and belong to the live/judge tier.
+ */
+export function giveUpMessageIssues(text: string): string[] {
+  const issues: string[] = [];
+  for (const rx of BAD_STOP_PHRASES) if (rx.test(text)) issues.push(`developer phrase: ${rx.source}`);
+  if (SLUG_IN_STOP.test(text)) issues.push('slug placeholder');
+  return issues;
+}
