@@ -8,7 +8,8 @@
  * behaviourally at Tier 3 (see the plan).
  *
  * Point at a STABLE checkout (PowerShell):
- *   $env:REPO_ROOT="C:\TestsArchives\stadium8-tests\18-09-2026"; $env:EXPECT_TEMPLATE="1"; npm run test:tier1
+ *   $env:REPO_ROOT="C:\TestsArchives\stadium8-tests\21-09-2026"; $env:EXPECT_TEMPLATE="1"; npm run test:tier1
+ *   (18-09-2026 and 21-09-2026 carry a byte-identical .claude at templateRef v1.3.0.)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -184,6 +185,35 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — /plan epic-scope wording is p
     const hits = findProjectFactRedirect(md);
     expect(hits, hits.map((h) => `L${h.line}: ${h.text}`).join('\n')).toEqual([]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Tier 2 — recorded-run invariants (PENDING). Registered as todos so they are tracked.
+// Blocked on: a live-captured parked-epic golden run (a parked design-update run isn't
+// synthesizable — it must come from a Tier-3 run first). See plan-epic-scope-test-plan.md § Tier 2.
+// ---------------------------------------------------------------------------
+
+describe('Tier 2 — recorded-run invariants (pending a live capture)', () => {
+  it.todo('AC2: the changed project fact IS on `main` (git cat-file main:generated-docs/project.md + content grep)');
+  it.todo('AC5: the design digest/source is NOT on `main` for a parked design-update epic, and state.json.epic carries parkedDesignUpdate + non-null designFingerprint + designDecisions[]');
+});
+
+// ---------------------------------------------------------------------------
+// Tier 3 — behavioural (PENDING, the real verification). Registered as todos.
+// Blocked on: the plan-facts-changed scorer fix, a mid-run design-file-swap scenario driver,
+// an abandon step + inheritance/park-build assertions, and Tier-3 target resolution against the
+// archive checkout. See plan-epic-scope-test-plan.md § Tier 3 + § Feasibility.
+// ---------------------------------------------------------------------------
+
+describe('Tier 3 — behavioural (pending harness infra + scorer fix)', () => {
+  it.todo('AC1/AC3 positive completion: a project-fact epic AND a design-update epic each reach READY-TO-BUILD, write the epic-plan row on main, leave no leftover worktree/branch, and /status shows the parked epic');
+  it.todo('AC2 confirm + inherit: fact confirmed → lands on main → two later epics both see it; a stale already-parked epic re-checks the changed fact at build');
+  it.todo('AC4 told-what-moved: the plain-language diff appears at approval (not build); plus the negative and the no-digest first-time message');
+  it.todo('AC5 clean abandon: pure design-update leaves nothing on main; mixed epic keeps the fact but drops the design; palette/globals.css cleared too');
+  it.todo('AC6 park → build against approved design: on drift the build warns and requires a choice (no silent drift or rollback)');
+  it.todo('AC8 concurrency: /plan does not disturb a running build; same-fact-different-values surfaces a Tier-4 halt with both values; different sections additive-union auto-merge (benign twin)');
+  it.todo('Draft vs new: both Step 3c forks (new epic fresh brief; draft revised brief) end parked with the fields set');
+  it.todo('Decline path: a declined project change leaves main untouched; the design-update work still proceeds');
 });
 
 if (!TEMPLATE_PRESENT) {
