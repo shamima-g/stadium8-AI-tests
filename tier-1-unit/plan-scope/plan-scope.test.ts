@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TEMPLATE_DIR, TEMPLATE_PRESENT, NO_TEMPLATE_REASON } from '../../helpers';
+import { TEMPLATE_DIR, TEMPLATE_PRESENT, TEMPLATE_REF, NO_TEMPLATE_REASON } from '../../helpers';
 import {
   hasStep3a,
   hasStep3b,
@@ -133,8 +133,11 @@ describe('AC7 residual-redirect hunt', () => {
 // Fail-closed: template present when explicitly expected
 // ---------------------------------------------------------------------------
 
-it('the template under test is present when EXPECT_TEMPLATE is set', () => {
-  if (process.env.EXPECT_TEMPLATE) expect(TEMPLATE_PRESENT).toBe(true);
+it('the template under test is present (and the right one) when EXPECT_TEMPLATE is set', () => {
+  if (!process.env.EXPECT_TEMPLATE) return;
+  expect(TEMPLATE_PRESENT).toBe(true);
+  // Identity check: if EXPECT_TEMPLATE_REF is set, a stale/wrong checkout goes red, not green.
+  if (process.env.EXPECT_TEMPLATE_REF) expect(TEMPLATE_REF).toBe(process.env.EXPECT_TEMPLATE_REF);
 });
 
 // ---------------------------------------------------------------------------

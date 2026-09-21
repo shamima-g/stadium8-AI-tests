@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TARGET_ROOT, TEMPLATE_DIR, TEMPLATE_PRESENT, NO_TEMPLATE_REASON } from '../../helpers';
+import { TARGET_ROOT, TEMPLATE_DIR, TEMPLATE_PRESENT, TEMPLATE_REF, NO_TEMPLATE_REASON } from '../../helpers';
 import {
   extractStops,
   findBadPhrasesInStops,
@@ -175,8 +175,11 @@ describe('links + tick-persistence', () => {
 // Fail-closed: template must be present when explicitly expected (CI opt-in)
 // ---------------------------------------------------------------------------
 
-it('the template under test is present when EXPECT_TEMPLATE is set', () => {
-  if (process.env.EXPECT_TEMPLATE) expect(TEMPLATE_PRESENT).toBe(true);
+it('the template under test is present (and the right one) when EXPECT_TEMPLATE is set', () => {
+  if (!process.env.EXPECT_TEMPLATE) return;
+  expect(TEMPLATE_PRESENT).toBe(true);
+  // Identity check: if EXPECT_TEMPLATE_REF is set, a stale/wrong checkout goes red, not green.
+  if (process.env.EXPECT_TEMPLATE_REF) expect(TEMPLATE_REF).toBe(process.env.EXPECT_TEMPLATE_REF);
 });
 
 // ---------------------------------------------------------------------------

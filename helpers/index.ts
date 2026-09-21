@@ -5,7 +5,7 @@ export type { TempProject, CreateTempProjectOptions } from './temp-project';
 
 // Standalone-target resolution: where the .claude/ template under test lives,
 // whether it's present, and the gate for template-dependent suites.
-export { TARGET_ROOT, TEMPLATE_DIR, TEMPLATE_PRESENT, NO_TEMPLATE_REASON } from './target';
+export { TARGET_ROOT, TEMPLATE_DIR, TEMPLATE_PRESENT, TEMPLATE_REF, NO_TEMPLATE_REASON } from './target';
 export { describeTemplate } from './describe-template';
 
 export { rollback } from './rollback';

@@ -36,6 +36,21 @@ export const TEMPLATE_DIR = path.join(TARGET_ROOT, '.claude');
  */
 export const TEMPLATE_PRESENT = fs.existsSync(path.join(TEMPLATE_DIR, 'scripts'));
 
+/**
+ * The template's declared version (`template-version.json` → `templateRef`, e.g. "v1.3.0"), or
+ * null when absent/unreadable. Lets a suite fail-closed on IDENTITY (not just presence) — set
+ * `EXPECT_TEMPLATE_REF=v1.3.0` and a stale/wrong checkout goes red instead of silently green.
+ */
+export const TEMPLATE_REF: string | null = (() => {
+  try {
+    const raw = fs.readFileSync(path.join(TARGET_ROOT, 'template-version.json'), 'utf8');
+    const ref = (JSON.parse(raw) as { templateRef?: unknown }).templateRef;
+    return typeof ref === 'string' ? ref : null;
+  } catch {
+    return null;
+  }
+})();
+
 /** Human-readable explanation shown once when the template is missing. */
 export const NO_TEMPLATE_REASON =
   `No Stadium-8 template (.claude/) found at: ${TARGET_ROOT}\n` +
