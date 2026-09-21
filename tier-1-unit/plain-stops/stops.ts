@@ -107,11 +107,15 @@ export function extractStops(md: string): Stop[] {
 // AC2 red tripwires — developer-facing phrasing must be gone from stop strings
 // ---------------------------------------------------------------------------
 
+// Shared objects so the CI carve-out can match by reference (see CI_ALLOWED below).
+const DIAGNOSE_LOCALLY = /diagnose locally/i;
+const FORCE_MERGE_ANYWAY = /force merge anyway/i;
+
 export const BAD_STOP_PHRASES: RegExp[] = [
   /walk me through the issue/i,
-  /diagnose locally/i,
+  DIAGNOSE_LOCALLY,
   /mark non-routable/i,
-  /force merge anyway/i,
+  FORCE_MERGE_ANYWAY,
   /manual intervention needed/i,
   /\b\d+ manual-test fix cycles\b/i,
   /\bhalt\b/i,
@@ -123,13 +127,31 @@ export interface StopOffender {
   phrase: string;
 }
 
+/**
+ * ACCEPTED EXCEPTION — the CI-failure stop (B7.2.3). Ruled intended by the AC owner (engineer),
+ * 2026-09-21: a CI failure is the user's own CI/environment, so "Diagnose locally" / "Force merge
+ * anyway" are retained as advanced CI-recovery affordances. AC2 is amended to exempt THIS stop for
+ * THESE TWO phrases only. See plain-language-stops-test-plan.md.
+ *
+ * The stop is identified by an INDEPENDENT anchor (its `gh pr rerun` / "Re-run the failing checks"
+ * content) — NOT by the exempted phrases, which would be self-fulfilling and collapse the exception
+ * into a blanket allow.
+ */
+export const isCiFailureStop = (stop: Stop): boolean =>
+  /gh pr rerun/i.test(stop.raw) && /re-run the failing checks/i.test(stop.raw);
+
+const CI_ALLOWED: RegExp[] = [DIAGNOSE_LOCALLY, FORCE_MERGE_ANYWAY];
+
 /** Bad developer-facing phrases found in any stop's user-facing strings (empty = clean). */
 export function findBadPhrasesInStops(md: string): StopOffender[] {
   const out: StopOffender[] = [];
   for (const stop of extractStops(md)) {
+    const ci = isCiFailureStop(stop);
     for (const s of stop.strings) {
       for (const rx of BAD_STOP_PHRASES) {
-        if (rx.test(s)) out.push({ line: stop.line, string: s, phrase: rx.source });
+        if (!rx.test(s)) continue;
+        if (ci && CI_ALLOWED.includes(rx)) continue; // scoped exception: only these two, only here
+        out.push({ line: stop.line, string: s, phrase: rx.source });
       }
     }
   }

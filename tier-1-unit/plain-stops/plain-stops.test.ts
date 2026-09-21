@@ -23,6 +23,7 @@ import { TARGET_ROOT, TEMPLATE_DIR, TEMPLATE_PRESENT, NO_TEMPLATE_REASON } from 
 import {
   extractStops,
   findBadPhrasesInStops,
+  isCiFailureStop,
   findSlugInStops,
   findForbiddenDocVocab,
   extractMarkdownLinks,
@@ -79,6 +80,37 @@ describe('findBadPhrasesInStops', () => {
   });
   it('CLEAN when options are plain', () => {
     expect(findBadPhrasesInStops('`AskUserQuestion`:\n- **"Try again"** — re-run\n- **"Stop for now"** — pause\n')).toEqual([]);
+  });
+});
+
+// The CI-failure stop is an accepted, scoped exception (ruled intended by the AC owner,
+// 2026-09-21): "Diagnose locally" / "Force merge anyway" are allowed THERE only. The exemption
+// must be scoped to (that stop) × (those two phrases) and identified by an independent anchor.
+describe('CI-failure stop exception (accepted, scoped)', () => {
+  const ciStop = [
+    '- **Any check fails** → surface to user with `AskUserQuestion`:',
+    '  - "Re-run the failing checks" — `gh pr rerun` for the failed runs',
+    '  - "Diagnose locally" — drop into the failing test output',
+    '  - "Force merge anyway" — proceed with a warning',
+  ].join('\n');
+
+  it('identifies the CI stop by its independent anchor, not by the exempted phrases', () => {
+    expect(isCiFailureStop(extractStops(ciStop)[0])).toBe(true);
+    // SAMPLE_STOP carries "Diagnose locally" but is NOT the CI stop (no gh pr / re-run anchor).
+    expect(isCiFailureStop(extractStops(SAMPLE_STOP)[0])).toBe(false);
+  });
+
+  it('exempts the two phrases AT the CI stop (clean)', () => {
+    expect(findBadPhrasesInStops(ciStop)).toEqual([]);
+  });
+
+  it('still flags the two phrases at a NON-CI stop (exemption is scoped to the CI stop)', () => {
+    expect(findBadPhrasesInStops(SAMPLE_STOP).map((o) => o.string)).toContain('Diagnose locally');
+  });
+
+  it('still flags OTHER developer phrasing at the CI stop (exemption is scoped to the two phrases)', () => {
+    const ciPlusOther = ciStop + '\n  - "Walk me through the issue" — hand it to a developer';
+    expect(findBadPhrasesInStops(ciPlusOther).map((o) => o.string)).toContain('Walk me through the issue');
   });
 });
 
@@ -140,15 +172,17 @@ it('the template under test is present when EXPECT_TEMPLATE is set', () => {
 
 const read = (p: string) => fs.readFileSync(p, 'utf8');
 const CONTINUE = path.join(TEMPLATE_DIR, 'commands', 'continue.md');
-const WORKFLOWS = path.join(TEMPLATE_DIR, 'WORKFLOWS.md');
 const CLAUDE_USER = path.join(TARGET_ROOT, 'CLAUDE.user.md');
 const HELP_DIR = path.join(TARGET_ROOT, '.template-docs', 'users', 'Help');
 const PEER_CMDS = ['start', 'plan', 'migrate-legacy']
   .map((c) => path.join(TEMPLATE_DIR, 'commands', `${c}.md`))
   .filter((p) => fs.existsSync(p));
 
+// AC3 SCOPE (amended 2026-09-21, ruled by the AC owner/engineer): `.claude/WORKFLOWS.md` is an
+// INTERNAL developer/maintainer reference, not text the end-user reads — so it is OUT OF SCOPE for
+// AC3's "no old vocabulary" check. AC3 covers the genuinely user-facing docs below.
 function userDocs(): string[] {
-  const docs = [WORKFLOWS, CLAUDE_USER];
+  const docs = [CLAUDE_USER];
   if (fs.existsSync(HELP_DIR)) docs.push(...fs.readdirSync(HELP_DIR).filter((f) => f.endsWith('.md')).map((f) => path.join(HELP_DIR, f)));
   return docs.filter((p) => fs.existsSync(p));
 }
@@ -160,10 +194,21 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — stops in continue.md', () => 
     expect(stops.filter((s) => s.strings.length > 0).length).toBeGreaterThanOrEqual(5);
   });
 
-  // RED-PENDING until the rework removes the developer-facing options.
-  it('[red-pending] no developer-facing phrasing in any stop', () => {
+  // The CI-failure stop is an accepted, scoped exception (AC2 amended — ruled intended by the AC
+  // owner, 2026-09-21). Every OTHER stop must still be free of developer-facing phrasing.
+  it('no developer-facing phrasing in any stop (CI-failure stop excepted)', () => {
     const bad = findBadPhrasesInStops(read(CONTINUE));
     expect(bad, bad.map((o) => `L${o.line}: "${o.string}"`).join('\n')).toEqual([]);
+  });
+
+  // Fail-closed positive: the exception must correspond to a REAL, present CI stop that still
+  // carries both exempted phrases — otherwise the check above would pass vacuously.
+  it('the CI-failure stop exists and still carries the two exempted phrases', () => {
+    const ciStops = extractStops(read(CONTINUE)).filter(isCiFailureStop);
+    expect(ciStops.length, 'exactly one CI-failure stop').toBe(1);
+    const joined = ciStops[0].strings.join(' | ');
+    expect(joined).toMatch(/diagnose locally/i);
+    expect(joined).toMatch(/force merge anyway/i);
   });
 
   it('no slug placeholder leaks into a stop question', () => {
@@ -184,16 +229,10 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — stops in peer commands', () =
 });
 
 describe.skipIf(!TEMPLATE_PRESENT)('regression — user-facing docs (AC3)', () => {
-  // RED-PENDING: WORKFLOWS.md still has a "Halt Conditions" section + "Tier 4".
-  it('[red-pending] WORKFLOWS.md has no halt/Tier 4/verbatim vocabulary', () => {
-    const hits = findForbiddenDocVocab(read(WORKFLOWS));
-    expect(hits, hits.map((h) => `L${h.line}: ${h.term}`).join('\n')).toEqual([]);
-  });
-
-  // RED-PENDING must-show: the stale "unexpected stop" entry must be rewritten (old framing gone).
-  it('[red-pending] the stale "BUILD halted" help entry is rewritten', () => {
-    expect(read(WORKFLOWS)).not.toMatch(/BUILD halted on something I didn'?t expect/i);
-  });
+  // NOTE: `.claude/WORKFLOWS.md` is intentionally NOT scanned here — it was ruled an internal
+  // developer reference (see AC3 SCOPE note above), so its "halt"/"Tier 4" wording is out of
+  // AC3's scope. Residual gap: there is no user-facing "unexpected stop" help entry in Help/* to
+  // rewrite; if one is wanted, that's a separate must-show (Tier-3 / manual), recorded in the plan.
 
   it('CLAUDE.user.md exists and is clean of the old vocabulary', () => {
     expect(fs.existsSync(CLAUDE_USER)).toBe(true);
