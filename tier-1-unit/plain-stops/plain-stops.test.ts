@@ -287,24 +287,17 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — user-facing docs (AC3)', () =
 });
 
 // ---------------------------------------------------------------------------
-// Tier 3 — behavioural (PENDING). Registered as todos so they are tracked in the suite.
-// Blocked on: a live-run harness (drive /continue, delete files mid-run, force repeated
-// failures, answer prompts turn-by-turn) AND the message-tagging (audience/role) that lets a
-// test tell the user's messages from internal chatter. These cannot be honestly built until
-// that infra lands — see plain-language-stops-test-plan.md, Tier 3.
+// Tier 3 — behavioural: verified MANUALLY (not automated). DECISION (2026-09-21): the engineer
+// declined the message-tagging that would let an automated test separate the user's messages from
+// internal chatter, so the "plain wording" checks can't be reliably automated. Per the agreed
+// Option 3, these are verified by a human via the manual test doc, which also covers the objective
+// git/filesystem checks:
+//   manual-tests/B-plain-stops.md — AC1 self-repair (delete brief+story → /continue → silent
+//   restore, clean tree, only story commits) + AC1 positive/boundary; AC2 give-up flow (plain
+//   give-up message, keep-trying + tick persistence, other-option).
+// These are intentionally NOT `it.todo`s — there is no automated test to write (automation was
+// declined), so tracking lives in the manual doc + plain-stops-coverage-matrix.md, not the suite.
 // ---------------------------------------------------------------------------
-
-describe('Tier 3 — behavioural (pending live-run harness + message-tagging)', () => {
-  it.todo('AC1 self-repair: delete brief + next story → /continue restores them silently (no question, no technical output), next message is the "Story N of M built" hand-back, tree clean, only normal story commits');
-  it.todo('AC1 positive surface: a genuine user-environment failure surfaces as exactly ONE plain line');
-  it.todo('AC1 boundary: deleting state.json surfaces the plain "run /start" line, not a technical error');
-  // The give-up message's PLAINNESS half is now testable now (giveUpMessageIssues, tested above);
-  // only the live parts remain — the actual message from a real run, its option count, and that
-  // it names the story in plan words.
-  it.todo('AC2 give-up (live): the real give-up message names the story in the user\'s plan words, re-evaluates, and offers >=2 non-developer options');
-  it.todo('AC2 keep-trying: choosing "keep trying" runs one more round; check-off page returns with only the affected test unticked, previously-passed still ticked');
-  it.todo('AC2 other-option: reporting again and choosing a different option continues as expected');
-});
 
 // Two open items are DECISIONS, not deferred tests, so they live in the plan/tracker, not here
 // (a `.todo` implies a test will be written; these aren't tests until the decision is made):
