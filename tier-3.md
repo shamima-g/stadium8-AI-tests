@@ -167,3 +167,44 @@ parked epic leaves are asserted in **two** places, and they are the only halves 
 So a rule id like `plan-parked` is *record-only* when observed live in Tier 3, but the same
 trace is a *gating* invariant when replayed over the golden run in Tier 2. Nothing is
 double-counted: Tier 2 gates the traces; Tier 3 confirms only what can't be replayed.
+
+## Output-quality judge (record-only) — `tier-3-automated/judge/`
+
+The subjective output-discipline criteria (act-from-first-line, at-a-glance, only-the-actionable-part,
+shown-once, no-blind-approvals) have no mechanical ground truth, so the design is for a live run to be
+scored by an LLM judge against a fixed rubric (`rubric.ts`, one item per criterion). **Today only the
+deterministic scaffolding is built — the model call is a typed but unimplemented seam (`JudgeAdapter`),
+so no live grading actually runs yet.** What exists and runs (**under vitest** —
+`tier-3-automated/judge/**/*.test.ts` is in the vitest `include`, *not* the Pester `test:tier3-unit`
+suite): the rubric integrity check and the **calibration math** — before the judge's verdicts could
+count, it must agree with a fixed human-labelled good/bad set and catch every planted canary
+(`calibration.ts` + `calibration-set.ts`). By design the judge is **record-only**
+(`JUDGE_GATES_THE_BUILD === false`) — it will never gate the build.
+
+## Behaviours confirmed by hand for the not-yet-in-v1.3.0 reworks
+
+Two reworks (the "Voice and volume" verbosity rule; plain-language stops) are not in v1.3.0, so their
+behavioural cores are confirmed by a person, not automated:
+
+- **Plain-language stops (manual — Option 3).** The message-tagging that would let a test split the
+  user's messages from internal chatter was declined, so the behavioural checks are run by hand via
+  the **plain-stops manual test doc** (kept with the QA test plans on the template checkout's
+  `qa/test-plans` branch, not in this harness): delete a brief + story → `/continue` restores them silently (clean
+  tree, only story commits); the give-up loop names the story in plain words and offers non-developer
+  options; keep-trying carries tick state. (The wording *logic* has fixture-tested helpers in Tier 1;
+  the end-to-end judgement is manual.)
+- **Clean messages (verbosity).** Walk one build and confirm by eye every message is a decision /
+  result / progress marker, hand-backs are glance-able, and approved content is shown once — via the
+  **verbosity manual test doc** (same `qa/test-plans` branch of the template checkout).
+
+## `/plan` epic-scope (project-fact + design-update epics) — v1.3.0, behavioural proof pending
+
+Beyond parking (above), v1.3.0 lets `/plan` change a project fact or rebuild against changed design.
+The wording is guarded in Tier 1 (`tier-1-unit/plan-scope/`); the behavioural proof — a fact lands on
+`main` and later epics inherit it; a design change reaches `main` only at merge and a clean abandon
+leaves nothing; a parked epic builds against the approved design (warns on drift); concurrency and the
+same-fact Tier-4 halt — is registered as `it.todo` and, when built, is **record-only** here.
+**Caveat:** the existing `plan-facts-changed` scorer (above) treats *any* planner change to
+`project.md` as a defect — the exact opposite of a project-fact epic — so it must be made
+scenario-scoped before this behavioural proof can run. See the `/plan` epic-scope test plan (kept on
+the template checkout's `qa/test-plans` branch).

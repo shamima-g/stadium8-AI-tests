@@ -80,6 +80,19 @@ only make sense across a whole epic.
   `status.md` call the same collector). **Feature-detected off the recording**: a docs-only
   capture, or a recording whose template predates the collector, **skips visibly**.
 
+**Output-discipline invariants (test-first — for the unshipped "Voice and volume" rework).**
+`tier-2-recorded-run/voice-and-volume/` adds a second invariant family, over the **messages a user
+actually read** during a run (a `{ audience: 'user' | 'internal', role, text }` transcript — the
+shape the template's forthcoming *marker convention* will emit). The **invariant functions** are the
+always-run contract, exercised two-sided against inline fixtures: no internal-mechanism leaks (agent/
+phase/branch/path/SHA/script names, with the carve-out), every message is a decision/result/progress
+marker, hand-back shape, the accepted dev/test-generator return-block exception, the approval
+headline/role checks, and chat-points-not-repeats — plus a **fail-closed extractor** (an empty
+extraction from a non-empty run is a failure, not a vacuous green). The **capture regression** runs
+those functions over a real tagged transcript once one exists at
+`fixtures/golden-run/voice-and-volume/*.json`; until then it **skips visibly**. This is **test-first
+for a feature not in v1.3.0** — see the [hub §14 post-v1.3.0 coverage](workflow-tests.md#14-coverage-today-and-open-work).
+
 > **When to re-record.** The recording is a committed fixture. Re-record it after any
 > change that alters how the workflow runs (orchestrator rules, agent prompts,
 > settings, hooks): run the Tier 3 walkthrough once and copy the fresh bundle and tree

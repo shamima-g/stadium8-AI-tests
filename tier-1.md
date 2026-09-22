@@ -52,3 +52,21 @@ and finish in seconds. A few areas get extra care:
   it can't drift from the producer.
 - **Generated-code linting.** The rules in [the surface area](workflow-tests.md#5-what-we-test--the-surface-area),
   proven on samples and then run over the real output when it exists.
+- **`/plan` epic-scope wording guards (`tier-1-unit/plan-scope/`).** For the shipped v1.3.0
+  feature that lets `/plan` handle project-fact-change and design-update epics. These are
+  **wording regression-guards, mutation-coupled**: each detector passes on the real `plan.md` /
+  `continue.md` / `design-update.md` wording *and* is proven to go red on the deletion it guards
+  (remove Step 3a/3b, drop the by-name staging, remove the fingerprint `--compare`, etc.). Green
+  against v1.3.0 today; the behavioural verifications (inheritance, clean abandon, drift, concurrency)
+  are registered as `it.todo` — 8 Tier-3 behavioural + 2 Tier-2 recorded-run (see the
+  [hub §16 convention](workflow-tests.md#16-running-the-suite)).
+  **Regression net on wording only — the ACs are *to be* proven behaviourally at Tier 3 (`it.todo`,
+  pending live-run infra + the `plan-facts-changed` scorer fix); not verified today.**
+- **Output-discipline checks — test-first, feature-detected (`tier-1-unit/voice-and-volume/`,
+  `tier-1-unit/plain-stops/`).** For two reworks **not yet in v1.3.0** (the "Voice and volume"
+  verbosity rule; plain-language stops). The detector unit tests (leak/jargon scan, message-kind,
+  hand-back shape, stop-extractor, forbidden-doc-vocab) are the always-run contract with good **and**
+  broken samples; the regressions over a real template are **feature-detected and red-pending** —
+  they skip on templates without the rework and pin the target once it lands. Plain-stops'
+  behavioural checks are **manual** (see [Tier 3](tier-3.md)) because the message-tagging that would
+  automate them was declined. See the [hub §14 post-v1.3.0 coverage](workflow-tests.md#14-coverage-today-and-open-work).

@@ -85,6 +85,10 @@ Tier 3 has two parts:
   pwsh -NoProfile -Command "Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-3-automated/tests -Output Detailed"
   ```
 
+  > Note: the **output-quality judge's** deterministic logic (`tier-3-automated/judge/`) runs under
+  > **vitest** (it's in the vitest `include`), so it's covered by `npm test` / `test:raw`, **not** by
+  > `test:tier3-unit` (which is Pester-only). The judge itself is record-only — it never gates.
+
 - **The live AI build** — the whole workflow driven by a real AI (below).
 
 ### Test a live AI run against an example app
@@ -98,9 +102,10 @@ to build with `-Benchmark`:
 ./Run-QATests.ps1 -IncludeTier3 -Benchmark transactions
 ```
 
-`-Benchmark <name>` is the folder name under `benchmark-files/` (today the only set is
-`transactions`). The choices aren't hard-wired — the runner offers each folder it
-finds, so adding a new app is just dropping in a new folder (plus its `answers.json`).
+`-Benchmark <name>` is the folder name under `benchmark-files/` (several ship today, e.g.
+`transactions`, `contact-form`, `contact-form-design`, `design-taskboard`, `e-commerce`,
+`feedback-api-design`, `minimal-concurrent`). The choices aren't hard-wired — the runner offers each
+folder it finds, so adding a new app is just dropping in a new folder (plus its `answers.json`).
 Name one that doesn't exist and the run stops and lists the valid options. Results land
 in that set's own folder under `TestResults/<benchmark>/`, never mixed across apps.
 

@@ -246,8 +246,9 @@ merge always waiting for you. It runs two ways: by hand (a person drives it), **
 scores the run, and files a report — the score is **record-only, it never fails the run**. The
 **live** run needs an AI, so it isn't part of `npm test`; but its non-AI assertion functions (the
 `/plan` trace checks and the artifact-lint scoring) **do** have an npm-runnable Pester unit suite,
-`npm run test:tier3-unit`. Tier 3 is run before a release, and each clean pass is a good moment to
-re-record the Tier 2 fixture.
+`npm run test:tier3-unit`. (One exception: the newer **output-quality judge**'s deterministic logic
+runs under **vitest**, not that Pester suite — see [tier-3.md](tier-3.md).) Tier 3 is run before a
+release, and each clean pass is a good moment to re-record the Tier 2 fixture.
 
 ---
 
@@ -545,6 +546,11 @@ coverage for the post-v1.2.0 changes* below for the new tests these changes call
   doesn't apply to must **skip**, never quietly pass — use `it.skipIf(...)` /
   `describe.skipIf(...)`, feature-detected (e.g. "is the build-report collector present?"),
   not a bare `return` (which Vitest counts as a pass).
+- **`it.todo` — a fourth state, for tracked-but-not-yet-buildable work** (e.g. a behavioural check
+  blocked on live-run infra). Honest and visible (reported as "todo", never counted pass/fail); it
+  **complements — does not replace — skip/green/red**: use it only for a real test that *will* be
+  written once its blocker lands, name exactly what it will assert, and record the blocker. A check
+  that merely doesn't apply to a version still **skips** (feature-detected), never `todo`.
 - **Known template defect → `it.fails()`, not a loosened assertion** (§13.1). When the
   suite catches a real template bug it can't fix from here, mark the case `it.fails()`
   (expected-fail) with a comment naming the root cause. The baseline stays honestly green
@@ -571,6 +577,33 @@ branch `S8-129`; the cases now assert the corrected behaviour directly. **Caveat
 older targets:** these cases are plain `it` (not feature-detected), so aiming the suite at a
 genuine pre-fix archive (exact v1.1.0/v1.2.0) will legitimately turn them red — the defect
 really is present there. If cross-version-clean is wanted, gate them on a behaviour probe.
+
+### Post-v1.3.0 additions (branch `test/continue-no-epic-and-resume-confirm`)
+
+New test modules added for three template reworks. Each follows [section 2](#2-the-rules-every-test-follows)
+(good **and** broken case, isolated); the test-first ones are **feature-detected** — they skip, never
+fail, on templates without the surface. **Honest split — only one is built coverage of a shipped
+surface; the other two are test-first for features not in v1.3.0** and must not be folded into the
+v1.3.0 baseline count above:
+
+- **`/plan` epic-scope — BUILT, green vs v1.3.0** (`tier-1-unit/plan-scope/`). `/plan` handling
+  project-fact-change and design-update epics is *shipped*, so these are real Tier-1 coverage:
+  mutation-coupled **wording regression-guards** (pass on the real wording, red on the deletion they
+  guard). The behavioural verifications are registered as `it.todo` (8 Tier-3 behavioural + 2 Tier-2 recorded-run), blocked on
+  live-run infra + a `plan-facts-changed` scorer fix (the current scorer flags any planner `project.md`
+  change as a defect — the opposite of a project-fact epic). See the `/plan` epic-scope test plan
+  (on the template checkout's `qa/test-plans` branch).
+- **Verbosity ("Voice and volume") — TEST-FIRST, feature-detected** (`tier-1-unit/voice-and-volume/`
+  + `tier-2-recorded-run/voice-and-volume/` + the Tier-3 judge below). Detector unit tests + Tier-2
+  invariant functions are the always-run contract; the template/capture regressions are **red-pending
+  and feature-detected** (skip on templates without the rework). Not in v1.3.0.
+- **Plain-language stops — TEST-FIRST + MANUAL** (`tier-1-unit/plain-stops/`). Static wording guards
+  (green) + a give-up-plainness helper; the **behavioural checks are manual** (the `manual-tests/` docs
+  on the template checkout's `qa/test-plans` branch, not in this harness) because the message-tagging
+  that would automate them was declined (Option 3). Not in v1.3.0.
+- **Tier-3 output-quality judge — record-only** (`tier-3-automated/judge/`). Rubric + calibration +
+  scoring math run **under vitest** (in the vitest `include`), *not* the Pester `test:tier3-unit`
+  suite; the model call is an unimplemented `JudgeAdapter` seam. See [tier-3.md](tier-3.md).
 
 ### Planned coverage for the post-v1.2.0 changes
 
@@ -773,8 +806,18 @@ npm run test:pester              # the PowerShell hooks (needs PowerShell 7 + Pe
 npm run test:full                # also exercise the web build, the browser specs, and the checks
 npm run test:target -- --target dev --ref v1.1.0     # aim at a specific template + version (§12)
 npm run compare:targets -- --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0   # promote check (§12)
+
+# Aim Tier 1 at an external checkout, fail-closed on identity (PowerShell):
+$env:REPO_ROOT="C:\path\to\a\template-checkout"; $env:EXPECT_TEMPLATE="1"; $env:EXPECT_TEMPLATE_REF="v1.3.0"; npm run test:tier1
 ```
 
+- **`REPO_ROOT`** points the suite at any template checkout (else the parent repo). Two **opt-in
+  fail-closed guards** back it (added for the external-archive workflow): **`EXPECT_TEMPLATE=1`** turns
+  a *missing* template from a green skip into a failure, and **`EXPECT_TEMPLATE_REF=v1.3.0`** asserts
+  the checkout's `template-version.json` `templateRef` matches — so aiming at a **stale/wrong** checkout
+  goes red, not silently green. This is a *target-identity* guard, **distinct from** per-test
+  feature-detection (§12 Layer B still decides whether a given test applies by surface presence, not a
+  version number); the guards only answer "did the operator aim at the intended checkout at all?"
 - **Standalone is safe.** With no template present, template-dependent tests skip with
   a visible notice (rule 6); the rest still run.
 - **Cross-platform.** Run Tier 1 on both Linux and Windows — path handling is the
@@ -822,4 +865,8 @@ npm run compare:targets -- --a release --a-ref v1.0.0 --b dev --b-ref v1.1.0   #
 | Version-gated tests | A check for a not-yet-existing feature fails an old version instead of skipping |
 | Grade by own rules | An old version is graded against today's rules — a fake failure |
 | Labelled results | Two versions' results collide, so the side-by-side promote check can't be trusted |
+| Template-identity guard (`EXPECT_TEMPLATE_REF`) | The suite runs against a stale/wrong checkout and passes green instead of failing |
+| `/plan` epic-scope wording guards | The `/plan` project-fact / design-update wording regresses (a dead-end redirect returns, design leaks to `main` at plan time) — v1.3.0 |
+| Output-discipline (verbosity / plain-stops) | Internal mechanism leaks to the user, a stop reads as developer jargon, or old halt/Tier-4 vocab lingers — **test-first, not in v1.3.0** |
+| Output-quality judge (record-only) | The subjective wording criteria go ungraded on a live run (never gates) |
 | Tier 3 — full walkthrough | Anything the automated tiers miss |
