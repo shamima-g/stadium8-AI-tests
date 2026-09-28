@@ -41,6 +41,8 @@ import {
   intakeWritesOverview,
   intakeCommitStagesClaudeMd,
   mergeRecheckWired,
+  mergeLeavesCleanWhenNoChange,
+  markCompleteStagesClaudeMd,
 } from './rules';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -131,6 +133,35 @@ describe('wiring guards — start.md / continue.md (mutation-coupled)', () => {
       mergeRecheckWired("First bring `CLAUDE.md`'s `## Project Overview` into line with `generated-docs/project.md`, per [project-overview.md](../shared/project-overview.md)."),
     ).toBe(true);
     expect(mergeRecheckWired('Flip the phase to COMPLETE and commit on main.')).toBe(false);
+  });
+
+  it('mergeLeavesCleanWhenNoChange pins the WHOLE no-op expression (5 real regressions go red)', () => {
+    const good = '# only when you corrected nothing\ngit diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md';
+    expect(mergeLeavesCleanWhenNoChange(good)).toBe(true);
+    expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- CLAUDE.md')).toBe(false);         // dropped `|| git checkout`
+    expect(mergeLeavesCleanWhenNoChange('git checkout -- CLAUDE.md')).toBe(false);             // bare checkout = always discard corrections
+    expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- CLAUDE.md && git checkout -- CLAUDE.md')).toBe(false); // ||→&&
+    expect(mergeLeavesCleanWhenNoChange('git diff -- CLAUDE.md || git checkout -- CLAUDE.md')).toBe(false);         // dropped --quiet
+    expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- state.json || git checkout -- CLAUDE.md')).toBe(false); // pathspec off CLAUDE.md
+  });
+
+  it('markCompleteStagesClaudeMd is git-add-line-scoped within the commit block', () => {
+    const COMMIT = 'git commit -m "chore(my-slug): mark epic complete"';
+    // the real shape: the no-op `git checkout -- CLAUDE.md` sits just above the git add + commit.
+    const real = 'git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\n' +
+      'node .claude/scripts/mark-epic-complete.js --slug my-slug\n' +
+      'git add generated-docs/epics/my-slug/state.json CLAUDE.md\n' + COMMIT;
+    expect(markCompleteStagesClaudeMd(real)).toBe(true);
+    // split staging + whole-tree add stay green (no false-red)
+    expect(markCompleteStagesClaudeMd(`git add generated-docs/epics/my-slug/state.json\ngit add CLAUDE.md\n${COMMIT}`)).toBe(true);
+    expect(markCompleteStagesClaudeMd(`git add -A\n${COMMIT}`)).toBe(true);
+    // MUTATION: drop CLAUDE.md from the git add, LEAVING the `git checkout -- CLAUDE.md` no-op intact.
+    // A block grep for CLAUDE.md would stay green here; the git-add-line restriction makes it red.
+    const dropped = 'git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\n' +
+      'git add generated-docs/epics/my-slug/state.json\n' + COMMIT;
+    expect(markCompleteStagesClaudeMd(dropped)).toBe(false);
+    // rename/remove the mark-complete commit → anchor miss → red
+    expect(markCompleteStagesClaudeMd('git add generated-docs/ CLAUDE.md\ngit commit -m "chore: something else"')).toBe(false);
   });
 });
 
@@ -338,8 +369,11 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the 
     expect(intakeCommitStagesClaudeMd(md), 'stages CLAUDE.md').toBe(true);
   });
 
-  it('continue.md wires the merge-time (B7.2.6) re-check', () => {
-    expect(mergeRecheckWired(read(CONTINUE))).toBe(true);
+  it('continue.md wires B7.2.6: re-check, idempotence no-op, and mark-complete staging CLAUDE.md', () => {
+    const md = read(CONTINUE);
+    expect(mergeRecheckWired(md), 're-align sentence').toBe(true);
+    expect(mergeLeavesCleanWhenNoChange(md), 'idempotence no-op').toBe(true);
+    expect(markCompleteStagesClaudeMd(md), 'mark-complete stages CLAUDE.md').toBe(true);
   });
 
   it('must-survive tripwire: the shipped-user file still carries the PLACEHOLDER anchor', () => {

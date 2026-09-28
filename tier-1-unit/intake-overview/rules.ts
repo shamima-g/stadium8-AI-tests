@@ -122,3 +122,37 @@ export function mergeRecheckWired(continueMd: string): boolean {
     /project-overview\.md/i.test(t)
   );
 }
+
+/**
+ * B7.2.6 leaves CLAUDE.md alone when nothing was stale — the idempotence no-op that stops the file
+ * churning. Pins the WHOLE bash expression, not just the `git checkout` fragment: a fragment grep
+ * stays green under real regressions (`||`→`&&`, dropping `--quiet`, changing the pathspec, or
+ * deleting the `git diff --quiet` half so it ALWAYS discards corrections). Exact literal is correct —
+ * it's a command, not prose. Mutations that must go red: delete the `|| git checkout` half; delete the
+ * `git diff --quiet … ||` half; flip `||`→`&&`; drop `--quiet`; repoint the pathspec off CLAUDE.md.
+ */
+export const mergeLeavesCleanWhenNoChange = (continueMd: string): boolean =>
+  /git diff --quiet -- CLAUDE\.md \|\| git checkout -- CLAUDE\.md/.test(continueMd.replace(/[ \t]+/g, ' '));
+
+/**
+ * The `chore(<slug>): mark epic complete` commit stages CLAUDE.md, so a B7.2.6 correction lands on
+ * main. SCOPED to that commit's `git add` block and — critically — inspects ONLY `git add` lines: the
+ * idempotence no-op `git checkout -- CLAUDE.md` (continue.md:741) sits ~8 lines above the commit
+ * inside the lookback window, so a block grep for `CLAUDE.md` would stay green when CLAUDE.md is
+ * dropped from the `git add` (the intake-council whole-file-grep bug, worse here). Tolerates a
+ * whole-tree add and a split-staging refactor. Mutation: drop CLAUDE.md from the `git add` (leaving
+ * :741 intact) → red.
+ */
+export function markCompleteStagesClaudeMd(continueMd: string): boolean {
+  const lines = continueMd.split(/\r?\n/);
+  const commitIdx = lines.findIndex((l) => /git commit -m "chore\([^)]*\): mark epic complete"/i.test(l));
+  if (commitIdx === -1) return false;
+  for (let i = commitIdx - 1; i >= 0 && i >= commitIdx - 10; i--) {
+    const l = lines[i];
+    if (/git commit\b/.test(l)) break; // stop at the previous commit — stay in this commit's block
+    if (!/(^|\s)git add\b/.test(l)) continue; // REQUIRED: skips :741's `git checkout -- CLAUDE.md`
+    if (/git add\s+(?:-A|--all|\.)(?:\s|$)/.test(l)) return true;
+    if (/\bCLAUDE\.md\b/.test(l)) return true;
+  }
+  return false;
+}
