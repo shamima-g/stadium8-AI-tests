@@ -86,14 +86,18 @@ export function statesCorrectDontRewrite(specMd: string): boolean {
 
 /**
  * "Stale" includes a MISSING fact, not only a contradicting one — the clause that makes a generic
- * (all-facts-absent) overview count as stale and get backfilled at the next merge. Ordered-anchored
- * across the definition sentence so narrowing it to "contradicts project.md" only turns it red (a
- * generic overview contradicts nothing — it omits — so without this half the backfill never fires).
- * A *qualified* narrowing ("…missing that the epic changed") keeps the substring and is only catchable
- * behaviourally (Tier 3), not by this static guard.
+ * (all-facts-absent) overview count as stale and get backfilled at the next merge. Scoped to the
+ * "Stale means …" definition line, then both facets required INDEPENDENTLY (order- and
+ * punctuation-agnostic, so a legitimate reword doesn't false-red): a `contradicts project.md` clause
+ * AND a `a stated fact is missing` clause. Narrowing the definition to contradiction-only drops the
+ * second facet → red (a generic overview omits rather than contradicts, so without it the backfill
+ * never fires). A *qualified* narrowing ("…missing that the epic changed") keeps the phrase and is
+ * only catchable behaviourally (Tier 3), not by a static guard.
  */
-export const staleIncludesMissingFact = (specMd: string): boolean =>
-  /Stale means[^\n]*contradicts\s+`?project\.md`?[^\n]*,\s*or a stated fact is missing/i.test(specMd);
+export const staleIncludesMissingFact = (specMd: string): boolean => {
+  const line = specMd.split(/\r?\n/).find((l) => /Stale means/i.test(l)) ?? '';
+  return /contradicts\s+`?project\.md`?/i.test(line) && /a stated fact is missing/i.test(line);
+};
 
 // ── Over the wiring (start.md, continue.md) — anchor on CONTENT, not "Step 9.4" labels ────────
 
@@ -190,27 +194,33 @@ export const markCompleteStagesClaudeMd = (continueMd: string): boolean =>
 
 // ── Over upgrade.md (the backfill/migration path) ─────────────────────────────────────────────
 
-/** The `## Step 5` … `## Step 6` span of upgrade.md — the mixed-file merge step. */
-function upgradeStep5(upgradeMd: string): string {
-  const ls = upgradeMd.split(/\r?\n/);
-  const s = ls.findIndex((l) => /^##\s*Step 5\b/.test(l));
-  if (s < 0) return '';
-  const e = ls.findIndex((l, i) => i > s && /^##\s*Step 6\b/.test(l));
-  return ls.slice(s, e < 0 ? undefined : e).join('\n');
+/** Text OUTSIDE ``` fences — so a phrase inside a fenced doc-sample can't satisfy a prose guard. */
+function nonFenceText(md: string): string {
+  const out: string[] = [];
+  let inFence = false;
+  for (const l of md.split(/\r?\n/)) {
+    if (/^\s*```/.test(l)) { inFence = !inFence; continue; }
+    if (!inFence) out.push(l);
+  }
+  return out.join('\n');
 }
 
 /**
- * `/upgrade` adds NO overview migration: Step 5 states it never touches `## Project Overview` and
- * never asks. SCOPED to the Step 5 span — `never ask` also appears at Step 9 (upgrade.md:265) and
- * `never touch` at the `web/*` rules, so a whole-file grep would false-green when the Step-5 clause is
- * removed. Whitespace-collapsed (the "Do this yourself — never ask" phrase wraps two lines) and
- * em-dash tolerant. Mutations that go red: delete the `## Project Overview` never-touch clause; delete
- * the Step-5 `Do this yourself — never ask` (even if the Step-9 `never ask` survives).
+ * `/upgrade` adds NO overview migration: it states it never touches `## Project Overview` and never
+ * asks. Two prose phrases, each FILE-UNIQUE, so a whole-file (fence-stripped) scan is both sufficient
+ * and simplest — the never-touch is co-anchored to `## Project Overview` (only upgrade.md:178; the
+ * `web/*` "never touch" rules can't match) and the never-ask is the full "Do this yourself — never
+ * ask" (only Step 5; the bare Step-9 `never ask` can't match). We deliberately DON'T slice to a Step-5
+ * span: it bought nothing observable (both phrases are already unique) and added false-greens (a
+ * missing/renamed Step 6 ran the span to EOF; the heading match wasn't fence-aware). Adjacency is
+ * relaxed (≤20 chars) so "never touch the `## Project Overview` section" still matches; em-dash
+ * tolerant. Mutations that go red: delete either clause. (An overview-specific AskUserQuestion added
+ * elsewhere still passes — real silence is behavioural, deferred to Tier 2/3.)
  */
 export function upgradeLeavesOverviewAlone(upgradeMd: string): boolean {
-  const flat = upgradeStep5(upgradeMd).replace(/\s+/g, ' ');
+  const flat = nonFenceText(upgradeMd).replace(/\s+/g, ' ');
   return (
-    /never touch\s+`?##\s*Project Overview`?/i.test(flat) &&
+    /never touch\b[^\n]{0,20}`?##\s*Project Overview/i.test(flat) &&
     /Do this yourself\s*[—–-]\s*never ask/i.test(flat)
   );
 }

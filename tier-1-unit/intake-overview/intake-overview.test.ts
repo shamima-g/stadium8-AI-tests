@@ -107,34 +107,45 @@ describe('spec guards — project-overview.md (mutation-coupled)', () => {
     expect(statesCorrectDontRewrite('Rewrite the section from scratch each merge.')).toBe(false);
   });
 
-  it('staleIncludesMissingFact keeps the "or a stated fact is missing" half (backfill trigger)', () => {
+  it('staleIncludesMissingFact requires both facets, order/punctuation independent', () => {
     expect(staleIncludesMissingFact('Stale means it contradicts `project.md`, or a stated fact is missing. Worded differently is not stale.')).toBe(true);
+    // reorder must NOT false-red (facets checked independently)
+    expect(staleIncludesMissingFact('Stale means a stated fact is missing, or it contradicts `project.md`.')).toBe(true);
     // mutation: narrow to contradiction-only → a generic (all-absent) overview would never backfill → red.
     expect(staleIncludesMissingFact('Stale means it contradicts `project.md`.')).toBe(false);
+    // mutation: drop the contradiction facet → red.
+    expect(staleIncludesMissingFact('Stale means a stated fact is missing.')).toBe(false);
   });
 });
 
-describe('upgrade guard — upgrade.md Step 5 (mutation-coupled, Step-5-scoped)', () => {
+describe('upgrade guard — upgrade.md never-touch/never-ask (whole-file, fence-stripped)', () => {
   const GOOD =
     '## Step 5: Merge the mixed files (judgment)\n\n' +
     'Update only the template-owned parts; preserve everything the project added. Do this\n' +
     'yourself — never ask.\n\n' +
-    '- **`CLAUDE.md`** — **never touch `## Project Overview`**, which the workflow maintains.\n\n' +
-    '## Step 6: Migrate workflow state\n\nRun `/migrate-legacy`.';
+    '- **`CLAUDE.md`** — **never touch `## Project Overview`**, which the workflow maintains.\n';
 
-  it('true on the well-formed Step 5', () => {
+  it('true on the well-formed wording', () => {
     expect(upgradeLeavesOverviewAlone(GOOD)).toBe(true);
   });
   it('mutation: delete the never-touch-overview clause → red', () => {
-    expect(upgradeLeavesOverviewAlone(GOOD.replace('- **`CLAUDE.md`** — **never touch `## Project Overview`**, which the workflow maintains.', '- **`CLAUDE.md`** — merge the template sections.'))).toBe(false);
+    expect(upgradeLeavesOverviewAlone(GOOD.replace('**never touch `## Project Overview`**, which the workflow maintains.', 'merge the template sections.'))).toBe(false);
   });
-  it('mutation: delete the Step-5 never-ask clause → red', () => {
+  it('mutation: delete the never-ask clause → red', () => {
     expect(upgradeLeavesOverviewAlone(GOOD.replace('Do this\nyourself — never ask.', 'Do this yourself.'))).toBe(false);
   });
-  it('NEGATIVE CONTROL: a Step-9 "never ask" must NOT rescue a deleted Step-5 clause', () => {
-    const step5NoAsk = GOOD.replace('Do this\nyourself — never ask.', 'Do this yourself.');
-    const withStep9 = step5NoAsk + '\n\n## Step 9: Commit\n\nnever ask the user to review a diff or run a git command.';
-    expect(upgradeLeavesOverviewAlone(withStep9)).toBe(false); // Step-5-scoped: :265-style survivor can't rescue it
+  it('a generic "never touch web/src" (no overview clause) does NOT satisfy it', () => {
+    expect(upgradeLeavesOverviewAlone('Never touch `web/src/`. Do this yourself — never ask.')).toBe(false);
+  });
+  it('a bare "never ask" (not the full phrase) does NOT satisfy it', () => {
+    expect(upgradeLeavesOverviewAlone('- never touch `## Project Overview`.\nnever ask the user to review a diff.')).toBe(false);
+  });
+  it('relaxed adjacency: "never touch the `## Project Overview` section" still matches (no false-red)', () => {
+    expect(upgradeLeavesOverviewAlone('never touch the `## Project Overview` section. Do this yourself — never ask.')).toBe(true);
+  });
+  it('fence-stripped: the phrases only inside a ``` example do NOT count', () => {
+    const fencedOnly = '```md\nnever touch `## Project Overview`\nDo this yourself — never ask.\n```\nStep 5 actually rewrites the overview.';
+    expect(upgradeLeavesOverviewAlone(fencedOnly)).toBe(false);
   });
 });
 
