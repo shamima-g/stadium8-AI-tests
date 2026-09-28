@@ -136,18 +136,21 @@ describe('wiring guards — start.md / continue.md (mutation-coupled)', () => {
   });
 
   it('mergeLeavesCleanWhenNoChange pins the WHOLE no-op expression (5 real regressions go red)', () => {
-    const good = '# only when you corrected nothing\ngit diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md';
+    const good = '```bash\n# only when you corrected nothing\ngit diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\n```';
     expect(mergeLeavesCleanWhenNoChange(good)).toBe(true);
     expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- CLAUDE.md')).toBe(false);         // dropped `|| git checkout`
     expect(mergeLeavesCleanWhenNoChange('git checkout -- CLAUDE.md')).toBe(false);             // bare checkout = always discard corrections
     expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- CLAUDE.md && git checkout -- CLAUDE.md')).toBe(false); // ||→&&
     expect(mergeLeavesCleanWhenNoChange('git diff -- CLAUDE.md || git checkout -- CLAUDE.md')).toBe(false);         // dropped --quiet
     expect(mergeLeavesCleanWhenNoChange('git diff --quiet -- state.json || git checkout -- CLAUDE.md')).toBe(false); // pathspec off CLAUDE.md
+    // NOT-a-grep: the literal in prose/comment must NOT count when the live command is broken.
+    expect(mergeLeavesCleanWhenNoChange('git checkout -- CLAUDE.md\nNever run git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md blindly.')).toBe(false);
+    expect(mergeLeavesCleanWhenNoChange('git checkout -- CLAUDE.md\n# ref: git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md')).toBe(false);
   });
 
-  it('markCompleteStagesClaudeMd is git-add-line-scoped within the commit block', () => {
+  it('markCompleteStagesClaudeMd is command-line-scoped, every-match, block-bounded', () => {
     const COMMIT = 'git commit -m "chore(my-slug): mark epic complete"';
-    // the real shape: the no-op `git checkout -- CLAUDE.md` sits just above the git add + commit.
+    // real shape: the no-op `git checkout -- CLAUDE.md` sits just above the git add + commit.
     const real = 'git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\n' +
       'node .claude/scripts/mark-epic-complete.js --slug my-slug\n' +
       'git add generated-docs/epics/my-slug/state.json CLAUDE.md\n' + COMMIT;
@@ -155,11 +158,22 @@ describe('wiring guards — start.md / continue.md (mutation-coupled)', () => {
     // split staging + whole-tree add stay green (no false-red)
     expect(markCompleteStagesClaudeMd(`git add generated-docs/epics/my-slug/state.json\ngit add CLAUDE.md\n${COMMIT}`)).toBe(true);
     expect(markCompleteStagesClaudeMd(`git add -A\n${COMMIT}`)).toBe(true);
-    // MUTATION: drop CLAUDE.md from the git add, LEAVING the `git checkout -- CLAUDE.md` no-op intact.
-    // A block grep for CLAUDE.md would stay green here; the git-add-line restriction makes it red.
-    const dropped = 'git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\n' +
-      'git add generated-docs/epics/my-slug/state.json\n' + COMMIT;
-    expect(markCompleteStagesClaudeMd(dropped)).toBe(false);
+    // MUTATION: drop CLAUDE.md from the git add, LEAVING the `git checkout -- CLAUDE.md` no-op intact —
+    // the no-op line contains CLAUDE.md but isn't a `git add`, so this is red.
+    expect(markCompleteStagesClaudeMd('git diff --quiet -- CLAUDE.md || git checkout -- CLAUDE.md\ngit add generated-docs/epics/my-slug/state.json\n' + COMMIT)).toBe(false);
+    // false-green #1 (comment counted as command): a `# … git add … CLAUDE.md` comment must NOT count.
+    expect(markCompleteStagesClaudeMd('# git add generated-docs/epics/my-slug/state.json CLAUDE.md\ngit add generated-docs/epics/my-slug/state.json\n' + COMMIT)).toBe(false);
+    // false-green #2 (first-match): an EXAMPLE commit that keeps CLAUDE.md must not mask a REAL one that drops it.
+    expect(markCompleteStagesClaudeMd(
+      'git add generated-docs/epics/demo/state.json CLAUDE.md\ngit commit -m "chore(demo): mark epic complete"\n' +
+      'git add generated-docs/epics/real/state.json\ngit commit -m "chore(real): mark epic complete"')).toBe(false);
+    // false-green (prev-commit break): an unrelated `git add -A` under a DIFFERENT commit must not leak in.
+    expect(markCompleteStagesClaudeMd(
+      'git add -A\ngit commit -m "chore(x): something"\ngit add generated-docs/epics/x/state.json\n' +
+      'git commit -m "chore(x): mark epic complete"')).toBe(false);
+    // false-red (window): a correct git add many lines above the commit (same block) still passes.
+    expect(markCompleteStagesClaudeMd(
+      'git add generated-docs/epics/x/state.json CLAUDE.md\n' + 'echo step\n'.repeat(12) + COMMIT)).toBe(true);
     // rename/remove the mark-complete commit → anchor miss → red
     expect(markCompleteStagesClaudeMd('git add generated-docs/ CLAUDE.md\ngit commit -m "chore: something else"')).toBe(false);
   });

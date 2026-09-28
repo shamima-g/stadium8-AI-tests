@@ -93,26 +93,58 @@ export function intakeWritesOverview(startMd: string): boolean {
 }
 
 /**
- * INTAKE's commit stages CLAUDE.md. SCOPED TO THE INTAKE COMMIT: anchor on the intake commit line
- * (`git commit -m "docs(project): …"`) and look back over the `git add` block immediately preceding
- * it. CLAUDE.md must be staged in THAT block — on the bundle line, on its own split line, or via a
- * whole-tree add. Scoping to the block (not the whole file) closes two holes a whole-file scan has:
- * an unrelated `git add -A` elsewhere can't create a false-green, and a legitimate split-staging
- * refactor (`git add CLAUDE.md` on its own line) doesn't false-red.
+ * The actual shell commands in a doc: lines inside ``` fences (comments and blanks dropped). When a
+ * doc has NO fence the whole input is treated as commands — so a bare-command test fixture works
+ * while a real markdown doc is scoped to its fences. This is what stops a `git …`/`CLAUDE.md`
+ * reference in PROSE or a COMMENT from being mistaken for a live command (the whole-file-grep bug
+ * this file preaches against — see the header).
  */
-export function intakeCommitStagesClaudeMd(startMd: string): boolean {
-  const lines = startMd.split(/\r?\n/);
-  const commitIdx = lines.findIndex((l) => /git commit -m "docs\(project\):/i.test(l));
-  if (commitIdx === -1) return false;
-  for (let i = commitIdx - 1; i >= 0 && i >= commitIdx - 10; i--) {
-    const l = lines[i];
-    if (/git commit\b/.test(l)) break; // stop at the previous commit — stay in this commit's block
-    if (!/(^|\s)git add\b/.test(l)) continue;
-    if (/git add\s+(?:-A|--all|\.)(?:\s|$)/.test(l)) return true;
-    if (/\bCLAUDE\.md\b/.test(l)) return true;
+function commandLines(md: string): string[] {
+  const lines = md.split(/\r?\n/);
+  const hasFence = lines.some((l) => /^\s*```/.test(l));
+  const out: string[] = [];
+  let inFence = false;
+  for (const raw of lines) {
+    if (/^\s*```/.test(raw)) { inFence = !inFence; continue; }
+    if (hasFence && !inFence) continue; // scope to fences when the doc has them
+    const t = raw.trim();
+    if (t === '' || t.startsWith('#') || t.startsWith('<!--')) continue;
+    out.push(t);
   }
-  return false;
+  return out;
 }
+
+/**
+ * Does the commit matched by `commitRe` stage CLAUDE.md? Over COMMAND lines only, so a CLAUDE.md
+ * mention in prose/comment can't satisfy it, and anchored at line start so the idempotence no-op
+ * (`git checkout -- CLAUDE.md`, which contains CLAUDE.md but isn't a `git add`) is skipped. Requires
+ * EVERY matching commit's `git add` block — bounded by the previous commit, not a magic line count —
+ * to stage CLAUDE.md (by name, or a whole-tree add). Using `every` (not first-match) means an example
+ * commit that keeps CLAUDE.md can't mask a real one that drops it. Empty match → false.
+ */
+function everyCommitStagesClaudeMd(md: string, commitRe: RegExp): boolean {
+  const cmds = commandLines(md);
+  const idxs = cmds.map((l, i) => (commitRe.test(l) ? i : -1)).filter((i) => i >= 0);
+  if (idxs.length === 0) return false;
+  return idxs.every((ci) => {
+    for (let i = ci - 1; i >= 0; i--) {
+      const l = cmds[i];
+      if (/^git commit\b/.test(l)) break; // previous commit — block boundary
+      if (!/^git add\b/.test(l)) continue;
+      if (/^git add\s+(?:-A|--all|\.)(?:\s|$)/.test(l)) return true;
+      if (/\bCLAUDE\.md\b/.test(l)) return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * INTAKE's commit (`git commit -m "docs(project): …"`) stages CLAUDE.md. Block-scoped, command-lines
+ * only, every-match — see `everyCommitStagesClaudeMd`. A whole-tree add or a split `git add CLAUDE.md`
+ * line stays green; a dropped CLAUDE.md, or an unrelated `git add -A` under a different commit, is red.
+ */
+export const intakeCommitStagesClaudeMd = (startMd: string): boolean =>
+  everyCommitStagesClaudeMd(startMd, /^git commit -m "docs\(project\):/i);
 
 /** The merge-time (B7.2.6) re-check brings the overview into line with project.md per the spec. */
 export function mergeRecheckWired(continueMd: string): boolean {
@@ -125,34 +157,22 @@ export function mergeRecheckWired(continueMd: string): boolean {
 
 /**
  * B7.2.6 leaves CLAUDE.md alone when nothing was stale — the idempotence no-op that stops the file
- * churning. Pins the WHOLE bash expression, not just the `git checkout` fragment: a fragment grep
- * stays green under real regressions (`||`→`&&`, dropping `--quiet`, changing the pathspec, or
- * deleting the `git diff --quiet` half so it ALWAYS discards corrections). Exact literal is correct —
- * it's a command, not prose. Mutations that must go red: delete the `|| git checkout` half; delete the
- * `git diff --quiet … ||` half; flip `||`→`&&`; drop `--quiet`; repoint the pathspec off CLAUDE.md.
+ * churning. Pins the WHOLE bash expression (a `git checkout` fragment grep stays green under `||`→`&&`,
+ * dropped `--quiet`, a repointed pathspec, or a deleted `git diff --quiet` half that ALWAYS discards
+ * corrections). Over COMMAND lines only and anchored `^…$`, so the literal appearing in prose/a
+ * comment/a "don't do this" example can't false-green a reverted live command. Mutations that go red:
+ * delete the `|| git checkout` half; delete the `git diff --quiet … ||` half; `||`→`&&`; drop
+ * `--quiet`; repoint the pathspec.
  */
 export const mergeLeavesCleanWhenNoChange = (continueMd: string): boolean =>
-  /git diff --quiet -- CLAUDE\.md \|\| git checkout -- CLAUDE\.md/.test(continueMd.replace(/[ \t]+/g, ' '));
+  commandLines(continueMd).some((l) => /^git diff --quiet -- CLAUDE\.md\s*\|\|\s*git checkout -- CLAUDE\.md$/.test(l));
 
 /**
  * The `chore(<slug>): mark epic complete` commit stages CLAUDE.md, so a B7.2.6 correction lands on
- * main. SCOPED to that commit's `git add` block and — critically — inspects ONLY `git add` lines: the
- * idempotence no-op `git checkout -- CLAUDE.md` (continue.md:741) sits ~8 lines above the commit
- * inside the lookback window, so a block grep for `CLAUDE.md` would stay green when CLAUDE.md is
- * dropped from the `git add` (the intake-council whole-file-grep bug, worse here). Tolerates a
- * whole-tree add and a split-staging refactor. Mutation: drop CLAUDE.md from the `git add` (leaving
- * :741 intact) → red.
+ * main. Command-lines only + anchored + every-match (see `everyCommitStagesClaudeMd`): the
+ * idempotence no-op `git checkout -- CLAUDE.md` (continue.md:741) sits just above the commit and
+ * contains CLAUDE.md, but is skipped because it isn't a `^git add` line. Whole-tree and split staging
+ * stay green; dropping CLAUDE.md from the `git add` (leaving :741 intact) is red.
  */
-export function markCompleteStagesClaudeMd(continueMd: string): boolean {
-  const lines = continueMd.split(/\r?\n/);
-  const commitIdx = lines.findIndex((l) => /git commit -m "chore\([^)]*\): mark epic complete"/i.test(l));
-  if (commitIdx === -1) return false;
-  for (let i = commitIdx - 1; i >= 0 && i >= commitIdx - 10; i--) {
-    const l = lines[i];
-    if (/git commit\b/.test(l)) break; // stop at the previous commit — stay in this commit's block
-    if (!/(^|\s)git add\b/.test(l)) continue; // REQUIRED: skips :741's `git checkout -- CLAUDE.md`
-    if (/git add\s+(?:-A|--all|\.)(?:\s|$)/.test(l)) return true;
-    if (/\bCLAUDE\.md\b/.test(l)) return true;
-  }
-  return false;
-}
+export const markCompleteStagesClaudeMd = (continueMd: string): boolean =>
+  everyCommitStagesClaudeMd(continueMd, /^git commit -m "chore\([^)]*\): mark epic complete"/i);
