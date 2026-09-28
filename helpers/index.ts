@@ -45,3 +45,25 @@ export type { CheckpointId } from './checkpoint-fixtures';
 
 export { loadGoldenRun } from './golden-run';
 export type { GoldenRun } from './golden-run';
+
+// INTAKE `## Project Overview` analysis — pure, string-only; shared across Tier 1/2/3.
+export {
+  PLACEHOLDER,
+  POINTER_TARGETS,
+  resolveShippedUserFile,
+  extractSection,
+  countWords,
+  withinBudget,
+  LINE_BUDGET,
+  WORD_BUDGET,
+  isPointerLine,
+  pointersIn,
+  analyzeStructure,
+  neverPresentTokenLeaks,
+  parseOverviewRoles,
+  roleSetEquals,
+  claimsClosedList,
+  sectionSpan,
+  criticalRulesAndPoliciesUnchanged,
+} from './project-overview';
+export type { ShippedUserFile, Section, Budget, Structure, Leak } from './project-overview';
