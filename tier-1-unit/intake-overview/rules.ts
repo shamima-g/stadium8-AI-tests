@@ -84,6 +84,17 @@ export function statesCorrectDontRewrite(specMd: string): boolean {
   return /Correct, don'?t rewrite/i.test(specMd) && /byte-for-byte untouched/i.test(specMd);
 }
 
+/**
+ * "Stale" includes a MISSING fact, not only a contradicting one — the clause that makes a generic
+ * (all-facts-absent) overview count as stale and get backfilled at the next merge. Ordered-anchored
+ * across the definition sentence so narrowing it to "contradicts project.md" only turns it red (a
+ * generic overview contradicts nothing — it omits — so without this half the backfill never fires).
+ * A *qualified* narrowing ("…missing that the epic changed") keeps the substring and is only catchable
+ * behaviourally (Tier 3), not by this static guard.
+ */
+export const staleIncludesMissingFact = (specMd: string): boolean =>
+  /Stale means[^\n]*contradicts\s+`?project\.md`?[^\n]*,\s*or a stated fact is missing/i.test(specMd);
+
 // ── Over the wiring (start.md, continue.md) — anchor on CONTENT, not "Step 9.4" labels ────────
 
 /** INTAKE writes CLAUDE.md's `## Project Overview` per the spec. */
@@ -176,3 +187,30 @@ export const mergeLeavesCleanWhenNoChange = (continueMd: string): boolean =>
  */
 export const markCompleteStagesClaudeMd = (continueMd: string): boolean =>
   everyCommitStagesClaudeMd(continueMd, /^git commit -m "chore\([^)]*\): mark epic complete"/i);
+
+// ── Over upgrade.md (the backfill/migration path) ─────────────────────────────────────────────
+
+/** The `## Step 5` … `## Step 6` span of upgrade.md — the mixed-file merge step. */
+function upgradeStep5(upgradeMd: string): string {
+  const ls = upgradeMd.split(/\r?\n/);
+  const s = ls.findIndex((l) => /^##\s*Step 5\b/.test(l));
+  if (s < 0) return '';
+  const e = ls.findIndex((l, i) => i > s && /^##\s*Step 6\b/.test(l));
+  return ls.slice(s, e < 0 ? undefined : e).join('\n');
+}
+
+/**
+ * `/upgrade` adds NO overview migration: Step 5 states it never touches `## Project Overview` and
+ * never asks. SCOPED to the Step 5 span — `never ask` also appears at Step 9 (upgrade.md:265) and
+ * `never touch` at the `web/*` rules, so a whole-file grep would false-green when the Step-5 clause is
+ * removed. Whitespace-collapsed (the "Do this yourself — never ask" phrase wraps two lines) and
+ * em-dash tolerant. Mutations that go red: delete the `## Project Overview` never-touch clause; delete
+ * the Step-5 `Do this yourself — never ask` (even if the Step-9 `never ask` survives).
+ */
+export function upgradeLeavesOverviewAlone(upgradeMd: string): boolean {
+  const flat = upgradeStep5(upgradeMd).replace(/\s+/g, ' ');
+  return (
+    /never touch\s+`?##\s*Project Overview`?/i.test(flat) &&
+    /Do this yourself\s*[—–-]\s*never ask/i.test(flat)
+  );
+}

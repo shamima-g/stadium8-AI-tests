@@ -43,6 +43,8 @@ import {
   mergeRecheckWired,
   mergeLeavesCleanWhenNoChange,
   markCompleteStagesClaudeMd,
+  staleIncludesMissingFact,
+  upgradeLeavesOverviewAlone,
 } from './rules';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -103,6 +105,36 @@ describe('spec guards — project-overview.md (mutation-coupled)', () => {
     const cdr = '**Correct, don\'t rewrite.** … leave `CLAUDE.md` byte-for-byte untouched.';
     expect(statesCorrectDontRewrite(cdr)).toBe(true);
     expect(statesCorrectDontRewrite('Rewrite the section from scratch each merge.')).toBe(false);
+  });
+
+  it('staleIncludesMissingFact keeps the "or a stated fact is missing" half (backfill trigger)', () => {
+    expect(staleIncludesMissingFact('Stale means it contradicts `project.md`, or a stated fact is missing. Worded differently is not stale.')).toBe(true);
+    // mutation: narrow to contradiction-only → a generic (all-absent) overview would never backfill → red.
+    expect(staleIncludesMissingFact('Stale means it contradicts `project.md`.')).toBe(false);
+  });
+});
+
+describe('upgrade guard — upgrade.md Step 5 (mutation-coupled, Step-5-scoped)', () => {
+  const GOOD =
+    '## Step 5: Merge the mixed files (judgment)\n\n' +
+    'Update only the template-owned parts; preserve everything the project added. Do this\n' +
+    'yourself — never ask.\n\n' +
+    '- **`CLAUDE.md`** — **never touch `## Project Overview`**, which the workflow maintains.\n\n' +
+    '## Step 6: Migrate workflow state\n\nRun `/migrate-legacy`.';
+
+  it('true on the well-formed Step 5', () => {
+    expect(upgradeLeavesOverviewAlone(GOOD)).toBe(true);
+  });
+  it('mutation: delete the never-touch-overview clause → red', () => {
+    expect(upgradeLeavesOverviewAlone(GOOD.replace('- **`CLAUDE.md`** — **never touch `## Project Overview`**, which the workflow maintains.', '- **`CLAUDE.md`** — merge the template sections.'))).toBe(false);
+  });
+  it('mutation: delete the Step-5 never-ask clause → red', () => {
+    expect(upgradeLeavesOverviewAlone(GOOD.replace('Do this\nyourself — never ask.', 'Do this yourself.'))).toBe(false);
+  });
+  it('NEGATIVE CONTROL: a Step-9 "never ask" must NOT rescue a deleted Step-5 clause', () => {
+    const step5NoAsk = GOOD.replace('Do this\nyourself — never ask.', 'Do this yourself.');
+    const withStep9 = step5NoAsk + '\n\n## Step 9: Commit\n\nnever ask the user to review a diff or run a git command.';
+    expect(upgradeLeavesOverviewAlone(withStep9)).toBe(false); // Step-5-scoped: :265-style survivor can't rescue it
   });
 });
 
@@ -360,6 +392,7 @@ const read = (p: string) => fs.readFileSync(p, 'utf8');
 const SPEC = path.join(TEMPLATE_DIR, 'shared', 'project-overview.md');
 const START = path.join(TEMPLATE_DIR, 'commands', 'start.md');
 const CONTINUE = path.join(TEMPLATE_DIR, 'commands', 'continue.md');
+const UPGRADE = path.join(TEMPLATE_DIR, 'commands', 'upgrade.md');
 
 describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the real template', () => {
   it('project-overview.md states budget, exactly-3 pointers, never-present list, allowed facts', () => {
@@ -370,11 +403,16 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the 
     expect(allowedFactsIntact(md), 'allowed facts').toBe(true);
   });
 
-  it('project-overview.md states silence, two write points, correct-don\'t-rewrite', () => {
+  it('project-overview.md states silence, two write points, correct-don\'t-rewrite, stale-includes-missing', () => {
     const md = read(SPEC);
     expect(statesSilence(md), 'silence').toBe(true);
     expect(statesTwoWritePoints(md), 'two write points').toBe(true);
     expect(statesCorrectDontRewrite(md), "correct-don't-rewrite").toBe(true);
+    expect(staleIncludesMissingFact(md), 'stale includes a missing fact (backfill trigger)').toBe(true);
+  });
+
+  it('upgrade.md adds no overview migration (never touch ## Project Overview / never ask)', () => {
+    expect(upgradeLeavesOverviewAlone(read(UPGRADE))).toBe(true);
   });
 
   it('start.md writes the overview and stages CLAUDE.md in the intake commit', () => {
