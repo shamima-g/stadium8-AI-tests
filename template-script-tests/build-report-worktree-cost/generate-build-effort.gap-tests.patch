@@ -1,0 +1,86 @@
+diff --git a/.claude/scripts/generate-build-effort.tests.js b/.claude/scripts/generate-build-effort.tests.js
+index 3b0fdcd..5f009e4 100644
+--- a/.claude/scripts/generate-build-effort.tests.js
++++ b/.claude/scripts/generate-build-effort.tests.js
+@@ -176,6 +176,81 @@ tmp('the data file and the console summary name the session folder that was read
+   assert(stdout.includes(onDisk), 'the console summary names it too');
+ });
+ 
++// =============================================================================
++// PARALLEL-WORKTREE SWEEP — a second session folder's spend reaches the figures,
++// and the report names what fed them. See build-report-worktree-cost-test-plan.md.
++// =============================================================================
++console.log('\nParallel-worktree sweep:');
++
++// A store with two session folders, NEITHER named as the project slug, so discovery's override
++// FALLBACK reads both (report-core.mjs:206). This is the cheap path that proves cost-WIRING — two
++// folders' spend reaches the totals and the named list — NOT case-selection: the git-confirmed,
++// differently-cased worktree ACCEPT is proven at report-core.tests.js:210. `primary` holds an
++// in-story record; `plan-worktree` holds one OUTSIDE every window, exactly where a parked /plan
++// session's spend falls.
++function planWorktreeStore(root) {
++  const store = path.join(root, 'multi-store');
++  fs.mkdirSync(path.join(store, 'primary-checkout'), { recursive: true });
++  fs.mkdirSync(path.join(store, 'plan-worktree'), { recursive: true });
++  fs.writeFileSync(path.join(store, 'primary-checkout', 's1.jsonl'), usageLine({ id: 'in-story', ts: '2026-07-01T09:05:00Z' }));
++  fs.writeFileSync(path.join(store, 'plan-worktree', 's2.jsonl'), usageLine({ id: 'plan-park', ts: '2026-07-01T12:00:00Z' }));
++  return store;
++}
++// Distinctive folder names (not the generic word "primary") so a substring check can't pass by
++// accident; the console test parses the emitted transcriptFolders field rather than scanning stdout.
++const rmOpts = { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }; // Windows EBUSY-safe
++
++// The out-of-window /plan spend must raise OVERHEAD (and so costUplift), never in-story cost —
++// asserted as a conservation delta over the generator's own totals, not a hand-summed folder, so
++// dedup/ts-filtering apply identically on both sides (build-report plan honesty #1/#2). Reads
++// full-precision data.totals/benchmarks, never the .toFixed(2) console fields.
++tmp('a second folder\'s out-of-story spend raises overhead + costUplift, leaving in-story cost intact', (root) => {
++  writeProject(root, { billing: { stories: story(1, 'invoice-table', 0, 30) } });
++  const store = planWorktreeStore(root);
++
++  const both = run(root, [`--transcripts=${store}`]);
++  assertEqual(both.status, 0, 'exit code');
++  close(both.data.totals.inStoryCost, LINE_COST, 'the in-story record is counted');
++  close(both.data.totals.overheadCost, LINE_COST, 'the out-of-window plan record lands in overhead');
++  close(both.data.totals.totalCost, 2 * LINE_COST, 'both folders reach the total');
++  close(both.data.benchmarks.costUplift, 2, 'uplift = total / in-story = 2×');
++
++  // Remove the plan folder and re-run: the delta is exactly its spend, and it moved ONLY overhead.
++  fs.rmSync(path.join(store, 'plan-worktree'), rmOpts);
++  const primaryOnly = run(root, [`--transcripts=${store}`]);
++  close(both.data.totals.overheadCost - primaryOnly.data.totals.overheadCost, LINE_COST, 'the plan folder is exactly the overhead delta');
++  close(both.data.totals.inStoryCost, primaryOnly.data.totals.inStoryCost, 'and in-story cost is unchanged by it');
++  close(primaryOnly.data.benchmarks.costUplift, 1, 'without the plan folder, uplift falls back to the measured 1×');
++});
++
++// AC2: the named-folders list tracks what actually fed the report, not fixed text. Set membership,
++// not positional order — the fallback returns readdirSync order.
++tmp('the named session folders track the store — a removed folder drops out of the list', (root) => {
++  writeProject(root, { billing: { stories: story(1, 'invoice-table', 0, 30) } });
++  const store = planWorktreeStore(root);
++
++  const before = run(root, [`--transcripts=${store}`]).data.transcriptFolders;
++  assert(before.includes('primary-checkout') && before.includes('plan-worktree'), 'both folders are named while present');
++  assertEqual(before.length, 2, 'exactly the two folders that fed the figures');
++
++  fs.rmSync(path.join(store, 'plan-worktree'), rmOpts);
++  const after = run(root, [`--transcripts=${store}`]).data.transcriptFolders;
++  assert(after.includes('primary-checkout'), 'the surviving folder is still named');
++  assert(!after.includes('plan-worktree'), 'the removed folder is no longer named — the line tracks what actually fed the report');
++  assertEqual(after.length, 1, 'the count drops to one');
++});
++
++// AC2: the count reaches the console too, beside the existing missing-sub-agent warning.
++tmp('the console names the session folders alongside the incomplete-cost warning', (root) => {
++  writeProject(root, { billing: { stories: story(1, 'invoice-table', 0, 30) } });
++  const store = planWorktreeStore(root); // main-only sessions → the sub-agent warning fires
++  const { stdout, stderr } = run(root, [`--transcripts=${store}`]);
++  // Distinctive folder names (not the generic word "primary"), so these substrings can only come
++  // from the emitted transcriptFolders — a stray console word can't make this pass by accident.
++  assert(stdout.includes('primary-checkout') && stdout.includes('plan-worktree'), 'both session folders are named on the console');
++  assert(/no sub-agent transcripts found/i.test(stderr), 'the sub-agent warning still fires beside the count');
++});
++
+ tmp('a story window with no transcript records still reports its time', (root) => {
+   writeProject(root, { billing: { stories: story(1, 'invoice-table', 0, 45) } });
+   const { status, data } = run(root);
