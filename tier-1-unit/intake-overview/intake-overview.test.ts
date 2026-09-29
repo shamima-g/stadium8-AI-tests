@@ -384,6 +384,22 @@ describe('parseProjectRoles — column headings of the §Roles & Permissions mat
     expect(parseProjectRoles('# Project\n\nNo roles here.')).toEqual([]);
     expect(parseProjectRoles('## Roles & Permissions\n\nProse, no table.')).toEqual([]);
   });
+  it('handles the real emitted shape (preamble line + matrix + ~ rows + footnote)', () => {
+    const md = [
+      '## Roles & Permissions', '',
+      '**Template:** Marketplace', '',
+      '| Permission | Moderator | Seller | Buyer |',
+      '|---|---|---|---|',
+      '| Browse listings | ✓ | ✓ | ✓ |',
+      '| Refund an order | ✓ | ~ | |', '',
+      '> Footnote on `~` (Seller — Refund): conditional.', '',
+      '## Authentication', '', 'BFF cookie.',
+    ].join('\n');
+    expect(parseProjectRoles(md)).toEqual(['Moderator', 'Seller', 'Buyer']);
+  });
+  it('skips a non-permissions table (first column is not "Permission") → fail-closed', () => {
+    expect(parseProjectRoles('## Roles & Permissions\n\n| Role | Can do |\n|---|---|\n| Admin | stuff |')).toEqual([]);
+  });
   it('round-trips with roleSetEquals against the overview side', () => {
     expect(roleSetEquals(parseOverviewRoles(GOOD), parseProjectRoles(PROJECT_MD))).toBe(true);
   });
@@ -414,6 +430,13 @@ describe('auditOverview — one call runs every project-overview check over a ca
     const a = auditOverview(tampered, PROJECT_MD, CLAUDE);
     expect(a.crPoliciesUnchanged).toBe(false);
     expect(a.ok).toBe(false);
+  });
+  it('closed-list phrasing is ADVISORY — an agreeing overview phrased differently still passes', () => {
+    const alt = CLAUDE.replace('(exact backend strings; no other role exists)', '(the only two roles in the system)');
+    const a = auditOverview(alt, PROJECT_MD);
+    expect(a.roles.equal).toBe(true);                 // roleSetEquals is the real gate
+    expect(a.roles.closedListClaimed).toBe(false);    // the 4-phrase regex doesn't match this wording
+    expect(a.ok, a.reasons.join(' | ')).toBe(true);   // ...so audit still passes; meaning is the Tier-3 judge's call
   });
 });
 

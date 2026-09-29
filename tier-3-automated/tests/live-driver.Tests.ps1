@@ -82,18 +82,6 @@ Describe 'Event parsing — Read-ClaudeEvent updates state and fires OnTurn' {
         @($seen)[0]       | Should -Be '1=green'      # a web/src .tsx write => green
     }
 
-    It 'PASS: B1 — captures tool name, AskUserQuestion inputs, and assistant text (lazy-init)' {
-        $state = @{ turns = 0; prevGate = 'spec'; partialTokens = 0 }   # NO tool/ask/text keys — B1 must create them
-        Read-ClaudeEvent -Line '{"type":"assistant","message":{"content":[{"type":"text","text":"Approve this plan?"},{"type":"tool_use","name":"AskUserQuestion","input":{"questions":[{"question":"Approve?"}]}}]}}' -State $state -OnTurn $null
-        Read-ClaudeEvent -Line '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"git commit -m x"}}]}}' -State $state -OnTurn $null
-        @($state.asks).Count            | Should -Be 1
-        @($state.asks)[0].turn          | Should -Be 1
-        @($state.asks)[0].input         | Should -Not -BeNullOrEmpty
-        @($state.assistantText)[0].text | Should -Be 'Approve this plan?'
-        (@($state.toolCalls | ForEach-Object { $_.name }) -join ',') | Should -Be 'AskUserQuestion,Bash'
-        @($state.toolCalls)[1].turn     | Should -Be 2   # the Bash call is on the second assistant turn
-    }
-
     It 'FAIL-guard: a non-JSON line is ignored, not fatal' {
         $state = @{ turns = 0; sessionId = $null; model = $null; sawResult = $false; isError = $false; durationMs = 0.0; costUsd = 0.0; tokens = 0; partialTokens = 0; lastType = $null; prevGate = 'spec' }
         { Read-ClaudeEvent -Line 'not json at all' -State $state -OnTurn $null } | Should -Not -Throw
@@ -569,7 +557,16 @@ Describe 'PLAN-A — plan conformance rules (record-only)' {
 
     It 'PASS: an EXPECTED fact change (project-fact / design-update epic) is credited, not flagged (B3)' {
         $f = New-CleanPlanFacts; $f.expectFactsChange = $true; $f.projectFactsChanged = $true
-        Get-Tier3PlanRulesMissed -Facts $f | Should -Not -Contain 'plan-facts-changed'
+        @(Get-Tier3PlanRulesMissed -Facts $f).Count | Should -Be 0   # credited: neither plan-facts-changed nor -missing
+    }
+
+    It 'PASS: -Expect omitting expectFactsChange does not throw under StrictMode (B3)' {
+        # A -Expect caller that supplies only the older keys must still resolve (index access, not member).
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("t3pf-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        $facts = Get-Tier3PlanFacts -Scaffold $tmp -Expect @{ expectNewEpic = $false; expectBlocked = $false; expectResume = $false }
+        $facts.expectFactsChange | Should -BeFalse
+        Remove-Item $tmp -Recurse -Force
     }
 
     It 'FAIL-guard: an EXPECTED fact change that did NOT land => plan-facts-change-missing (B3)' {

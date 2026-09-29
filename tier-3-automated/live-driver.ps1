@@ -313,24 +313,13 @@ function Read-ClaudeEvent {
             $State.turns++
             $msg = Get-JsonProp $evt 'message'
             $touched = New-Object System.Collections.Generic.List[string]
-            # B1 — retain the tool NAME, AskUserQuestion inputs, and assistant TEXT so a post-run
-            # scorer can run the silence check ("no AUQ between X and Y") and the judge. Lazily
-            # created so existing callers that don't pre-init these keys still work unchanged.
-            if (-not $State.ContainsKey('toolCalls'))     { $State.toolCalls     = [System.Collections.Generic.List[hashtable]]::new() }
-            if (-not $State.ContainsKey('asks'))          { $State.asks          = [System.Collections.Generic.List[hashtable]]::new() }
-            if (-not $State.ContainsKey('assistantText')) { $State.assistantText = [System.Collections.Generic.List[hashtable]]::new() }
+            # B1 lives in the POST-RUN parser (ConvertFrom-ClaudeStream), not here: the silence check
+            # and judge re-parse the retained *-claude.jsonl. Capturing here would be dead data (this
+            # $State's tool/text is never surfaced from Invoke-ClaudeHeadless) and would pin whole file
+            # contents in RAM for a full build. So this live path stays lean — file_path/command only.
             foreach ($block in @(Get-JsonProp $msg 'content' @())) {
-                $btype = Get-JsonProp $block 'type'
-                if ($btype -eq 'text') {
-                    $txt = Get-JsonProp $block 'text'
-                    if ($txt) { $State.assistantText.Add(@{ turn = $State.turns; text = [string]$txt }) }
-                    continue
-                }
-                if ($btype -ne 'tool_use') { continue }
-                $name = [string](Get-JsonProp $block 'name')
+                if ((Get-JsonProp $block 'type') -ne 'tool_use') { continue }
                 $inp = Get-JsonProp $block 'input'
-                $State.toolCalls.Add(@{ turn = $State.turns; name = $name; input = $inp })
-                if ($name -eq 'AskUserQuestion') { $State.asks.Add(@{ turn = $State.turns; input = $inp }) }
                 $fp = Get-JsonProp $inp 'file_path'; if ($fp) { $touched.Add([string]$fp) }
                 $cmd = Get-JsonProp $inp 'command'; if ($cmd) { $touched.Add([string]$cmd) }
             }
@@ -903,7 +892,7 @@ function Get-Tier3PlanRulesMissed {
     # AC11 — an UNEXPECTED project.md change from /plan is a defect; an EXPECTED one (a project-fact
     # or design-update epic the scenario deliberately drove) is the DESIRED trace, and its ABSENCE is
     # the defect instead. Mirrors the expectNewEpic/expectResume optional-behaviour flags below.
-    if ($Facts.expectFactsChange) {
+    if ($Facts['expectFactsChange']) {   # index access: a Facts hashtable omitting the key yields $null, never throws under StrictMode
         if (-not $Facts.projectFactsChanged) { $missed.Add('plan-facts-change-missing') }  # AC11 — intended change didn't land
     } elseif ($Facts.projectFactsChanged) {
         $missed.Add('plan-facts-changed')                                                   # AC11 — /plan touched project.md unbidden
@@ -1050,7 +1039,7 @@ function Get-Tier3PlanFacts {
         expectNewEpic        = [bool]$expect.expectNewEpic
         expectBlocked        = [bool]$expect.expectBlocked
         expectResume         = [bool]$expect.expectResume
-        expectFactsChange    = [bool]$expect.expectFactsChange
+        expectFactsChange    = [bool]$expect['expectFactsChange']   # index access: -Expect callers may omit this key (StrictMode-safe)
     }
 }
 

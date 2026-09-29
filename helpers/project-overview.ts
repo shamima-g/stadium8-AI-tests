@@ -312,7 +312,10 @@ export function parseProjectRoles(projectMd: string): string[] {
     if (!/^\s*\|.*\|\s*$/.test(header)) continue;            // a `| … |` table row
     if (!/^\s*\|[-:| ]*-[-:| ]*\|\s*$/.test(sep)) continue;  // followed by the `|---|---|` separator
     const cells = header.split('|').slice(1, -1).map((c) => c.replace(/`/g, '').trim());
-    return cells.slice(1).filter(Boolean); // drop the leading "Permission" column; the rest are roles
+    // The matrix's first column is the "Permission" label; if it isn't, this isn't the roles table —
+    // keep scanning rather than blindly dropping column 0 and returning garbage.
+    if (!/^permission$/i.test(cells[0] ?? '')) continue;
+    return cells.slice(1).filter(Boolean); // the remaining column headings are the role names
   }
   return [];
 }
@@ -391,7 +394,9 @@ export function auditOverview(claudeMd: string, projectMd: string, baselineClaud
   if (!budget.ok) reasons.push(`budget: ${budget.lineCount} lines / ${budget.wordCount} words`);
   if (leaks.length) reasons.push(`leaks: ${leaks.map((l) => l.kind).join(', ')}`);
   if (!roles.equal) reasons.push(`roles ${JSON.stringify(roles.overview)} != project ${JSON.stringify(roles.project)}`);
-  if (!roles.closedListClaimed) reasons.push('roles bullet does not assert the closed list');
+  // `closedListClaimed` is ADVISORY, not an `ok` gate: it's a 4-phrase regex, and roleSetEquals
+  // already catches the real danger (an overview naming 2 of 3 roles). Whether the closed-list is
+  // *meaningfully* asserted is the Tier-3 judge's call, not a phrasing match — reported, not gated.
   if (crPoliciesUnchanged === false) reasons.push('Critical Rules / Policies changed across the write');
 
   return { found: section.found, structure, budget, leaks, roles, crPoliciesUnchanged, ok: reasons.length === 0, reasons };

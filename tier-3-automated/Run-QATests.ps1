@@ -183,7 +183,7 @@ function Resolve-Tier3Template {
         if ($Target) { throw "Pass either -Target or -TemplateRoot, not both — they pick different templates." }
         $resolved = $null
         try { $resolved = (Resolve-Path -LiteralPath $TemplateRoot -ErrorAction Stop).Path } catch { throw "TemplateRoot '$TemplateRoot' does not exist." }
-        if (-not (Test-Path (Join-Path $resolved '.claude'))) { throw "TemplateRoot '$resolved' is not a Stadium-8 template — no .claude/ directory." }
+        if (-not (Test-Path (Join-Path $resolved '.claude') -PathType Container)) { throw "TemplateRoot '$resolved' is not a Stadium-8 template — no .claude/ directory." }
         return @{ root = $resolved; label = "local-$(Split-Path $resolved -Leaf)"; ref = 'local' }
     }
     if (-not $Target) {

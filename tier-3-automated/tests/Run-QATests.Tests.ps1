@@ -126,10 +126,25 @@ Describe 'Resolve-Tier3Template' {
     It 'PASS: -TemplateRoot builds against a local checkout (no clone) — label local-*, ref local (B4)' {
         $qa = New-Sandbox
         $tmpl = New-Sandbox; New-Item -ItemType Directory -Path (Join-Path $tmpl '.claude') -Force | Out-Null
-        $res = Resolve-Tier3Template -TemplateRoot $tmpl -QaRoot $qa   # no -Cloner: must not clone
+        # Tripwire: the clone branch must NEVER run for a local checkout.
+        $res = Resolve-Tier3Template -TemplateRoot $tmpl -QaRoot $qa -Cloner { throw 'clone must not happen for -TemplateRoot' }
         $res.root  | Should -Be (Resolve-Path $tmpl).Path
         $res.label | Should -Match '^local-'
         $res.ref   | Should -Be 'local'
+        Remove-Item $qa, $tmpl -Recurse -Force
+    }
+
+    It 'PASS: an empty/unset -TemplateRoot falls through to the default (the call site always passes it) (B4)' {
+        $qa = New-Sandbox
+        (Resolve-Tier3Template -TemplateRoot '' -QaRoot $qa).label   | Should -BeNullOrEmpty
+        (Resolve-Tier3Template -TemplateRoot $null -QaRoot $qa).root | Should -Be (Resolve-Path (Join-Path $qa '..')).Path
+        Remove-Item $qa -Recurse -Force
+    }
+
+    It 'FAIL-guard: a -TemplateRoot whose .claude is a FILE (not a dir) is rejected (B4)' {
+        $qa = New-Sandbox; $tmpl = New-Sandbox
+        Set-Content -Path (Join-Path $tmpl '.claude') -Value 'not a dir' -Encoding utf8
+        { Resolve-Tier3Template -TemplateRoot $tmpl -QaRoot $qa } | Should -Throw -ExpectedMessage '*not a Stadium-8 template*'
         Remove-Item $qa, $tmpl -Recurse -Force
     }
 

@@ -66,11 +66,14 @@ function ConvertFrom-ClaudeStream {
                 if ($btype -ne 'tool_use') { continue }
                 $name = [string](Get-JsonProp $block 'name')
                 $input = Get-JsonProp $block 'input'
-                $tools.Add(@{ name = $name; input = $input })
-                if ($name -eq 'AskUserQuestion') { $asks.Add(@{ turn = $turnIndex; input = $input }) }
                 $fp = Get-JsonProp $input 'file_path'
-                if ($fp) { $touched.Add([string]$fp) }
                 $cmd = Get-JsonProp $input 'command'
+                # Lean projection, NOT the raw input — a Write/Edit's full file content would bloat this.
+                # The silence check bounds its window on the CLAUDE.md `file_path` write (not the commit
+                # command text, which doesn't name staged files); AUQ keeps its input for the question.
+                $tools.Add(@{ name = $name; file_path = $fp; command = $cmd })
+                if ($name -eq 'AskUserQuestion') { $asks.Add(@{ turn = $turnIndex; input = $input }) }
+                if ($fp) { $touched.Add([string]$fp) }
                 if ($cmd) { $touched.Add([string]$cmd) }
             }
             $turns.Add(@{ index = $turnIndex; inputTokens = $inTok; outputTokens = $outTok; touched = @($touched); tools = @($tools) })

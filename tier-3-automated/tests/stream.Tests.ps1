@@ -55,8 +55,10 @@ Describe 'ConvertFrom-ClaudeStream — normalise the events' {
         $p = ConvertFrom-ClaudeStream -Path $path
         @($p.asks).Count    | Should -Be 1
         @($p.asks)[0].turn  | Should -Be 1
+        @($p.asks)[0].input.questions[0].question | Should -Be 'Approve the plan?'   # nested AUQ input survives
         @($p.texts)[0].text | Should -Be 'Here is the plan. Approve?'
         (@($p.turns)[0].tools | ForEach-Object { $_.name }) | Should -Be 'AskUserQuestion'
+        (@($p.turns)[0].tools | ForEach-Object { $_.command }) | Should -BeNullOrEmpty   # lean projection: no raw input/content
         (@($p.turns)[1].tools | ForEach-Object { $_.name }) | Should -Be 'Bash'
         Remove-Item $dir -Recurse -Force
     }
