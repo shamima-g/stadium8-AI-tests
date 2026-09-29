@@ -530,6 +530,8 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the 
     expect(mergeRecheckWired(md), 're-align sentence').toBe(true);
     expect(mergeLeavesCleanWhenNoChange(md), 'idempotence no-op').toBe(true);
     expect(markCompleteStagesClaudeMd(md), 'mark-complete stages CLAUDE.md').toBe(true);
+    // Ground truth: the STOCK template's no-remote path dead-ends before B7.2.6 (option (b) not shipped).
+    expect(mergeRecheckOnLocalMergePath(md), 'stock: local-merge path does NOT reach B7.2.6').toBe(false);
   });
 
   it('must-survive tripwire: the shipped-user file still carries the PLACEHOLDER anchor', () => {

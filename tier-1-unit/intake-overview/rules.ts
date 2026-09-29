@@ -171,17 +171,24 @@ export function mergeRecheckWired(continueMd: string): boolean {
 }
 
 /**
- * Option (b): does the NO-REMOTE (local-merge) path ALSO run the B7.2.6 re-check, instead of
- * short-circuiting before it? The stock template dead-ends when there's no remote ("the rest of
- * B7.2 doesn't apply … end /continue"), so the summary is re-checked only on the GitHub-PR path.
- * The mock routes the local merge on to B7.2.6, so the re-check runs offline too — which is what
- * lets the merge behaviour be tested WITHOUT a real GitHub sandbox. True on the option-(b) mock,
- * false on the stock template.
+ * Option (b): does the NO-REMOTE (local-merge) path *route to* the B7.2.6 re-check, rather than
+ * dead-ending before it? This is a WORDING check (necessary-not-sufficient, like its siblings): it
+ * proves the instruction points at B7.2.6 on the local path — NOT that the tool actually performs the
+ * re-check (that's behavioural, and needs a live build→merge run, Tier 3). The stock template
+ * dead-ends when there's no remote ("the rest of B7.2 doesn't apply … end /continue"); an option-(b)
+ * template routes the local merge on to B7.2.6. True on option-(b) wording, false on the stock.
+ * Region is scoped to the no-remote branch (up to its first code fence) so extra prose can't push the
+ * routing phrase out of view and false-red a correct file.
  */
 export function mergeRecheckOnLocalMergePath(continueMd: string): boolean {
-  const region = /git remote -v[\s\S]{0,600}/i.exec(continueMd.replace(/\s+/g, ' '))?.[0] ?? '';
+  const flat = continueMd.replace(/\s+/g, ' ');
+  const start = flat.search(/git remote -v/i);
+  if (start === -1) return false;
+  const rest = flat.slice(start);
+  const fence = rest.indexOf('```');
+  const region = rest.slice(0, fence >= 0 && fence < 700 ? fence : 700);
   const routesToRecheck = /(go straight to|continue at)\s*\*{0,2}B7\.2\.6|post-merge tidy-up must still run/i.test(region);
-  const deadEnds = /rest of B7\.2 doesn'?t apply/i.test(region);
+  const deadEnds = /rest of B7\.2 does(?:n['’]?t| not) apply/i.test(region);
   return routesToRecheck && !deadEnds;
 }
 
