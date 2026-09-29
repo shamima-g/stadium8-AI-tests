@@ -30,6 +30,7 @@ param(
     [ValidateSet('build', 'plan', 'concurrent')][string]$Scenario = 'build',
     [string]$Target,
     [string]$Ref,
+    [string]$TemplateRoot,
     [switch]$KeepDeps,
     [switch]$KeepRawLogs,
     [switch]$NoTeardown,
@@ -163,15 +164,28 @@ function Get-Tier3RunCommand {
 #     targets.json) into .targets/<target>-<ref>/ and build against THAT checkout — the
 #     Tier 3 counterpart to `npm run test:target`. -Ref defaults to the repo's default
 #     branch. This is what lets one run aim at dev vs release at a specific version.
+#   * -TemplateRoot <path> → build against an arbitrary LOCAL template checkout, with no
+#     network clone. This is how a run reaches an [Unreleased] feature branch that isn't a
+#     published tag (the same shape as the no-Target default, just an explicit path). Mutually
+#     exclusive with -Target.
 # $Cloner is injectable ({ param($repo,$ref,$dest) ... }) so tests need no network.
 function Resolve-Tier3Template {
     [CmdletBinding()]
     param(
         [string]$Target,
         [string]$Ref,
+        [string]$TemplateRoot,
         [Parameter(Mandatory)][string]$QaRoot,
         [scriptblock]$Cloner
     )
+    # A local checkout wins: point a run at a feature branch that isn't a published tag, no clone.
+    if ($TemplateRoot) {
+        if ($Target) { throw "Pass either -Target or -TemplateRoot, not both — they pick different templates." }
+        $resolved = $null
+        try { $resolved = (Resolve-Path -LiteralPath $TemplateRoot -ErrorAction Stop).Path } catch { throw "TemplateRoot '$TemplateRoot' does not exist." }
+        if (-not (Test-Path (Join-Path $resolved '.claude'))) { throw "TemplateRoot '$resolved' is not a Stadium-8 template — no .claude/ directory." }
+        return @{ root = $resolved; label = "local-$(Split-Path $resolved -Leaf)"; ref = 'local' }
+    }
     if (-not $Target) {
         return @{ root = (Resolve-Path (Join-Path $QaRoot '..')).Path; label = $null; ref = $null }
     }
@@ -289,7 +303,7 @@ function Invoke-RunQATests {
     $qaRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
     $tmpl = $null
     if (-not $ReplayResult -and ($IncludeTier3 -or $Resume)) {
-        $tmpl = Resolve-Tier3Template -Target $Target -Ref $Ref -QaRoot $qaRoot
+        $tmpl = Resolve-Tier3Template -Target $Target -Ref $Ref -TemplateRoot $TemplateRoot -QaRoot $qaRoot
     }
 
     # 1) setup — every prerequisite is mandatory. If setup couldn't make the machine fully

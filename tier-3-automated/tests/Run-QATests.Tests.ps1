@@ -122,6 +122,37 @@ Describe 'Resolve-Tier3Template' {
         { Resolve-Tier3Template -Target 'dev' -QaRoot $qa } | Should -Throw -ExpectedMessage '*targets.json*'
         Remove-Item $qa -Recurse -Force
     }
+
+    It 'PASS: -TemplateRoot builds against a local checkout (no clone) — label local-*, ref local (B4)' {
+        $qa = New-Sandbox
+        $tmpl = New-Sandbox; New-Item -ItemType Directory -Path (Join-Path $tmpl '.claude') -Force | Out-Null
+        $res = Resolve-Tier3Template -TemplateRoot $tmpl -QaRoot $qa   # no -Cloner: must not clone
+        $res.root  | Should -Be (Resolve-Path $tmpl).Path
+        $res.label | Should -Match '^local-'
+        $res.ref   | Should -Be 'local'
+        Remove-Item $qa, $tmpl -Recurse -Force
+    }
+
+    It 'FAIL-guard: a non-existent -TemplateRoot is a clear error (B4)' {
+        $qa = New-Sandbox
+        { Resolve-Tier3Template -TemplateRoot (Join-Path $qa 'nope') -QaRoot $qa } |
+            Should -Throw -ExpectedMessage '*does not exist*'
+        Remove-Item $qa -Recurse -Force
+    }
+
+    It 'FAIL-guard: a -TemplateRoot without a .claude/ template is rejected (B4)' {
+        $qa = New-Sandbox; $tmpl = New-Sandbox   # no .claude
+        { Resolve-Tier3Template -TemplateRoot $tmpl -QaRoot $qa } |
+            Should -Throw -ExpectedMessage '*not a Stadium-8 template*'
+        Remove-Item $qa, $tmpl -Recurse -Force
+    }
+
+    It 'FAIL-guard: -Target and -TemplateRoot together is rejected (B4)' {
+        $qa = New-Sandbox; $tmpl = New-Sandbox; New-Item -ItemType Directory -Path (Join-Path $tmpl '.claude') -Force | Out-Null
+        { Resolve-Tier3Template -Target 'dev' -TemplateRoot $tmpl -QaRoot $qa } |
+            Should -Throw -ExpectedMessage '*not both*'
+        Remove-Item $qa, $tmpl -Recurse -Force
+    }
 }
 
 Describe 'Targeted run — dev/release @ ref (kept separate)' {
