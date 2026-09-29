@@ -36,8 +36,11 @@ function ConvertFrom-ClaudeStream {
     $totalTokens = 0
     $claudeSeconds = 0.0
     $numTurns = 0
+    # B1 — the tool/AUQ/text timeline a post-run scorer re-parses for the silence check + judge.
+    $asks = [System.Collections.Generic.List[hashtable]]::new()
+    $texts = [System.Collections.Generic.List[hashtable]]::new()
 
-    if (-not (Test-Path $Path)) { return @{ turns = @(); totalTokens = 0; claudeSeconds = 0.0; numTurns = 0 } }
+    if (-not (Test-Path $Path)) { return @{ turns = @(); totalTokens = 0; claudeSeconds = 0.0; numTurns = 0; asks = @(); texts = @() } }
 
     foreach ($line in Get-Content -Path $Path -Encoding utf8) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -51,15 +54,26 @@ function ConvertFrom-ClaudeStream {
             $inTok = [int](Get-JsonProp $usage 'input_tokens' 0)
             $outTok = [int](Get-JsonProp $usage 'output_tokens' 0)
             $touched = [System.Collections.Generic.List[string]]::new()
+            $tools = [System.Collections.Generic.List[hashtable]]::new()
+            $turnIndex = $turns.Count + 1
             foreach ($block in @(Get-JsonProp $msg 'content' @())) {
-                if ((Get-JsonProp $block 'type') -ne 'tool_use') { continue }
+                $btype = Get-JsonProp $block 'type'
+                if ($btype -eq 'text') {
+                    $txt = Get-JsonProp $block 'text'
+                    if ($txt) { $texts.Add(@{ turn = $turnIndex; text = [string]$txt }) }
+                    continue
+                }
+                if ($btype -ne 'tool_use') { continue }
+                $name = [string](Get-JsonProp $block 'name')
                 $input = Get-JsonProp $block 'input'
+                $tools.Add(@{ name = $name; input = $input })
+                if ($name -eq 'AskUserQuestion') { $asks.Add(@{ turn = $turnIndex; input = $input }) }
                 $fp = Get-JsonProp $input 'file_path'
                 if ($fp) { $touched.Add([string]$fp) }
                 $cmd = Get-JsonProp $input 'command'
                 if ($cmd) { $touched.Add([string]$cmd) }
             }
-            $turns.Add(@{ index = $turns.Count + 1; inputTokens = $inTok; outputTokens = $outTok; touched = @($touched) })
+            $turns.Add(@{ index = $turnIndex; inputTokens = $inTok; outputTokens = $outTok; touched = @($touched); tools = @($tools) })
             $totalTokens += ($inTok + $outTok)
         }
         elseif ($type -eq 'result') {
@@ -76,7 +90,7 @@ function ConvertFrom-ClaudeStream {
     }
 
     if ($numTurns -eq 0) { $numTurns = $turns.Count }
-    return @{ turns = @($turns); totalTokens = $totalTokens; claudeSeconds = $claudeSeconds; numTurns = $numTurns }
+    return @{ turns = @($turns); totalTokens = $totalTokens; claudeSeconds = $claudeSeconds; numTurns = $numTurns; asks = @($asks); texts = @($texts) }
 }
 
 # Drive the stopwatch from parsed turns. Builds run > model > phase > wphase > turn, and

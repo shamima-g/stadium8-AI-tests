@@ -43,6 +43,33 @@ Describe 'ConvertFrom-ClaudeStream — normalise the events' {
         Remove-Item $s.Dir -Recurse -Force
     }
 
+    It 'PASS: B1 — captures per-turn tool names, AskUserQuestion asks, and assistant text' {
+        $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-stream-b1-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        $path = Join-Path $dir 'stream.jsonl'
+        Set-Content -Path $path -Encoding utf8 -Value @(
+            '{"type":"assistant","message":{"usage":{"input_tokens":1,"output_tokens":1},"content":[{"type":"text","text":"Here is the plan. Approve?"},{"type":"tool_use","name":"AskUserQuestion","input":{"questions":[{"question":"Approve the plan?"}]}}]}}',
+            '{"type":"assistant","message":{"usage":{"input_tokens":1,"output_tokens":1},"content":[{"type":"tool_use","name":"Bash","input":{"command":"git commit -m x"}}]}}',
+            '{"type":"result","subtype":"success","duration_ms":1000,"num_turns":2}'
+        )
+        $p = ConvertFrom-ClaudeStream -Path $path
+        @($p.asks).Count    | Should -Be 1
+        @($p.asks)[0].turn  | Should -Be 1
+        @($p.texts)[0].text | Should -Be 'Here is the plan. Approve?'
+        (@($p.turns)[0].tools | ForEach-Object { $_.name }) | Should -Be 'AskUserQuestion'
+        (@($p.turns)[1].tools | ForEach-Object { $_.name }) | Should -Be 'Bash'
+        Remove-Item $dir -Recurse -Force
+    }
+
+    It 'PASS: B1 — a stream with no AUQ/text yields empty asks/texts (back-compat)' {
+        $s = New-SampleStream
+        $p = ConvertFrom-ClaudeStream -Path $s.Path
+        @($p.asks).Count  | Should -Be 0
+        @($p.texts).Count | Should -Be 0
+        (@($p.turns)[3].tools | ForEach-Object { $_.name }) | Should -Be 'Bash'   # the git-commit turn
+        Remove-Item $s.Dir -Recurse -Force
+    }
+
     It 'PASS: captures the files/commands each turn touched' {
         $s = New-SampleStream
         $p = ConvertFrom-ClaudeStream -Path $s.Path

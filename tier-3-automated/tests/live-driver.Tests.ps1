@@ -82,6 +82,18 @@ Describe 'Event parsing — Read-ClaudeEvent updates state and fires OnTurn' {
         @($seen)[0]       | Should -Be '1=green'      # a web/src .tsx write => green
     }
 
+    It 'PASS: B1 — captures tool name, AskUserQuestion inputs, and assistant text (lazy-init)' {
+        $state = @{ turns = 0; prevGate = 'spec'; partialTokens = 0 }   # NO tool/ask/text keys — B1 must create them
+        Read-ClaudeEvent -Line '{"type":"assistant","message":{"content":[{"type":"text","text":"Approve this plan?"},{"type":"tool_use","name":"AskUserQuestion","input":{"questions":[{"question":"Approve?"}]}}]}}' -State $state -OnTurn $null
+        Read-ClaudeEvent -Line '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"git commit -m x"}}]}}' -State $state -OnTurn $null
+        @($state.asks).Count            | Should -Be 1
+        @($state.asks)[0].turn          | Should -Be 1
+        @($state.asks)[0].input         | Should -Not -BeNullOrEmpty
+        @($state.assistantText)[0].text | Should -Be 'Approve this plan?'
+        (@($state.toolCalls | ForEach-Object { $_.name }) -join ',') | Should -Be 'AskUserQuestion,Bash'
+        @($state.toolCalls)[1].turn     | Should -Be 2   # the Bash call is on the second assistant turn
+    }
+
     It 'FAIL-guard: a non-JSON line is ignored, not fatal' {
         $state = @{ turns = 0; sessionId = $null; model = $null; sawResult = $false; isError = $false; durationMs = 0.0; costUsd = 0.0; tokens = 0; partialTokens = 0; lastType = $null; prevGate = 'spec' }
         { Read-ClaudeEvent -Line 'not json at all' -State $state -OnTurn $null } | Should -Not -Throw
