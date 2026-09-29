@@ -864,6 +864,7 @@ function Get-Tier3PlanEpicSlugs {
 #   parkedEpics          @({ slug; storyCount; dependsOn=@(); onMain; onMainViaDocsPlan; hasEpicBranch; hasBuildCommits })
 #   leftoverPlanBranches @()  leftoverWorktrees @()  projectFactsChanged bool
 #   plannedNewEpic bool  resumedToBuild bool  expectNewEpic/expectBlocked/expectResume bool
+#   expectFactsChange bool  (scenario deliberately drove a project-fact / design-update change)
 function Get-Tier3PlanRulesMissed {
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Facts)
@@ -884,7 +885,14 @@ function Get-Tier3PlanRulesMissed {
     if (@($Facts.leftoverPlanBranches).Count -gt 0 -or @($Facts.leftoverWorktrees).Count -gt 0) {
         $missed.Add('plan-worktree-leftover')                                       # AC4 — throwaway not torn down
     }
-    if ($Facts.projectFactsChanged) { $missed.Add('plan-facts-changed') }           # AC11 — /plan touched project.md
+    # AC11 — an UNEXPECTED project.md change from /plan is a defect; an EXPECTED one (a project-fact
+    # or design-update epic the scenario deliberately drove) is the DESIRED trace, and its ABSENCE is
+    # the defect instead. Mirrors the expectNewEpic/expectResume optional-behaviour flags below.
+    if ($Facts.expectFactsChange) {
+        if (-not $Facts.projectFactsChanged) { $missed.Add('plan-facts-change-missing') }  # AC11 — intended change didn't land
+    } elseif ($Facts.projectFactsChanged) {
+        $missed.Add('plan-facts-changed')                                                   # AC11 — /plan touched project.md unbidden
+    }
 
     # Optional behaviours the scenario asked for — flag only when it drove them.
     if ($Facts.expectNewEpic -and -not $Facts.plannedNewEpic) { $missed.Add('plan-new-epic-missing') }   # AC3b
@@ -936,7 +944,7 @@ function Get-Tier3PlanFacts {
         [string]$WorktreeParent,
         [hashtable]$Expect
     )
-    $expect = if ($Expect) { $Expect } else { @{ expectNewEpic = $true; expectBlocked = $true; expectResume = $true } }
+    $expect = if ($Expect) { $Expect } else { @{ expectNewEpic = $true; expectBlocked = $true; expectResume = $true; expectFactsChange = $false } }
 
     # Branches: an epic/<slug> means build started; a plan/<slug> left behind means teardown missed.
     $branches = @(); try { $branches = @(& git -C $Scaffold branch "--format=%(refname:short)" 2>$null) } catch { }
@@ -1027,6 +1035,7 @@ function Get-Tier3PlanFacts {
         expectNewEpic        = [bool]$expect.expectNewEpic
         expectBlocked        = [bool]$expect.expectBlocked
         expectResume         = [bool]$expect.expectResume
+        expectFactsChange    = [bool]$expect.expectFactsChange
     }
 }
 

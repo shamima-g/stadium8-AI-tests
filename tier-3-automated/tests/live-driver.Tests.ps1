@@ -499,6 +499,7 @@ Describe 'PLAN-A — plan conformance rules (record-only)' {
                 expectNewEpic        = $true
                 expectBlocked        = $true
                 expectResume         = $true
+                expectFactsChange    = $false
             }
         }
     }
@@ -549,9 +550,19 @@ Describe 'PLAN-A — plan conformance rules (record-only)' {
         Get-Tier3PlanRulesMissed -Facts $g | Should -Contain 'plan-worktree-leftover'
     }
 
-    It 'FAIL-guard: /plan changed project.md => plan-facts-changed (AC11)' {
-        $f = New-CleanPlanFacts; $f.projectFactsChanged = $true
+    It 'FAIL-guard: an UNBIDDEN /plan project.md change => plan-facts-changed (AC11)' {
+        $f = New-CleanPlanFacts; $f.projectFactsChanged = $true   # expectFactsChange stays $false
         Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-facts-changed'
+    }
+
+    It 'PASS: an EXPECTED fact change (project-fact / design-update epic) is credited, not flagged (B3)' {
+        $f = New-CleanPlanFacts; $f.expectFactsChange = $true; $f.projectFactsChanged = $true
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Not -Contain 'plan-facts-changed'
+    }
+
+    It 'FAIL-guard: an EXPECTED fact change that did NOT land => plan-facts-change-missing (B3)' {
+        $f = New-CleanPlanFacts; $f.expectFactsChange = $true; $f.projectFactsChanged = $false
+        Get-Tier3PlanRulesMissed -Facts $f | Should -Contain 'plan-facts-change-missing'
     }
 
     It 'FAIL-guard: the brand-new-epic path was not exercised => plan-new-epic-missing (AC3b)' {
