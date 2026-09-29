@@ -292,6 +292,31 @@ export function claimsClosedList(sectionText: string): boolean {
   return /(no other role|only these roles|closed list|no others?)\b/i.test(line);
 }
 
+/**
+ * B2 — the PROJECT-side role names, from `project.md` §Roles & Permissions. INTAKE writes a permissions
+ * matrix whose first column is "Permission" and whose remaining **column headings are the role names**
+ * (see `.claude/shared/roles-snippets.md` — e.g. `| Permission | Owner | Admin | Member | Viewer |`).
+ * These are the "exact backend strings" the overview's Roles bullet must equal, so this is the
+ * ground-truth side for `roleSetEquals`. Heading-case tolerant; returns [] when the section or its
+ * table isn't found (fail-closed — an empty set never spuriously equals a real overview list).
+ */
+export function parseProjectRoles(projectMd: string): string[] {
+  const lines = projectMd.split(/\r?\n/);
+  const start = lines.findIndex((l) => /^#{1,6}\s+§?\s*Roles\s*&\s*Permissions\b/i.test(l));
+  const from = start === -1 ? 0 : start + 1;
+  let end = lines.length;
+  for (let i = from; i < lines.length; i++) { if (/^#{1,6}\s/.test(lines[i])) { end = i; break; } }
+  for (let i = from; i < end - 1; i++) {
+    const header = lines[i];
+    const sep = lines[i + 1];
+    if (!/^\s*\|.*\|\s*$/.test(header)) continue;            // a `| … |` table row
+    if (!/^\s*\|[-:| ]*-[-:| ]*\|\s*$/.test(sep)) continue;  // followed by the `|---|---|` separator
+    const cells = header.split('|').slice(1, -1).map((c) => c.replace(/`/g, '').trim());
+    return cells.slice(1).filter(Boolean); // drop the leading "Permission" column; the rest are roles
+  }
+  return [];
+}
+
 // ── Critical Rules / Policies unchanged BY INTAKE (self-diff, never vs a frozen template) ──────
 
 /** The raw text of a `## ` section, heading through the line before the next `## ` (or EOF). Fence-aware. */
@@ -321,4 +346,53 @@ export function criticalRulesAndPoliciesUnchanged(before: string, after: string)
     normSpan(beforeCR) === normSpan(sectionSpan(after, '## Critical Rules')) &&
     normSpan(beforePol) === normSpan(sectionSpan(after, '## Policies'))
   );
+}
+
+// ── B5 — Tier-2/3 orchestrator: run every project-overview check over a captured CLAUDE.md ──────
+
+export interface OverviewAudit {
+  found: boolean;
+  structure: Structure;
+  budget: Budget;
+  leaks: Leak[];
+  roles: { overview: string[]; project: string[]; equal: boolean; closedListClaimed: boolean };
+  /** Only computed when a pre-write baseline is supplied; `undefined` means "not checked". */
+  crPoliciesUnchanged?: boolean;
+  ok: boolean;
+  reasons: string[];
+}
+
+/**
+ * Bundle the whole overview verification over one captured `CLAUDE.md`. Pure over strings — the caller
+ * reads `golden.root/CLAUDE.md` (via `resolveShippedUserFile`) + `generated-docs/project.md`, and — for
+ * the byte-for-byte self-diff — the PRE-write `CLAUDE.md`. `crPoliciesUnchanged` is only meaningful with
+ * that baseline, so it's optional. This is what the parked intake Tier-2/Tier-3 todos will call once a
+ * capture exists; it composes the already-built checks so no assertion logic lives in the test file.
+ */
+export function auditOverview(claudeMd: string, projectMd: string, baselineClaudeMd?: string): OverviewAudit {
+  const section = extractSection(claudeMd);
+  const structure = analyzeStructure(section.text);
+  const budget = withinBudget(section);
+  const leaks = neverPresentTokenLeaks(section.text);
+  const overviewRoles = parseOverviewRoles(section.text);
+  const projectRoles = parseProjectRoles(projectMd);
+  const roles = {
+    overview: overviewRoles,
+    project: projectRoles,
+    equal: roleSetEquals(overviewRoles, projectRoles),
+    closedListClaimed: claimsClosedList(section.text),
+  };
+  const crPoliciesUnchanged =
+    baselineClaudeMd === undefined ? undefined : criticalRulesAndPoliciesUnchanged(baselineClaudeMd, claudeMd);
+
+  const reasons: string[] = [];
+  if (!section.found) reasons.push('no ## Project Overview section');
+  if (!structure.ok) reasons.push(`structure: ${structure.reasons.join('; ')}`);
+  if (!budget.ok) reasons.push(`budget: ${budget.lineCount} lines / ${budget.wordCount} words`);
+  if (leaks.length) reasons.push(`leaks: ${leaks.map((l) => l.kind).join(', ')}`);
+  if (!roles.equal) reasons.push(`roles ${JSON.stringify(roles.overview)} != project ${JSON.stringify(roles.project)}`);
+  if (!roles.closedListClaimed) reasons.push('roles bullet does not assert the closed list');
+  if (crPoliciesUnchanged === false) reasons.push('Critical Rules / Policies changed across the write');
+
+  return { found: section.found, structure, budget, leaks, roles, crPoliciesUnchanged, ok: reasons.length === 0, reasons };
 }

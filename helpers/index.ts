@@ -61,9 +61,11 @@ export {
   analyzeStructure,
   neverPresentTokenLeaks,
   parseOverviewRoles,
+  parseProjectRoles,
   roleSetEquals,
   claimsClosedList,
   sectionSpan,
   criticalRulesAndPoliciesUnchanged,
+  auditOverview,
 } from './project-overview';
-export type { ShippedUserFile, Section, Budget, Structure, Leak } from './project-overview';
+export type { ShippedUserFile, Section, Budget, Structure, Leak, OverviewAudit } from './project-overview';

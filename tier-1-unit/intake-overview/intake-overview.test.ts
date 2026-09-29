@@ -26,9 +26,11 @@ import {
   analyzeStructure,
   neverPresentTokenLeaks,
   parseOverviewRoles,
+  parseProjectRoles,
   roleSetEquals,
   claimsClosedList,
   criticalRulesAndPoliciesUnchanged,
+  auditOverview,
 } from '../../helpers/project-overview';
 import {
   statesBudget,
@@ -353,6 +355,65 @@ describe('fact agreement — set-equality, not subset (catches a dropped 3rd rol
   it('claimsClosedList detects the "no other role exists" assertion', () => {
     expect(claimsClosedList(GOOD)).toBe(true);
     expect(claimsClosedList('- Roles: `Importer`, `Approver`.')).toBe(false);
+  });
+});
+
+// ─── Phase 0 · B2 — project.md §Roles & Permissions parser (the ground-truth role side) ──────────
+describe('parseProjectRoles — column headings of the §Roles & Permissions matrix', () => {
+  const PROJECT_MD = [
+    '# Project', '',
+    '## Roles & Permissions', '',
+    '| Permission | Importer | Approver |',
+    '|---|---|---|',
+    '| Upload files | ✓ | |',
+    '| Approve | | ✓ |', '',
+    '## Authentication', '', 'Server-side session cookie.',
+  ].join('\n');
+
+  it('returns the role columns (dropping the leading "Permission" column)', () => {
+    expect(parseProjectRoles(PROJECT_MD)).toEqual(['Importer', 'Approver']);
+  });
+  it('is heading-case / §-prefix tolerant and stops at the next heading', () => {
+    expect(parseProjectRoles(PROJECT_MD.replace('## Roles & Permissions', '## §Roles & permissions'))).toEqual(['Importer', 'Approver']);
+  });
+  it('strips backticks and handles 4-role matrices', () => {
+    const md = '## Roles & Permissions\n\n| Permission | `Owner` | `Admin` | `Member` | `Viewer` |\n|---|---|---|---|---|\n| View | ✓ | ✓ | ✓ | ✓ |';
+    expect(parseProjectRoles(md)).toEqual(['Owner', 'Admin', 'Member', 'Viewer']);
+  });
+  it('fail-closed: no section or no table → [] (never spuriously equals a real overview list)', () => {
+    expect(parseProjectRoles('# Project\n\nNo roles here.')).toEqual([]);
+    expect(parseProjectRoles('## Roles & Permissions\n\nProse, no table.')).toEqual([]);
+  });
+  it('round-trips with roleSetEquals against the overview side', () => {
+    expect(roleSetEquals(parseOverviewRoles(GOOD), parseProjectRoles(PROJECT_MD))).toBe(true);
+  });
+});
+
+// ─── Phase 0 · B5 — auditOverview orchestrator (bundles the checks Tier-2/3 will call) ───────────
+describe('auditOverview — one call runs every project-overview check over a captured CLAUDE.md', () => {
+  const PROJECT_MD =
+    '## Roles & Permissions\n\n| Permission | Importer | Approver |\n|---|---|---|\n| Upload | ✓ | |\n';
+  const CLAUDE = `# CLAUDE.md\n\n${GOOD}\n\n## Critical Rules\n\n### 1. Use Shadcn\n\n## Policies\n\n- Auth intake\n`;
+
+  it('OK on a well-formed overview that agrees with project.md', () => {
+    const a = auditOverview(CLAUDE, PROJECT_MD);
+    expect(a.ok, a.reasons.join(' | ')).toBe(true);
+    expect(a.roles.equal).toBe(true);
+    expect(a.roles.closedListClaimed).toBe(true);
+    expect(a.leaks).toEqual([]);
+  });
+  it('NOT ok when project.md has a role the overview omitted (dropped 3rd role)', () => {
+    const a = auditOverview(CLAUDE, PROJECT_MD.replace('| Importer | Approver |', '| Importer | Approver | Auditor |').replace('|---|---|', '|---|---|---|'));
+    expect(a.ok).toBe(false);
+    expect(a.roles.equal).toBe(false);
+  });
+  it('self-diff runs only when a baseline is given; flags a touched Critical Rules', () => {
+    expect(auditOverview(CLAUDE, PROJECT_MD).crPoliciesUnchanged).toBeUndefined();
+    expect(auditOverview(CLAUDE, PROJECT_MD, CLAUDE).crPoliciesUnchanged).toBe(true);
+    const tampered = CLAUDE.replace('### 1. Use Shadcn', '### 1. Use Shadcn\n### 2. Injected');
+    const a = auditOverview(tampered, PROJECT_MD, CLAUDE);
+    expect(a.crPoliciesUnchanged).toBe(false);
+    expect(a.ok).toBe(false);
   });
 });
 
