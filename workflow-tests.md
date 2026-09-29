@@ -580,11 +580,11 @@ really is present there. If cross-version-clean is wanted, gate them on a behavi
 
 ### Post-v1.3.0 additions (branch `test/continue-no-epic-and-resume-confirm`)
 
-New test modules added for three template reworks. Each follows [section 2](#2-the-rules-every-test-follows)
-(good **and** broken case, isolated); the test-first ones are **feature-detected** — they skip, never
-fail, on templates without the surface. **Honest split — only one is built coverage of a shipped
-surface; the other two are test-first for features not in v1.3.0** and must not be folded into the
-v1.3.0 baseline count above:
+New test modules added for four template reworks. Each follows [section 2](#2-the-rules-every-test-follows)
+(good **and** broken case, isolated); the test-first ones are **feature-detected** where noted — they
+skip, never fail, on templates without the surface (one exception is called out below). **Honest split —
+only one is built coverage of a shipped surface; the other three are test-first for features not in
+v1.3.0** and must not be folded into the v1.3.0 baseline count above:
 
 - **`/plan` epic-scope — BUILT, green vs v1.3.0** (`tier-1-unit/plan-scope/`). `/plan` handling
   project-fact-change and design-update epics is *shipped*, so these are real Tier-1 coverage:
@@ -601,6 +601,20 @@ v1.3.0 baseline count above:
   (green) + a give-up-plainness helper; the **behavioural checks are manual** (the `manual-tests/` docs
   on the template checkout's `qa/test-plans` branch, not in this harness) because the message-tagging
   that would automate them was declined (Option 3). Not in v1.3.0.
+- **CLAUDE.md `## Project Overview` — TEST-FIRST, static-guards-only** (`tier-1-unit/intake-overview/`).
+  The `[Unreleased]` "CLAUDE.md now describes your app" feature: INTAKE writes a lean `## Project
+  Overview`, every epic merge re-checks it against `project.md`, and `/upgrade` backfills it into an
+  older CLAUDE.md. **Only the wording/wiring is guarded** — mutation-coupled static checks over the
+  `shared/project-overview.md` spec and the `start`/`continue`/`upgrade` prose (green vs the
+  `28-09-2026` snapshot), plus a reusable analysis core (`helpers/project-overview.ts`) that the
+  behavioural checks will call (most executing tests are pure-function unit tests over *that* helper,
+  not the template). **All behavioural verification is `it.todo` and blocked** (12 todos: 5 Tier-2 +
+  7 Tier-3) — the actual write, silence, budget on real output, the merge re-check and the upgrade
+  backfill need a second golden-run slot, a live intake scenario + `AskUserQuestion` extractor, and a
+  mergeable / `-Target release` sandbox. Not in v1.3.0; must not be folded into the baseline. **Caveat:**
+  its regression block is gated on `TEMPLATE_PRESENT`, **not** on the surface, so on a pre-feature
+  template it goes **red, not skip** (unlike the modules above) — a surface probe is the follow-up if
+  cross-version-clean is wanted. Plans: `test-plans/{intake-claudemd-project-overview,merge-claudemd-recheck,upgrade-backfill-claudemd}-test-plan.md`.
 - **Tier-3 output-quality judge — record-only** (`tier-3-automated/judge/`). Rubric + calibration +
   scoring math run **under vitest** (in the vitest `include`), *not* the Pester `test:tier3-unit`
   suite; the model call is an unimplemented `JudgeAdapter` seam. See [tier-3.md](tier-3.md).
@@ -690,6 +704,16 @@ both **heavily covered by the template's co-located `generate-build-effort.tests
 graceful degradation, the rate reaching every figure). The maintainer subprocess wiring is already
 exercised end-to-end by #9. Re-testing them here would duplicate co-located coverage (§13.6), so
 they're left where they live.
+
+**Worktree-cost gap tests (post-v1.3.0) — held as a patch, not landed.** A later `[Unreleased]` change
+makes the cost sweep **case-insensitive** (a differently-cased worktree folder is counted) and names the
+session folders that fed the figures. The case-insensitive worktree *accept* is already covered co-located
+by `report-core.tests.js` (the "differently-cased worktree still counts" test — the inclusion half of #8).
+Three additional **cost-wiring** gap tests (out-of-window spend raises `overheadCost`/`costUplift`, not
+in-story; the named-folder list tracks the store; the count coexists with the sub-agent warning) extend
+`generate-build-effort.tests.js` (#6) — but are **carried as a reapplyable patch**
+(`template-script-tests/build-report-worktree-cost/`), **not yet landed** upstream. Kept co-located per
+§13.6, not duplicated in this suite; landing the patch upstream is the follow-up.
 
 The remaining rows are the **Tier-3 live** ones (#14–15: design read-back at Intake, and
 update-design-mid-project), which need a real AI run.
