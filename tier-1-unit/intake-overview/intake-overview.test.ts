@@ -47,6 +47,7 @@ import {
   markCompleteStagesClaudeMd,
   staleIncludesMissingFact,
   upgradeLeavesOverviewAlone,
+  mergeRecheckOnLocalMergePath,
 } from './rules';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -178,6 +179,14 @@ describe('wiring guards — start.md / continue.md (mutation-coupled)', () => {
       mergeRecheckWired("First bring `CLAUDE.md`'s `## Project Overview` into line with `generated-docs/project.md`, per [project-overview.md](../shared/project-overview.md)."),
     ).toBe(true);
     expect(mergeRecheckWired('Flip the phase to COMPLETE and commit on main.')).toBe(false);
+  });
+
+  it('mergeRecheckOnLocalMergePath (option b): local-merge path runs B7.2.6 vs the stock dead-end', () => {
+    const optB = 'Then check the remote. When `git remote -v` is empty there is no PR, but the post-merge tidy-up must still run. So merge locally and go straight to **B7.2.6**.';
+    expect(mergeRecheckOnLocalMergePath(optB)).toBe(true);
+    // stock template: the no-remote path short-circuits before B7.2.6.
+    const stock = "Then check the remote; if `git remote -v` is empty, the rest of B7.2 doesn't apply — merge it yourself and end /continue.";
+    expect(mergeRecheckOnLocalMergePath(stock)).toBe(false);
   });
 
   it('mergeLeavesCleanWhenNoChange pins the WHOLE no-op expression (5 real regressions go red)', () => {

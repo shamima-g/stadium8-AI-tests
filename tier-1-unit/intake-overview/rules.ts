@@ -171,6 +171,21 @@ export function mergeRecheckWired(continueMd: string): boolean {
 }
 
 /**
+ * Option (b): does the NO-REMOTE (local-merge) path ALSO run the B7.2.6 re-check, instead of
+ * short-circuiting before it? The stock template dead-ends when there's no remote ("the rest of
+ * B7.2 doesn't apply … end /continue"), so the summary is re-checked only on the GitHub-PR path.
+ * The mock routes the local merge on to B7.2.6, so the re-check runs offline too — which is what
+ * lets the merge behaviour be tested WITHOUT a real GitHub sandbox. True on the option-(b) mock,
+ * false on the stock template.
+ */
+export function mergeRecheckOnLocalMergePath(continueMd: string): boolean {
+  const region = /git remote -v[\s\S]{0,600}/i.exec(continueMd.replace(/\s+/g, ' '))?.[0] ?? '';
+  const routesToRecheck = /(go straight to|continue at)\s*\*{0,2}B7\.2\.6|post-merge tidy-up must still run/i.test(region);
+  const deadEnds = /rest of B7\.2 doesn'?t apply/i.test(region);
+  return routesToRecheck && !deadEnds;
+}
+
+/**
  * B7.2.6 leaves CLAUDE.md alone when nothing was stale — the idempotence no-op that stops the file
  * churning. Pins the WHOLE bash expression (a `git checkout` fragment grep stays green under `||`→`&&`,
  * dropped `--quiet`, a repointed pathspec, or a deleted `git diff --quiet` half that ALWAYS discards
