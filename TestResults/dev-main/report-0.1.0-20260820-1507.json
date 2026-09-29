@@ -1,0 +1,27 @@
+{
+  "version": "0.1.0",
+  "fileStamp": "20260820-1507",
+  "runIso": "2026-08-20 15:07:16",
+  "runFriendly": "20 August 2026, 3:07pm",
+  "overall": "pass",
+  "counts": {
+    "total": 465,
+    "passed": 460,
+    "failed": 0,
+    "skipped": 5
+  },
+  "durationMs": 31721.21630859375,
+  "linesOfCode": null,
+  "runBy": "shamima-g",
+  "machine": "SHAMIMA-NB",
+  "tokens": null,
+  "costUsd": null,
+  "target": "dev",
+  "ref": "main",
+  "label": "dev-main",
+  "command": "node scripts/generate-test-report.cjs --label dev-main --target dev --ref main",
+  "repository": "https://github.com/stadium-software/stadium-8",
+  "branch": "main (commit 26cc1d4)",
+  "versionTested": "main",
+  "report": "report-0.1.0-20260820-1507.md"
+}
