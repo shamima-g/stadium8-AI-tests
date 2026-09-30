@@ -31,7 +31,9 @@ import { spawnSync } from 'node:child_process';
 const DEFAULT_DIR = path.resolve(__dirname, '..', 'fixtures', 'golden-run');
 const SLOTS_ROOT = path.resolve(__dirname, '..', 'fixtures', 'golden-runs');
 
-/** The fixture dir for a slot: the original single dir by default, `fixtures/golden-runs/<slot>/` when named. */
+/** The fixture dir for a slot: the original single dir by default, `fixtures/golden-runs/<slot>/` when named.
+ *  `slot` is a trusted, test-authored fixture name (not external input) — it is joined verbatim and NOT
+ *  sanitised, so callers must not pass a traversing (`../`) or absolute value. */
 function slotDir(slot?: string): string {
   return slot ? path.join(SLOTS_ROOT, slot) : DEFAULT_DIR;
 }

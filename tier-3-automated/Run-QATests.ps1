@@ -124,8 +124,17 @@ function Find-IncompleteRun {
 # history, charts, or estimates. Mirrors the label Resolve-Tier3Template returns for the same input.
 function Get-Tier3TargetLabel {
     param([string]$Target, [string]$Ref, [string]$TemplateRoot)
-    # Pure-string leaf of the checkout path: strip trailing separators, then everything up to the last.
-    if ($TemplateRoot) { $leaf = ($TemplateRoot -replace '[\\/]+$', '') -replace '.*[\\/]', ''; return "local-$leaf" }
+    if ($TemplateRoot) {
+        # Own results world per local checkout. Disambiguate by a short hash of the FULL path — two
+        # checkouts sharing a last segment (git worktrees, or two clones named the same) must NOT merge
+        # into one world. Sanitise the leaf so a degenerate path (drive root, trailing dot) can't yield
+        # a label with a char illegal in a folder name (which would crash the run at New-Item).
+        $norm = $TemplateRoot -replace '[\\/]+$', ''
+        $leaf = (($norm -replace '.*[\\/]', '') -replace '[^A-Za-z0-9._-]', '_').TrimEnd('.')
+        $bytes = [System.Security.Cryptography.SHA1]::HashData([System.Text.Encoding]::UTF8.GetBytes($norm.ToLowerInvariant()))
+        $h = ([System.BitConverter]::ToString($bytes) -replace '-', '').Substring(0, 8).ToLowerInvariant()
+        return $(if ($leaf) { "local-$leaf-$h" } else { "local-$h" })
+    }
     if (-not $Target) { return $null }
     $r = if ($Ref) { $Ref } else { 'default' }
     return "$Target-$r"
@@ -189,7 +198,8 @@ function Resolve-Tier3Template {
         $resolved = $null
         try { $resolved = (Resolve-Path -LiteralPath $TemplateRoot -ErrorAction Stop).Path } catch { throw "TemplateRoot '$TemplateRoot' does not exist." }
         if (-not (Test-Path (Join-Path $resolved '.claude') -PathType Container)) { throw "TemplateRoot '$resolved' is not a Stadium-8 template — no .claude/ directory." }
-        return @{ root = $resolved; label = "local-$(Split-Path $resolved -Leaf)"; ref = 'local' }
+        # Single-source the label so provenance matches the results world (collision-safe hash + all).
+        return @{ root = $resolved; label = (Get-Tier3TargetLabel -TemplateRoot $resolved); ref = 'local' }
     }
     if (-not $Target) {
         return @{ root = (Resolve-Path (Join-Path $QaRoot '..')).Path; label = $null; ref = $null }

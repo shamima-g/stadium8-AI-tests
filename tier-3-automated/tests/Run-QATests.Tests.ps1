@@ -85,11 +85,23 @@ Describe 'Target label slug' {
         Get-Tier3TargetLabel -Target 'release' -Ref 'v1.1.0' | Should -Be 'release-v1.1.0'
         Get-Tier3TargetLabel -Target 'dev'                    | Should -Be 'dev-default'
     }
-    It 'PASS: -TemplateRoot gets its own per-checkout local- results world so a capture never pollutes the baseline (B4)' {
-        Get-Tier3TargetLabel -TemplateRoot 'C:\temp\stadium-builder-template-mock-test'  | Should -Be 'local-stadium-builder-template-mock-test'
-        Get-Tier3TargetLabel -TemplateRoot 'C:\temp\stadium-builder-template-mock-test\' | Should -Be 'local-stadium-builder-template-mock-test'  # trailing slash tolerated
+    It 'PASS: -TemplateRoot gets its own per-checkout local- world (leaf + path hash) so a capture never pollutes the baseline (B4)' {
+        Get-Tier3TargetLabel -TemplateRoot 'C:\temp\stadium-builder-template-mock-test'  | Should -Match '^local-stadium-builder-template-mock-test-[0-9a-f]{8}$'
+        # trailing slash tolerated → identical label
+        (Get-Tier3TargetLabel -TemplateRoot 'C:\temp\mock') | Should -Be (Get-Tier3TargetLabel -TemplateRoot 'C:\temp\mock\')
         # -TemplateRoot wins over an empty target and never returns the null (baseline) key.
-        Get-Tier3TargetLabel -Target '' -TemplateRoot 'C:\x\feat' | Should -Be 'local-feat'
+        Get-Tier3TargetLabel -Target '' -TemplateRoot 'C:\x\feat' | Should -Match '^local-feat-[0-9a-f]{8}$'
+    }
+    It 'PASS: two checkouts sharing a last segment get DIFFERENT worlds (collision-safe, B4)' {
+        $a = Get-Tier3TargetLabel -TemplateRoot 'C:\a\feat'
+        $b = Get-Tier3TargetLabel -TemplateRoot 'C:\b\feat'
+        $a | Should -Not -Be $b            # same leaf, different full path → different world
+        $a | Should -Match '^local-feat-[0-9a-f]{8}$'
+    }
+    It 'PASS: a degenerate leaf is sanitised to a legal folder name — no crash-causing chars (B4)' {
+        $lbl = Get-Tier3TargetLabel -TemplateRoot 'C:\'   # drive root → colon must be sanitised, not left in a path
+        $lbl | Should -Not -Match ':'
+        $lbl | Should -Match '[0-9a-f]{8}$'
     }
 }
 

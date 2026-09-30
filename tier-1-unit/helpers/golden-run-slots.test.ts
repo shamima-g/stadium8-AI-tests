@@ -20,6 +20,21 @@ describe('loadGoldenRun — named slots (B8)', () => {
     expect(g.hasGit).toBe(false);
   });
 
+  it('a named slot present but EMPTY fails closed with the slot-labelled reason', () => {
+    const slot = `__b8-empty-${Date.now()}__`;
+    const dir = path.join(SLOTS_ROOT, slot);
+    const createdRoot = !fs.existsSync(SLOTS_ROOT);
+    fs.mkdirSync(dir, { recursive: true }); // no repo.bundle, no generated-docs/
+    try {
+      const g = loadGoldenRun(slot);
+      expect(g.present).toBe(false);
+      expect(g.reason).toMatch(new RegExp(`golden-runs/${slot}/ exists but has neither`));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      if (createdRoot) { try { fs.rmdirSync(SLOTS_ROOT); } catch { /* ignore */ } }
+    }
+  });
+
   it('loads a docs-only named slot, isolated under fixtures/golden-runs/<slot>/', () => {
     const slot = `__b8-test-${Date.now()}__`;
     const dir = path.join(SLOTS_ROOT, slot);
