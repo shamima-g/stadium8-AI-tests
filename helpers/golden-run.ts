@@ -2,8 +2,13 @@
  * loadGoldenRun() — loads the committed recording of one real end-to-end workflow run
  * that the Tier-2 recorded-run invariants replay (no live AI at test time).
  *
+ * Slots (B8): the DEFAULT run lives in `fixtures/golden-run/` (`loadGoldenRun()`, unchanged). A NAMED
+ * run lives in `fixtures/golden-runs/<slot>/` (`loadGoldenRun('<slot>')`) — so a second capture (e.g.
+ * an intake run, or a parked design-update run) can sit alongside the original `minimal-concurrent`
+ * one instead of overwriting it. Both slots take exactly the same two forms below.
+ *
  * A golden run is captured once by hand (see fixtures/golden-run/README.md) and lives
- * in `fixtures/golden-run/` in one of two forms:
+ * in its slot dir in one of two forms:
  *
  *   1. `repo.bundle`      — a `git bundle create … --all` of the repo AFTER an epic has
  *                           been built and merged to `main`. Preferred: it carries the
@@ -23,10 +28,17 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
-const FIXTURE_DIR = path.resolve(__dirname, '..', 'fixtures', 'golden-run');
-const BUNDLE = path.join(FIXTURE_DIR, 'repo.bundle');
-const DOCS_IN_FIXTURE = path.join(FIXTURE_DIR, 'generated-docs');
-const META = path.join(FIXTURE_DIR, 'meta.json');
+const DEFAULT_DIR = path.resolve(__dirname, '..', 'fixtures', 'golden-run');
+const SLOTS_ROOT = path.resolve(__dirname, '..', 'fixtures', 'golden-runs');
+
+/** The fixture dir for a slot: the original single dir by default, `fixtures/golden-runs/<slot>/` when named. */
+function slotDir(slot?: string): string {
+  return slot ? path.join(SLOTS_ROOT, slot) : DEFAULT_DIR;
+}
+/** Human label for messages: matches which dir a slot resolves to. */
+function slotLabel(slot?: string): string {
+  return slot ? `fixtures/golden-runs/${slot}/` : 'fixtures/golden-run/';
+}
 
 export interface GoldenRun {
   /** True when a usable golden run (bundle or docs tree) is present. */
@@ -47,21 +59,26 @@ export interface GoldenRun {
   cleanup: () => void;
 }
 
-function readMeta(): Record<string, unknown> {
+function readMeta(dir: string): Record<string, unknown> {
   try {
-    return JSON.parse(fs.readFileSync(META, 'utf8'));
+    return JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));
   } catch {
     return {};
   }
 }
 
-function absent(reason: string): GoldenRun {
-  return { present: false, reason, hasGit: false, root: null, docsDir: null, git: null, meta: readMeta(), cleanup: () => {} };
+function absent(dir: string, reason: string): GoldenRun {
+  return { present: false, reason, hasGit: false, root: null, docsDir: null, git: null, meta: readMeta(dir), cleanup: () => {} };
 }
 
-export function loadGoldenRun(): GoldenRun {
+/** Load a golden run. Omit `slot` for the default `fixtures/golden-run/`; pass a name for a slot under `fixtures/golden-runs/`. */
+export function loadGoldenRun(slot?: string): GoldenRun {
+  const FIXTURE_DIR = slotDir(slot);
+  const BUNDLE = path.join(FIXTURE_DIR, 'repo.bundle');
+  const DOCS_IN_FIXTURE = path.join(FIXTURE_DIR, 'generated-docs');
+  const label = slotLabel(slot);
   if (!fs.existsSync(FIXTURE_DIR)) {
-    return absent(`no fixtures/golden-run/ directory — capture a run first (see fixtures/golden-run/README.md)`);
+    return absent(FIXTURE_DIR, `no ${label} directory — capture a run first (see fixtures/golden-run/README.md)`);
   }
 
   // Preferred: a git bundle. Clone it into a temp working tree (default branch = main).
@@ -74,7 +91,7 @@ export function loadGoldenRun(): GoldenRun {
     const clone = spawnSync('git', ['clone', '--quiet', BUNDLE, root], { encoding: 'utf8' });
     if (clone.status !== 0) {
       fs.rmSync(root, { recursive: true, force: true });
-      return absent(`fixtures/golden-run/repo.bundle could not be cloned: ${clone.stderr?.trim()}`);
+      return absent(FIXTURE_DIR, `${label}repo.bundle could not be cloned: ${clone.stderr?.trim()}`);
     }
     return {
       present: true,
@@ -83,7 +100,7 @@ export function loadGoldenRun(): GoldenRun {
       root,
       docsDir: path.join(root, 'generated-docs'),
       git,
-      meta: readMeta(),
+      meta: readMeta(FIXTURE_DIR),
       cleanup: () => { try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* ignore */ } },
     };
   }
@@ -97,10 +114,10 @@ export function loadGoldenRun(): GoldenRun {
       root: FIXTURE_DIR,
       docsDir: DOCS_IN_FIXTURE,
       git: null,
-      meta: readMeta(),
+      meta: readMeta(FIXTURE_DIR),
       cleanup: () => {},
     };
   }
 
-  return absent(`fixtures/golden-run/ exists but has neither repo.bundle nor generated-docs/ — capture a run (see its README.md)`);
+  return absent(FIXTURE_DIR, `${label} exists but has neither repo.bundle nor generated-docs/ — capture a run (see its README.md)`);
 }
