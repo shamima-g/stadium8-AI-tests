@@ -85,6 +85,12 @@ Describe 'Target label slug' {
         Get-Tier3TargetLabel -Target 'release' -Ref 'v1.1.0' | Should -Be 'release-v1.1.0'
         Get-Tier3TargetLabel -Target 'dev'                    | Should -Be 'dev-default'
     }
+    It 'PASS: -TemplateRoot gets its own per-checkout local- results world so a capture never pollutes the baseline (B4)' {
+        Get-Tier3TargetLabel -TemplateRoot 'C:\temp\stadium-builder-template-mock-test'  | Should -Be 'local-stadium-builder-template-mock-test'
+        Get-Tier3TargetLabel -TemplateRoot 'C:\temp\stadium-builder-template-mock-test\' | Should -Be 'local-stadium-builder-template-mock-test'  # trailing slash tolerated
+        # -TemplateRoot wins over an empty target and never returns the null (baseline) key.
+        Get-Tier3TargetLabel -Target '' -TemplateRoot 'C:\x\feat' | Should -Be 'local-feat'
+    }
 }
 
 Describe 'Resolve-Tier3Template' {

@@ -117,10 +117,15 @@ function Find-IncompleteRun {
     return $null
 }
 
-# The results/label slug for a target@ref, or $null when building the local template.
+# The results/label slug for a run, or $null when building the QA-nested local template (the default).
 # e.g. ('release','v1.1.0') -> 'release-v1.1.0'; ('dev',$null) -> 'dev-default'.
+# A -TemplateRoot run (an arbitrary LOCAL checkout — e.g. an [Unreleased] feature branch) gets its own
+# 'local-<leaf>' world too, so a capture against it never mixes into / pollutes the baseline benchmark's
+# history, charts, or estimates. Mirrors the label Resolve-Tier3Template returns for the same input.
 function Get-Tier3TargetLabel {
-    param([string]$Target, [string]$Ref)
+    param([string]$Target, [string]$Ref, [string]$TemplateRoot)
+    # Pure-string leaf of the checkout path: strip trailing separators, then everything up to the last.
+    if ($TemplateRoot) { $leaf = ($TemplateRoot -replace '[\\/]+$', '') -replace '.*[\\/]', ''; return "local-$leaf" }
     if (-not $Target) { return $null }
     $r = if ($Ref) { $Ref } else { 'default' }
     return "$Target-$r"
@@ -266,7 +271,7 @@ function Invoke-RunQATests {
     # its own "<benchmark>@<target>-<ref>" world so its history, charts, and estimates
     # never mix with the local-template runs — the same "separated per benchmark" rule,
     # extended to the target. Without -Target this is just "<benchmark>", as before.
-    $targetLabel = Get-Tier3TargetLabel -Target $Target -Ref $Ref
+    $targetLabel = Get-Tier3TargetLabel -Target $Target -Ref $Ref -TemplateRoot $TemplateRoot
     $resultsKey  = if ($targetLabel) { "$Benchmark@$targetLabel" } else { $Benchmark }
     # A PLAN-A/PLAN-B run gets its own results world so its (deliberately partial, or two-session)
     # metrics never mix with a straight build's — same "separated per benchmark" rule, per scenario.
