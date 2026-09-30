@@ -272,6 +272,17 @@ describe('extractSection + budget (fixed conventions)', () => {
     expect(withinBudget(extractSection(bloated)).ok).toBe(false);
   });
 
+  it('the word budget is EXACT at the 150-word ceiling (near-ceiling stress, #479)', () => {
+    // Heading "## Project Overview" is 3 whitespace tokens; pad the body to hit N words exactly.
+    const at = (total: number) => `## Project Overview\n\n${Array(total - 3).fill('w').join(' ')}`;
+    const s150 = withinBudget(extractSection(at(150)));
+    expect(s150.wordCount).toBe(150);
+    expect(s150.ok).toBe(true);              // 150 is within (spec: "within … 150" = ≤150)
+    const s151 = withinBudget(extractSection(at(151)));
+    expect(s151.wordCount).toBe(151);
+    expect(s151.ok).toBe(false);             // one word over → fails
+  });
+
   it('countWords is whitespace tokens (not GNU wc)', () => {
     expect(countWords('one two   three\nfour')).toBe(4);
     expect(countWords('   ')).toBe(0);
