@@ -69,6 +69,12 @@ Turns **9** todos green (**8** before B1 lands): intake T2 ×5 (#461-465) + non-
 (+ #480 once B1 is done). #476/#478 are judge → Phase 2; #482 is merge → Phase 4.
 *All eight deterministic intake todos share the SAME single capture and therefore the SAME
 feature-target dependency (B4 or `-Target dev`).*
+**Capture benchmark: `contact-form`** (decided 2026-09-30) — the lightest fixture that still has ≥2
+roles with distinct permissions (Visitor/Support Agent/Admin), an auth model (BFF/session), and a data
+source, so it exercises every intake check; rejected minimal-concurrent (1 role/no auth), transactions
+(~6× heavier), e-commerce (2 MB). Target = the `28-09-2026` snapshot via `-TemplateRoot`; run stops
+after the intake commit; golden slot `intake-contact-form`. Recorded in the capture's `meta.json` and
+the Tier-2 test header too.
 
 ### Phase 2 — Judge — **needs B7 (needs B1) + a resolved §6.3, and B14 for #214** — *may be "recorded" not "green"*
 intake #476 (facts judge), #478 (per-category judge), plan-scope #214 (told-what-moved — **also needs
