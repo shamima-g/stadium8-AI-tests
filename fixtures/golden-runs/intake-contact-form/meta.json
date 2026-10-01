@@ -1,0 +1,6 @@
+{
+  "scenario": "intake-only",
+  "note": "stop-after-intake capture",
+  "capturedFrom": "release-shaped 28-09-2026",
+  "benchmark": "contact-form"
+}

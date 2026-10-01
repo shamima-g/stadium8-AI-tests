@@ -205,7 +205,9 @@ export function analyzeStructure(sectionText: string): Structure {
     if (/^#{1,6}\s/.test(t)) { disallowed.push(t); continue; }      // sub-heading
     if (/^\|/.test(t)) { disallowed.push(t); continue; }            // table row
     if (/^[-*]\s+/.test(t)) {
-      bulletLabels.push(t.replace(/^[-*]\s+/, '').split(':')[0].trim());
+      // Emphasis around the label (`**Roles:**`, `_Auth_`, `` `Data source` ``) is wording, not
+      // shape — strip *,_,` before capturing so the label whitelist compares the word, not markup.
+      bulletLabels.push(t.replace(/^[-*]\s+/, '').split(':')[0].replace(/[*_`]/g, '').trim());
       continue;
     }
     if (isPointerLine(t)) { pointerLineCount++; continue; }

@@ -336,6 +336,19 @@ describe('analyzeStructure — the load-bearing whitelist', () => {
     expect(analyzeStructure(extractSection(noPtr).text).pointerLineCount).toBe(0);
     expect(analyzeStructure(extractSection(noPtr).text).ok).toBe(false);
   });
+
+  it('TOLERATES emphasised bullet labels — bold/italic/code is wording, not shape (locks the bold-strip fix)', () => {
+    // The live INTAKE writes `- **Roles:**` etc. Emphasis around the LABEL must not fail the whitelist;
+    // the label WORD is still enforced. Mutation-coupled: delete the `.replace(/[*_`]/g,'')` in
+    // analyzeStructure (reintroducing the exact false-positive it removes) and this test goes red.
+    const bold = GOOD
+      .replace('- Roles:', '- **Roles:**')
+      .replace('- Auth:', '- _Auth_:')
+      .replace('- Data source:', '- `Data source`:');
+    const r = analyzeStructure(extractSection(bold).text);
+    expect(r.ok, r.reasons.join('; ')).toBe(true);
+    expect(r.bulletLabels.map((l) => l.toLowerCase())).toEqual(['roles', 'auth', 'data source']);
+  });
 });
 
 describe('neverPresentTokenLeaks — cheap NECESSARY gate (with data-source carve-out)', () => {
