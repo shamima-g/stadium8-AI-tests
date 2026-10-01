@@ -42,8 +42,10 @@ export interface ParkedDesignAudit {
 
 /**
  * A fully-parked design-update epic must carry, in `state.json.epic`:
- *   parkedDesignUpdate === true, a non-empty designFingerprint (written at plan time), and a
- *   non-empty designDecisions[]. Any missing/placeholder field fails closed with a named reason.
+ *   parkedDesignUpdate === true, a non-empty designFingerprint (written at plan time, never committed
+ *   null — plan.md Step 5.2), and a designDecisions[] ARRAY (present; MAY be empty — a conflict-free
+ *   update with no §Styling override and nothing named legitimately holds no decisions, design-update.md
+ *   §80-82). Any missing field / wrong type fails closed with a named reason.
  */
 export function auditParkedDesignUpdate(state: PlanEpicState | null): ParkedDesignAudit {
   const reasons: string[] = [];
@@ -62,14 +64,18 @@ export function auditParkedDesignUpdate(state: PlanEpicState | null): ParkedDesi
   const dd = epic.designDecisions;
   const isArr = Array.isArray(dd);
   const decisionsCount = isArr ? (dd as unknown[]).length : 0;
+  // Must be an array and PRESENT, but an empty one is valid (a conflict-free update holds no decisions);
+  // callers that need a held decision for their specific scenario assert on `decisionsCount` themselves.
   if (!isArr) reasons.push('epic.designDecisions is not an array');
-  else if (decisionsCount === 0) reasons.push('epic.designDecisions is empty — no held design choice');
 
   return { ok: reasons.length === 0, reasons, isParkedDesignUpdate, fingerprintSet, decisionsCount };
 }
 
-/** Matches a design digest/source path that must NOT be staged to `main` at plan time. */
-const DESIGN_PATH_ON_MAIN = /(^|\/)generated-docs\/design\//i;
+// The docs(plan) commit legitimately stages only generated-docs/epic-plan.md + generated-docs/epics/<slug>/.
+// Anything under the design digest tree (generated-docs/design/) OR the user's documentation/ design source
+// is a leak — neither may reach `main` at plan time (plan.md Step 3b "refreshed only in the worktree, never
+// staged"; design-update.md §65-70: documentation source reaches main only at merge).
+const DESIGN_PATH_ON_MAIN = /(^|\/)(generated-docs\/design|documentation)\//i;
 
 export interface DesignOnMainResult {
   ok: boolean;
@@ -79,7 +85,8 @@ export interface DesignOnMainResult {
 /**
  * The design-update's refreshed digest/source may NOT land on `main` — it stays in the worktree
  * (plan.md Step 3b). Given the paths the park staged to `main` (the test feeds these from
- * `git show --name-only <docs(plan) commit>`), none may live under `generated-docs/design/`.
+ * `git show --name-only <docs(plan) commit>`), none may live under the design digest tree
+ * (`generated-docs/design/`) or the `documentation/` design source.
  * `ok === true` means the design stayed off `main` (the good case).
  */
 export function designStagedOnMain(mainChangedPaths: string[]): DesignOnMainResult {

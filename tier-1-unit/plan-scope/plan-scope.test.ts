@@ -196,10 +196,10 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — /plan epic-scope wording is p
 // synthesizable — it must come from a Tier-3 run first). See plan-epic-scope-test-plan.md § Tier 2.
 // ---------------------------------------------------------------------------
 
-describe('Tier 2 — recorded-run invariants (pending a live capture)', () => {
-  it.todo('AC2: the changed project fact IS on `main` (git cat-file main:generated-docs/project.md + content grep)');
-  it.todo('AC5: the design digest/source is NOT on `main` for a parked design-update epic, and state.json.epic carries parkedDesignUpdate + non-null designFingerprint + designDecisions[]');
-});
+// Tier 2 — recorded-run invariants #200 (AC2) and #201 (AC5) are now WIRED in
+// tier-2-recorded-run/plan-scope/plan-design-update.test.ts: they run the B10 analysis core
+// (helpers/plan-scope.ts — auditParkedDesignUpdate / designStagedOnMain) over the `plan-design-update`
+// golden slot and SKIP VISIBLY until that live `/plan` capture exists (the intake Piece-2 pattern).
 
 // ---------------------------------------------------------------------------
 // Tier 3 — behavioural (PENDING, the real verification). Registered as todos.

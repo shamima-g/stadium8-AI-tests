@@ -59,12 +59,11 @@ describe('auditParkedDesignUpdate — all three fields required', () => {
     expect(a.reasons.join(' ')).toMatch(/designFingerprint/);
   });
 
-  it('FAILS when designDecisions is empty (no held choice)', () => {
+  it('ACCEPTS an empty designDecisions array (valid per spec — a conflict-free update holds none)', () => {
     const s = parsePlanEpicState(GOOD_STATE.replace('[{"topic":"primary-colour","chose":"blue"}]', '[]'));
     const a = auditParkedDesignUpdate(s);
-    expect(a.ok).toBe(false);
+    expect(a.ok, a.reasons.join('; ')).toBe(true);  // present + array is enough; non-empty is NOT required
     expect(a.decisionsCount).toBe(0);
-    expect(a.reasons.join(' ')).toMatch(/designDecisions is empty/);
   });
 
   it('FAILS when designDecisions is not an array', () => {
@@ -99,6 +98,12 @@ describe('designStagedOnMain — the design must stay off main (plan.md Step 3b)
     ]);
     expect(r.ok).toBe(false);
     expect(r.offenders).toEqual(['generated-docs/design/digest.md']);
+  });
+
+  it('FAILS when documentation/ design source leaked onto main (plan commit must not stage it)', () => {
+    const r = designStagedOnMain(['generated-docs/project.md', 'documentation/tokens.css']);
+    expect(r.ok).toBe(false);
+    expect(r.offenders).toEqual(['documentation/tokens.css']);
   });
 
   it('normalises Windows backslashes before matching', () => {

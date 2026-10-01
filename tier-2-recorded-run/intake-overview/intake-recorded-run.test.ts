@@ -19,7 +19,7 @@
  * the specific deviations are pinned so a change in failure mode is visible. Tracked for the template
  * owner in findings/intake-project-overview-nonconformance.md. Remove the `.fails` + pin when fixed.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadGoldenRun } from '../../helpers/golden-run';
@@ -30,6 +30,7 @@ if (!golden.present) {
   // eslint-disable-next-line no-console
   console.warn('[intake-recorded-run] skipping — ' + golden.reason);
 }
+afterAll(() => golden.cleanup()); // remove the temp bundle clone (matches the canonical recorded-run suite)
 
 // Resolve the shipped file (CLAUDE.md in a release capture; CLAUDE.user.md in a dev one) + project.md.
 const shipped = golden.present && golden.root ? resolveShippedUserFile(golden.root) : null;
