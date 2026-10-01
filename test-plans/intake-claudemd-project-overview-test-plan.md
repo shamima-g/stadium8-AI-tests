@@ -307,11 +307,12 @@ tier-1 house style (`plan-scope/`); `-Target release` + release entry in `target
    assert the shipped-user file resolved (`TEMPLATE_PRESENT` alone doesn't).
 3. **Section extractor** — heading→last-non-blank-before-next-`##`; word/line algorithm; fail-closed
    on zero lines. Precedent: `design-digest.ts` `digestSections()` (copy, don't reuse).
-4. **Second golden-run slot** — loader support for a named intake golden run alongside
-   `minimal-concurrent`; capture as `repo.bundle` with `CLAUDE.md` committed. **Largest item.**
-5. **Intake scenario + overview assertions** in `live-driver.ps1` (or `build` + post-run asserts).
-6. **`AskUserQuestion` extractor** over raw `*-claude.jsonl(.gz)` (record tool name + inputs).
-7. **Near-ceiling budget fixture** (3+ roles / long verbatim role strings).
+4. ✅ **DONE — Second golden-run slot** — the B8 multi-slot loader + the `intake-contact-form` slot
+   (`repo.bundle` with `CLAUDE.md` committed, alongside `minimal-concurrent`) are built. (Was the largest item.)
+5. ✅ **DONE (capture variant)** — a stop-after-intake `contact-form` capture (via a standalone capture
+   script, not yet a `live-driver.ps1` scenario) feeds the Tier-2 assertions.
+6. **`AskUserQuestion` extractor** over raw `*-claude.jsonl(.gz)` (record tool name + inputs). *Still pending* (Tier-3 #480).
+7. **Near-ceiling budget fixture** (3+ roles / long verbatim role strings). *Still pending* (Tier-3 #479).
 
 **Doc/decision items:** confirm the release repo ships `CLAUDE.md` with the placeholder; decide
 budget-vs-verbatim precedence; the tier-3 clone is shallow (`--depth 1`) — fine for the run-created
@@ -326,8 +327,10 @@ intake commit, limited for deep history.
 2. Section extractor + fixed budget conventions (unblocks Tier 2/3 budget + structural whitelist).
 3. Build the intake scenario + `AskUserQuestion` extractor; run the Tier-3 walkthrough on `-Target
    release`; add the near-ceiling fixture.
-4. Add the second golden-run slot; capture the intake run; freeze Tier-2 invariants (structural
-   whitelist, set-equality, self-diff, commit-introduced-facts); add the B7.2.6 extension.
+4. ✅ **DONE (2026-09-30)** — the second golden-run slot + the `contact-form` intake capture are built and
+   the Tier-2 invariants (#461–465) are frozen; the full audit (#461–463) is a documented `it.fails` KNOWN
+   PRODUCT GAP (`findings/intake-project-overview-nonconformance.md`). **Remaining:** the B7.2.6
+   merge-recheck extension (Phase 4), plus Tier-3 items 6 (AUQ extractor) and 7 (near-ceiling fixture).
 
 ---
 

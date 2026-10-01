@@ -1,8 +1,19 @@
-# Implementation plan — unblocking the 22 parked behavioural tests (councilled v2)
+# Implementation plan — unblocking the parked behavioural tests (councilled v2)
 
-**Scope:** the 12 `it.todo` in `tier-1-unit/intake-overview/` + the 10 `it.todo` in
-`tier-1-unit/plan-scope/` + the manual `plain-stops` behavioural checks. All are *behavioural* /
-*recorded-run* — the static guards are built and green.
+**Scope:** the `it.todo` in `tier-1-unit/intake-overview/` and `tier-1-unit/plan-scope/` + the manual
+`plain-stops` behavioural checks. All are *behavioural* / *recorded-run* — the static guards are built
+and green.
+
+> **Status (2026-10-01) — Phase 1 Tier-2 landed; Tier-3 still pending.** The intake **recorded-run** half
+> is built: the five intake invariants (#461–465) now run against a live `/start` `contact-form` capture
+> in the `intake-contact-form` golden slot. #464/#465 pass; the full-overview audit (#461–463) is a
+> documented `it.fails` **KNOWN PRODUCT GAP** — the live INTAKE output doesn't conform to the template's
+> own `project-overview.md` (see `findings/intake-project-overview-nonconformance.md`). The deterministic
+> #477 (placeholder-gone) and #481 (CR/Policies self-diff) are now covered in Tier 2, so they're no
+> longer separate Tier-3 todos. **Remaining parked:** intake **5** Tier-3 (#476 facts-judge, #478
+> detail-judge, #479 budget near-ceiling, #480 silence, #482 merge-recheck) + plan-scope **10** = **15**
+> (was 22). Built in Phase 1: **B5, B6 (build-capture variant), B8** (on top of the Phase-0 B1–B4 work).
+> Phases 2–4 below are unchanged and still gated on §6 (judge decision, real-GitHub merge sandbox).
 
 **Grounding:** a capability inventory of `tier-3-automated/` and the Tier-2 golden-run infra. A council
 verified the harness facts (all citations correct) and found several dependency/effort/feasibility
@@ -64,9 +75,11 @@ where the feature actually exists.
 B2, B3, B4(local variant), B5, the near-ceiling fixture, and **complete B1** (its finish gates Phase 1
 #480 and all of Phase 2 — treat B1 as the critical path, not a background "start").
 
-### Phase 1 — INTAKE recorded-run + non-judge behavioural — **needs B6 (or build-capture fallback), B8, B5, B4/`-Target dev`, and B1 for #480**
-Turns **9** todos green (**8** before B1 lands): intake T2 ×5 (#461-465) + non-judge T3 #477/#479/#481
-(+ #480 once B1 is done). #476/#478 are judge → Phase 2; #482 is merge → Phase 4.
+### Phase 1 — INTAKE recorded-run + non-judge behavioural — ✅ **Tier-2 recorded-run DONE (2026-09-30)**; non-judge Tier-3 still pending — **needs B6 (or build-capture fallback), B8, B5, B4/`-Target dev`, and B1 for #480**
+**Done:** intake T2 ×5 (#461-465) run against the `contact-form` capture — #464/#465 pass, #461-463 is a
+documented `it.fails` KNOWN PRODUCT GAP; the deterministic #477/#481 are now folded into Tier-2.
+**Still pending (Tier-3):** non-judge #479 (needs a near-ceiling fixture) and #480 (needs B1 + an AUQ
+extractor). #476/#478 are judge → Phase 2; #482 is merge → Phase 4.
 *All eight deterministic intake todos share the SAME single capture and therefore the SAME
 feature-target dependency (B4 or `-Target dev`).*
 **Capture benchmark: `contact-form`** (decided 2026-09-30) — the lightest fixture that still has ≥2

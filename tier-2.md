@@ -93,6 +93,29 @@ those functions over a real tagged transcript once one exists at
 `fixtures/golden-run/voice-and-volume/*.json`; until then it **skips visibly**. This is **test-first
 for a feature not in v1.3.0** — see the [hub §14 post-v1.3.0 coverage](workflow-tests.md#14-coverage-today-and-open-work).
 
+**INTAKE `## Project Overview` invariants (captured — its own golden slot).**
+`tier-2-recorded-run/intake-overview/` replays a **live `/start` intake golden capture** — benchmark
+`contact-form`, stopped after the `docs(project)` intake commit — held in its **own** slot
+`fixtures/golden-runs/intake-contact-form/` (the B8 multi-slot loader, so it sits alongside the default
+`minimal-concurrent` golden run without colliding). It runs the already-unit-tested analysis core
+(`helpers/project-overview.ts` — `auditOverview` / `resolveShippedUserFile` /
+`criticalRulesAndPoliciesUnchanged`) over the captured CLAUDE.md + `generated-docs/project.md`. The two
+**git-history** invariants pass — Critical Rules + Policies unchanged across the write (#464, a
+whitespace-normalized self-diff) and the `docs(project)` commit is what wrote the section (#465, not
+latest-touch) — alongside two capture preconditions (the shipped file + `project.md` present; the
+placeholder gone) and a precise defect pin. The **substantive conformance invariant — the full audit
+(#461 structure, #462 facts set-equality, #463 never-present + budget) — is a documented `it.fails` KNOWN
+PRODUCT GAP**: the live INTAKE output does not conform to the template's own `project-overview.md` —
+**roles as prose, not backticked exact strings (load-bearing: those strings are the app's RBAC
+identifiers)**, no pointer line, and (minor) "Data" not "Data source". Of the three capture attempts, **2
+completed and both failed** (2026-09-30); the third stalled on Claude Code's own git-setup prompt (a
+harness gap, since fixed), and the two completed runs failed *differently* (one also dropped the Auth
+bullet) — so the non-conformance is reproducible but the failure mode is not deterministic. Tracked in
+`findings/intake-project-overview-nonconformance.md`. A precise pin catches a change in the failure
+mode, and the `.fails` flips red when the template is fixed. Re-capture via the stop-after-intake capture
+procedure (a fresh `/start` intake against a release-shaped template, frozen only on exit 0 + a real
+non-placeholder intake commit) — see the intake capture test plan.
+
 > **When to re-record.** The recording is a committed fixture. Re-record it after any
 > change that alters how the workflow runs (orchestrator rules, agent prompts,
 > settings, hooks): run the Tier 3 walkthrough once and copy the fresh bundle and tree

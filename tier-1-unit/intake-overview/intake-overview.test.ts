@@ -570,34 +570,30 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// Tier 2 — recorded-run invariants (PENDING). Blocked on a captured intake golden run + a SECOND
-// golden-run slot (the single fixtures/golden-run/ slot is occupied by minimal-concurrent). The
+// Tier 2 — recorded-run invariants: IMPLEMENTED (#461–465). These now run over a live `/start` intake
+// golden capture (benchmark contact-form, slot fixtures/golden-runs/intake-contact-form/ via the B8
+// multi-slot loader) in tier-2-recorded-run/intake-overview/intake-recorded-run.test.ts — they call the
 // analysis above (extractSection / analyzeStructure / neverPresentTokenLeaks / roleSetEquals /
-// criticalRulesAndPoliciesUnchanged) is what these will call — see the test plan § Tier 2.
+// criticalRulesAndPoliciesUnchanged / auditOverview). The full-overview conformance case (#461–463) is a
+// documented it.fails KNOWN PRODUCT GAP — the live INTAKE output does not conform to its own
+// project-overview.md spec (2/2 completed runs 2026-09-30); see findings/intake-project-overview-nonconformance.md.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-describe('Tier 2 — recorded-run invariants (pending a captured intake golden run)', () => {
-  it.todo('structural whitelist holds over the written CLAUDE.md (lead-in + 3 bullets + 1 pointer line, nothing else)');
-  it.todo('facts by set-equality vs project.md §Roles/§Authentication/§Data Source; closed-list claim true; auth forbid clause present');
-  it.todo('never-present token gate clean; data-source line allowed; budget met under the fixed conventions');
-  it.todo('Critical Rules + Policies spans byte-identical across the write (pre-vs-post self-diff)');
-  it.todo('the commit that INTRODUCED the fact bytes is the intake commit on main; span is non-placeholder (git blame, not latest-touch)');
-});
-
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// Tier 3 — behavioural (PENDING, the real AC verification). Blocked on: a net-new intake scenario
-// (or build-scenario post-run asserts), an AskUserQuestion extractor over the raw *-claude.jsonl(.gz)
-// for the silence check, a near-ceiling budget fixture, and -Target release resolution. See the
-// test plan § Tier 3 + § Feasibility.
+// Tier 3 — behavioural (PENDING, the real AC verification). Only the irreducibly-LIVE checks remain
+// here. Two deterministic items the plan once listed for Tier 3 — placeholder-gone and the
+// Critical-Rules/Policies self-diff — are now covered deterministically in Tier 2 over the real capture
+// (tier-2-recorded-run/intake-overview/), so they are NOT duplicated as pending Tier-3 work; likewise the
+// "landed on main" half of the silence check is Tier-2 #465. Blocked on: a live judge, an AskUserQuestion
+// extractor over the raw *-claude.jsonl(.gz) for the silence check, a near-ceiling budget fixture, and
+// -Target release resolution. See the test plan § Tier 3 + § Feasibility.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 describe('Tier 3 — behavioural (pending harness infra)', () => {
   it.todo('facts stated, correct, and agree with project.md — incl. role→action mapping and the auth forbid clause (judge)');
-  it.todo('placeholder (shared PLACEHOLDER) is gone, replaced by this project\'s facts');
   it.todo('detail is pointered not present — semantic judge per never-present category (paraphrase-proof)');
   it.todo('budget ≤12 lines / ≤150 words on the copied section; stressed by a near-ceiling fixture (3+ / long verbatim roles)');
-  it.todo('landed on main in the intake commit; ZERO AskUserQuestion between intake-approval and the CLAUDE.md commit');
-  it.todo('Critical Rules + Policies unchanged by intake (self-diff)');
+  it.todo('ZERO AskUserQuestion between intake-approval and the CLAUDE.md commit (silence check; landed-on-main is Tier-2 #465)');
   it.todo('second write point: B7.2.6 corrects a staled fact without rewriting, or leaves the file untouched when nothing is stale');
 });
 

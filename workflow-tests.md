@@ -583,8 +583,10 @@ really is present there. If cross-version-clean is wanted, gate them on a behavi
 New test modules added for four template reworks. Each follows [section 2](#2-the-rules-every-test-follows)
 (good **and** broken case, isolated); the test-first ones are **feature-detected** where noted — they
 skip, never fail, on templates without the surface (one exception is called out below). **Honest split —
-only one is built coverage of a shipped surface; the other three are test-first for features not in
-v1.3.0** and must not be folded into the v1.3.0 baseline count above:
+built vs test-first, and none of these folds into the v1.3.0 baseline count above.** `/plan` epic-scope
+(Tier-1) and CLAUDE.md `## Project Overview` (Tier-1 guards **plus** a captured Tier-2 intake run — which
+surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") and Plain-language stops are
+**test-first** for features not in v1.3.0:
 
 - **`/plan` epic-scope — BUILT, green vs v1.3.0** (`tier-1-unit/plan-scope/`). `/plan` handling
   project-fact-change and design-update epics is *shipped*, so these are real Tier-1 coverage:
@@ -601,20 +603,42 @@ v1.3.0** and must not be folded into the v1.3.0 baseline count above:
   (green) + a give-up-plainness helper; the **behavioural checks are manual** (the `manual-tests/` docs
   on the template checkout's `qa/test-plans` branch, not in this harness) because the message-tagging
   that would automate them was declined (Option 3). Not in v1.3.0.
-- **CLAUDE.md `## Project Overview` — TEST-FIRST, static-guards-only** (`tier-1-unit/intake-overview/`).
-  The `[Unreleased]` "CLAUDE.md now describes your app" feature: INTAKE writes a lean `## Project
-  Overview`, every epic merge re-checks it against `project.md`, and `/upgrade` backfills it into an
-  older CLAUDE.md. **Only the wording/wiring is guarded** — mutation-coupled static checks over the
-  `shared/project-overview.md` spec and the `start`/`continue`/`upgrade` prose (green vs the
-  `28-09-2026` snapshot), plus a reusable analysis core (`helpers/project-overview.ts`) that the
-  behavioural checks will call (most executing tests are pure-function unit tests over *that* helper,
-  not the template). **All behavioural verification is `it.todo` and blocked** (12 todos: 5 Tier-2 +
-  7 Tier-3) — the actual write, silence, budget on real output, the merge re-check and the upgrade
-  backfill need a second golden-run slot, a live intake scenario + `AskUserQuestion` extractor, and a
-  mergeable / `-Target release` sandbox. Not in v1.3.0; must not be folded into the baseline. **Caveat:**
-  its regression block is gated on `TEMPLATE_PRESENT`, **not** on the surface, so on a pre-feature
-  template it goes **red, not skip** (unlike the modules above) — a surface probe is the follow-up if
-  cross-version-clean is wanted. Plans: `test-plans/{intake-claudemd-project-overview,merge-claudemd-recheck,upgrade-backfill-claudemd}-test-plan.md`.
+- **CLAUDE.md `## Project Overview` — static guards + Tier-2 intake capture landed**
+  (`tier-1-unit/intake-overview/`, `tier-2-recorded-run/intake-overview/`). The `[Unreleased]`
+  "CLAUDE.md now describes your app" feature: INTAKE writes a lean `## Project Overview`, every epic
+  merge re-checks it against `project.md`, and `/upgrade` backfills it into an older CLAUDE.md.
+  **Tier-1 (wording/wiring):** mutation-coupled static checks over the `shared/project-overview.md`
+  spec and the `start`/`continue`/`upgrade` prose (green vs the `28-09-2026` snapshot), plus a reusable
+  analysis core (`helpers/project-overview.ts`) — most executing tests are pure-function unit tests over
+  *that* helper. Includes an **emphasis-tolerance guard** that locks in the analyzer's bold-label fix
+  (`- **Roles:**` is wording, not shape — the label word is still enforced).
+  **Tier-2 (recorded run) — the intake invariants (#461–465) are now IMPLEMENTED and run** against a
+  live `/start` intake golden capture (benchmark **`contact-form`**, stop-after-intake, slot
+  `fixtures/golden-runs/intake-contact-form/` via the B8 multi-slot loader). The two **git-history**
+  invariants pass — **#464** Critical-Rules/Policies unchanged across the write (whitespace-normalized
+  self-diff) and **#465** the `docs(project)` intake commit is what wrote the section (not latest-touch) —
+  alongside two capture preconditions (the shipped CLAUDE.md + `project.md` are present; the placeholder is
+  gone) and a precise defect pin. **The substantive conformance invariant — the full audit (#461
+  structure, #462 facts set-equality, #463 never-present + budget) — is a documented `it.fails` KNOWN
+  PRODUCT GAP:** the live INTAKE output does **not** conform to the template's own `project-overview.md` —
+  **roles written as prose, not backticked exact strings (load-bearing: those strings are the app's RBAC
+  identifiers)**, no pointer line, and (minor) "Data" not "Data source". Across the three capture
+  attempts, **2 completed and both failed** (2026-09-30); the third stalled on Claude Code's own
+  git-setup prompt (a capture-harness gap, since fixed), and the two completed runs failed *differently*
+  (one also dropped the Auth bullet) — so the non-conformance is **reproducible but the failure mode is
+  not deterministic**. Tracked for the template owner in
+  `findings/intake-project-overview-nonconformance.md`; the pin catches a *change* in failure mode, and
+  the `.fails` flips **red** (its cue to be removed) if the template is fixed. **Still `it.todo` (5 Tier-3
+  behavioural):** the facts / pointered-detail judges, the near-ceiling budget stress, the
+  zero-`AskUserQuestion` silence check, and the B7.2.6 merge re-check — blocked on a live judge +
+  `AskUserQuestion` extractor, a near-ceiling budget fixture, and a mergeable / `-Target release` sandbox.
+  (The deterministic placeholder-gone and CR/Policies self-diff the plan once listed for Tier 3 are now
+  covered in Tier 2, not pending; the `/upgrade` backfill is a separate planned module, not one of these
+  todos.) Not in v1.3.0; must not be folded into the baseline. **Caveat:** the Tier-1 regression block is gated on
+  `TEMPLATE_PRESENT`, **not** on the surface, so on a pre-feature template it goes **red, not skip** — a
+  surface probe is the follow-up if cross-version-clean is wanted. Plans:
+  `test-plans/{intake-claudemd-project-overview,merge-claudemd-recheck,upgrade-backfill-claudemd}-test-plan.md`;
+  benchmark rationale (why `contact-form`) in the Tier-2 test header.
 - **Tier-3 output-quality judge — record-only** (`tier-3-automated/judge/`). Rubric + calibration +
   scoring math run **under vitest** (in the vitest `include`), *not* the Pester `test:tier3-unit`
   suite; the model call is an unimplemented `JudgeAdapter` seam. See [tier-3.md](tier-3.md).
