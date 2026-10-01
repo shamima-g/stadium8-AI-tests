@@ -1184,6 +1184,57 @@ function Get-Tier3ConcurrentRulesMissed {
     return @($missed | Select-Object -Unique)
 }
 
+# ─────────────────────────────────────────────────────────────────────────────────────────────────
+# B13 — same-fact-CONFLICT scorer. Encodes the §6.2 conflict-class rule in
+# .claude/policies/epic-branch-concurrency.md (exercised by the AC8 concurrency AC at
+# tier-1-unit/plan-scope/plan-scope.test.ts; "#217" elsewhere is that test's line, not a template rule
+# id). Get-Tier3ConcurrentRulesMissed above scores the benign NON-colliding run (and hardwires
+# blockedMergeRefused=$null, never flagging a conflict). This scores the colliding twin: two sessions
+# changing the SAME project fact to DIFFERENT values must STOP and ASK (a Tier-4 halt) surfacing BOTH
+# values, and must never be silently auto-merged; while edits to DIFFERENT sections must additive-union
+# auto-merge with no halt. Index access ($Facts['key']) keeps it StrictMode-safe (member access throws
+# on a missing key under Set-StrictMode -Version Latest) — deliberately safer than the sibling scorer's
+# member-access style; a sparse-Facts unit test pins this.
+#
+# NOT YET WIRED (runway, not a thin deferral): reaching this scorer live needs three UNBUILT pieces —
+#   (1) a NEW colliding /plan scenario (the current concurrent planner drives a DIFFERENT epic, i.e. the
+#       benign twin; nothing yet sets sameFactCollision=$true outside the unit tests),
+#   (2) a Get-Tier3ConflictFacts gatherer (no analogue of Get-Tier3ConcurrentFacts exists), and
+#   (3) B14 message-tagging — DECLINED (§6.4) — to populate haltShowedBothValues from the transcript.
+# Until those land, this is unit-tested logic with no live caller.
+# SCOPE: scores ONE conflict class per run (collision OR benign). A mixed rebase (same-fact collision on
+# fact A + additive union on section B at once) is NOT scored by the single sameFactCollision boolean —
+# capture those as two scenarios, or extend to per-section facts.
+#
+# Facts shape:
+#   sameFactCollision    bool  the scenario drove two sessions changing the SAME fact to DIFFERENT values
+#                              ($false = the benign different-section twin; additive union expected)
+#   haltRaised           bool  a Tier-4 halt / stop-and-ask was surfaced to the user
+#   haltShowedBothValues bool  that halt presented BOTH conflicting values (needs message extraction, B14)
+#   autoMergedCollision  bool  a same-fact collision was merged WITHOUT halting (the silent-guess failure)
+#   additiveUnionMerged  bool  the different-section edits auto-merged, both landing on main
+function Get-Tier3ConflictRulesMissed {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][hashtable]$Facts)
+    $missed = [System.Collections.Generic.List[string]]::new()
+
+    if ($Facts['sameFactCollision']) {
+        # A same-fact-different-values collision MUST halt, show both values, and never silently merge.
+        if (-not $Facts['haltRaised']) {
+            $missed.Add('plan-conflict-no-halt')
+        } elseif (-not $Facts['haltShowedBothValues']) {
+            $missed.Add('plan-conflict-values-missing')
+        }
+        if ($Facts['autoMergedCollision']) { $missed.Add('plan-conflict-silent-merge') }
+    } else {
+        # The benign twin: different sections additive-union auto-merge, and no halt should fire.
+        if (-not $Facts['additiveUnionMerged']) { $missed.Add('plan-additive-union-missing') }
+        if ($Facts['haltRaised'])               { $missed.Add('plan-conflict-spurious-halt') }
+    }
+
+    return @($missed | Select-Object -Unique)
+}
+
 # Best-effort: gather PLAN-B facts from the shared remote + the builder tree after both sessions
 # finish. Session-known values (slugs, overlap) are passed in; git supplies main's final state.
 # Never throws — missing git yields empty/false facts.

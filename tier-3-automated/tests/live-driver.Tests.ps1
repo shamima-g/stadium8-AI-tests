@@ -710,6 +710,81 @@ Describe 'PLAN-B — concurrent conformance rules (record-only)' {
     }
 }
 
+Describe 'B13 — same-fact-conflict rules (concurrent #217, record-only)' {
+    BeforeAll {
+        # The colliding twin, handled correctly: a same-fact-different-values collision that halted and
+        # showed both values, and did not silently merge.
+        function New-CleanConflictFacts {
+            return @{
+                sameFactCollision    = $true
+                haltRaised           = $true
+                haltShowedBothValues = $true
+                autoMergedCollision  = $false
+                additiveUnionMerged  = $false
+            }
+        }
+        # The benign twin, handled correctly: different sections additive-union auto-merged, no halt.
+        function New-CleanBenignTwinFacts {
+            return @{
+                sameFactCollision    = $false
+                haltRaised           = $false
+                haltShowedBothValues = $false
+                autoMergedCollision  = $false
+                additiveUnionMerged  = $true
+            }
+        }
+    }
+
+    It 'PASS: a correctly-halted same-fact collision misses no rules' {
+        @(Get-Tier3ConflictRulesMissed -Facts (New-CleanConflictFacts)).Count | Should -Be 0
+    }
+    It 'PASS: a correctly additive-union-merged benign twin misses no rules' {
+        @(Get-Tier3ConflictRulesMissed -Facts (New-CleanBenignTwinFacts)).Count | Should -Be 0
+    }
+
+    It 'FAIL-guard: a same-fact collision was NOT halted => plan-conflict-no-halt' {
+        $f = New-CleanConflictFacts; $f.haltRaised = $false
+        Get-Tier3ConflictRulesMissed -Facts $f | Should -Contain 'plan-conflict-no-halt'
+    }
+    It 'FAIL-guard: halted but did not show both values => plan-conflict-values-missing' {
+        $f = New-CleanConflictFacts; $f.haltShowedBothValues = $false
+        Get-Tier3ConflictRulesMissed -Facts $f | Should -Contain 'plan-conflict-values-missing'
+    }
+    It 'FAIL-guard: a collision was silently auto-merged => plan-conflict-silent-merge' {
+        $f = New-CleanConflictFacts; $f.autoMergedCollision = $true
+        Get-Tier3ConflictRulesMissed -Facts $f | Should -Contain 'plan-conflict-silent-merge'
+    }
+    It 'no-halt implies the values-missing rule does not ALSO fire (one failure, named once)' {
+        $f = New-CleanConflictFacts; $f.haltRaised = $false; $f.haltShowedBothValues = $false
+        $m = Get-Tier3ConflictRulesMissed -Facts $f
+        $m | Should -Contain 'plan-conflict-no-halt'
+        $m | Should -Not -Contain 'plan-conflict-values-missing'
+    }
+
+    It 'FAIL-guard: the benign twin did NOT additive-union merge => plan-additive-union-missing' {
+        $f = New-CleanBenignTwinFacts; $f.additiveUnionMerged = $false
+        Get-Tier3ConflictRulesMissed -Facts $f | Should -Contain 'plan-additive-union-missing'
+    }
+    It 'FAIL-guard: the benign twin raised a spurious halt => plan-conflict-spurious-halt' {
+        $f = New-CleanBenignTwinFacts; $f.haltRaised = $true
+        Get-Tier3ConflictRulesMissed -Facts $f | Should -Contain 'plan-conflict-spurious-halt'
+    }
+    It 'the collision rules never fire on a benign twin (branch isolation)' {
+        $f = New-CleanBenignTwinFacts; $f.autoMergedCollision = $true  # irrelevant off the collision branch
+        $m = Get-Tier3ConflictRulesMissed -Facts $f
+        $m | Should -Not -Contain 'plan-conflict-silent-merge'
+        $m | Should -Not -Contain 'plan-conflict-no-halt'
+    }
+    It 'is StrictMode-safe on a SPARSE Facts hashtable (missing keys => $null, no throw)' {
+        # Only the collision flag set; the other 4 keys absent. Under Set-StrictMode -Version Latest,
+        # index access must return $null (not throw) — so absent halt reads as the no-halt failure.
+        # Locks the header's safety claim: a member-access regression ($Facts.haltRaised) would THROW here.
+        $sparse = @{ sameFactCollision = $true }
+        { Get-Tier3ConflictRulesMissed -Facts $sparse } | Should -Not -Throw
+        Get-Tier3ConflictRulesMissed -Facts $sparse | Should -Contain 'plan-conflict-no-halt'
+    }
+}
+
 Describe 'PLAN-B — bare remote + facts over real git' {
     BeforeAll {
         $script:hasGit = [bool](Get-Command git -ErrorAction SilentlyContinue)

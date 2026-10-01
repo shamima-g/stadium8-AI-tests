@@ -64,7 +64,7 @@ where the feature actually exists.
 | **B10** | `design` scenario (swap) | L | = **B9 + a NEW design-diff scorer** (`parkedDesignUpdate`/`designFingerprint`/`designDecisions[]`, digest-not-on-main, told-what-moved) **+ a B8 slot** — not "mostly free once B9". Fixture is complete. |
 | **B11** | **Real GitHub + `gh` merge sandbox** (throwaway repo + `gh` auth added to Setup) | **L** | The **only** path that runs B7.2.6. The bare-remote "option (a)" is struck — it cannot reach B7.2.6. |
 | **B12** | `upgrade` scenario | L | Needs B9 + B4(two-root) + B11 + a real **old-base→feature** pair. |
-| **B13** | Concurrent **same-fact-conflict** variant + scorer | M | New: existing `concurrent` drives a *non-colliding* epic and hardwires `blockedMergeRefused=$null` (never flags). #217's halt/additive-union needs a colliding prompt + a real halt signal + a "both values" message check (→ B14). |
+| **B13** | Concurrent **same-fact-conflict** variant + scorer | M | **Scorer ✅ landed (2026-10-01)** — `Get-Tier3ConflictRulesMissed` + 10 Pester tests (encodes `policies/epic-branch-concurrency.md` §6.2). **Still unbuilt:** the colliding `/plan` scenario (the existing `concurrent` drives a *non-colliding* epic and hardwires `blockedMergeRefused=$null`), a `Get-Tier3ConflictFacts` gatherer, and the "both values" check needs **B14** (declined). |
 | **B14** | **Message-tagging** (separate user-facing text from internal chatter) | M | The declined design decision (§6.4). Needed to locate "the diff shown at approval" (#214) and to automate plain-stops plainness. B1 retains text but does **not** tag audience. |
 
 ---
@@ -115,7 +115,7 @@ without a real GitHub+`gh` sandbox.**
 
 **plan-scope (10):** #200 → B3+B8 + a /plan capture (Phase 3); #201 → B8+**B9+B10** (Phase 3); #212 →
 B3+**B9**+B10+B4 (Phase 3); #213 → B3+B9+**B11** (Phase 4); #214 → B1+**B14**+plan scenario (**Phase 2**,
-tagging-gated); #215 → B9+B10 (Phase 3); #216 → B9+B10+**B11** (Phase 4); #217 → **B13**(+B14 for the
+tagging-gated); #215 → B9+B10 (Phase 3); #216 → B9+B10+**B11** (Phase 4); #217 → **B13** (scorer ✅ done; colliding scenario + `Get-Tier3ConflictFacts` + B14 pending) (+B14 for the
 "both values" message) (Phase 3); #218 → B9+plan scenario (Phase 3); #219 → B9+plan scenario (Phase 3).
 
 **plain-stops (manual):** B1 + B7 + **B14** (message-tagging, declined) + B9 (delete-files-mid-run for
