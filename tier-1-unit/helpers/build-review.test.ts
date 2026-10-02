@@ -4,8 +4,12 @@
  * guarantees of the generated HTML. Good AND broken case per check (workflow-tests §2 rule 1).
  */
 import { describe, it, expect } from 'vitest';
-import { buildReviewHtml, assembleVerdict, escapeHtml, type ReviewManifest } from '../../helpers/build-review';
-import { stampFor } from '../../helpers/human-review';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buildReviewHtml, writeReview, assembleVerdict, escapeHtml, type ReviewManifest } from '../../helpers/build-review';
+import { stampFor, type EvidenceItem } from '../../helpers/human-review';
+import { ingestVerdict } from '../../helpers/ingest-verdict';
 
 const MANIFEST: ReviewManifest = {
   captureLabel: 'intake <contact-form>',
@@ -96,5 +100,27 @@ describe('buildReviewHtml — self-contained, escaped, correctly stamped', () =>
 describe('escapeHtml', () => {
   it('escapes the five dangerous chars', () => {
     expect(escapeHtml(`<a href="x" title='y'>&`)).toBe('&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;');
+  });
+});
+
+describe('writeReview — the single shared manifest the page, ingest, and the test all agree on', () => {
+  it('writes manifest.json + review.html, and a verdict for that manifest ingests cleanly end-to-end', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-write-'));
+    try {
+      const { manifestPath, htmlPath } = writeReview(dir, MANIFEST);
+      expect(fs.existsSync(manifestPath)).toBe(true);
+      expect(fs.existsSync(htmlPath)).toBe(true);
+
+      // the manifest ingest will read carries the SAME items the page was stamped from
+      const items = (JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { items: EvidenceItem[] }).items;
+      const stamp = stampFor(items);
+      expect(fs.readFileSync(htmlPath, 'utf8')).toContain(JSON.stringify(stamp)); // page embedded the same stamp
+
+      // a verdict built against that stamp is accepted by ingest (full write→ingest agreement)
+      const r = ingestVerdict(items, JSON.stringify({ stamp, results: { facts: 'pass' }, citations: { facts: 'ok' } }));
+      expect(r.ok, r.error).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -19,6 +19,8 @@
  * untested CSP risks silently blocking the srcdoc mockup (a gating design-review check), so it's not added
  * blind here.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { stampFor, type EvidenceItem, type Outcome } from './human-review';
 
 export interface ReviewItem extends EvidenceItem {
@@ -102,6 +104,25 @@ export function buildReviewHtml(manifest: ReviewManifest): string {
   // Embed the exact pure function the unit tests test, so the page runs tested code.
   const assembleSrc = assembleVerdict.toString();
 
+  return renderPage(manifest, stamp, sections, assembleSrc);
+}
+
+/**
+ * Write the review bundle to `reviewDir`: `manifest.json` (the SINGLE shared source of the evidence — the
+ * same items this page is stamped from, which `ingest-verdict` + `loadVerdict` re-read) and `review.html`.
+ * So the stamp the page embeds, the stamp ingest validates, and the stamp the test re-checks are identical
+ * by construction (all `stampFor(manifest.items)`).
+ */
+export function writeReview(reviewDir: string, manifest: ReviewManifest): { manifestPath: string; htmlPath: string } {
+  fs.mkdirSync(reviewDir, { recursive: true });
+  const manifestPath = path.join(reviewDir, 'manifest.json');
+  const htmlPath = path.join(reviewDir, 'review.html');
+  fs.writeFileSync(manifestPath, JSON.stringify({ captureLabel: manifest.captureLabel, items: manifest.items }, null, 2));
+  fs.writeFileSync(htmlPath, buildReviewHtml(manifest));
+  return { manifestPath, htmlPath };
+}
+
+function renderPage(manifest: ReviewManifest, stamp: string, sections: string, assembleSrc: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
