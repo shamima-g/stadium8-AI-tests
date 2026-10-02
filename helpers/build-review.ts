@@ -14,10 +14,11 @@
  *   - Copy-to-clipboard + a select-all <textarea> are the primary output (a file download can't choose
  *     its path and Safari opens JSON inline — the `ingest-verdict` command places the file, Step 3).
  *
- * The page is injection-safe and zero-network by escaping + the sandboxed iframe (council-verified). A CSP
- * meta tag is deliberately DEFERRED to the Step-7 live wiring, where it can be browser-smoke-tested — an
- * untested CSP risks silently blocking the srcdoc mockup (a gating design-review check), so it's not added
- * blind here.
+ * The page is injection-safe and zero-network by escaping + the sandboxed iframe (council-verified: no
+ * fetch/XHR, only navigator.clipboard.writeText). A CSP <meta> is still DEFERRED: it must be smoke-tested
+ * in a real browser (not available here) because a wrong frame-src could silently block the srcdoc mockup
+ * (a gating design-review check). The page is network-free by construction regardless, so CSP is
+ * defense-in-depth, not load-bearing. Revisit when a browser is available.
  */
 import fs from 'node:fs';
 import path from 'node:path';

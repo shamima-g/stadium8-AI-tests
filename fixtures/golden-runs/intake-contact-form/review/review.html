@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review — intake-contact-form overview — subjective review</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 900px; margin: 1rem auto; padding: 0 1rem; }
+  .check { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  .guidance { color: #555; font-style: italic; }
+  .evidence { background: #f6f8fa; padding: .75rem; border-radius: 6px; white-space: pre-wrap; overflow-x: auto; }
+  .mockup { width: 100%; height: 320px; border: 1px solid #ddd; border-radius: 6px; }
+  .verdict { margin-top: .5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  .cite { flex: 1; min-width: 200px; padding: .3rem; }
+  #out { width: 100%; height: 160px; font-family: monospace; }
+  button { padding: .5rem 1rem; font-size: 1rem; cursor: pointer; }
+  #err { color: #b00; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Review — intake-contact-form overview — subjective review</h1>
+<p>Judge each check, add a one-line citation for every <b>Yes</b>, then <b>Build verdict</b> and <b>Copy</b>.
+Place it with <code>npm run ingest-verdict</code> (it will not save to a folder from the browser).</p>
+<section class="check" data-id="intake-facts-correct">
+  <h2>Do the overview&#39;s stated facts match project.md and read correctly (roles→actions, the auth clause)?</h2>
+  <p class="guidance">PASS: every role/action/auth/data statement is true to project.md and the app. FAIL: a wrong, invented, or garbled fact.</p>
+  <pre class="evidence">--- the overview as written (CLAUDE.md) ---
+## Project Overview
+
+**Contact &amp; Enquiry Management** — A public-facing contact form for Visitors to submit enquiries (name, email, optional address, category, and comment), with a role-gated back-office inbox where Support Agents triage enquiries through a status lifecycle (New -&gt; In Progress -&gt; Resolved) and Admins can additionally delete spam or duplicates.
+
+- **Roles:** Visitor (submits enquiries, views own), Support Agent (triages inbox), Admin (can also delete)
+- **Auth:** Server-side (simulated client-side for prototype)
+- **Data:** Mock-only with in-memory fixtures
+
+--- facts on record (generated-docs/project.md, roles/auth/data) ---
+## Roles &amp; Permissions
+
+**Template:** `custom`
+
+| Permission | Visitor | Support Agent | Admin |
+|---|---|---|---|
+| Sign in | ✓ | ✓ | ✓ |
+| Submit an enquiry | ✓ | | |
+| View own submissions | ✓ | | |
+| View all enquiries (inbox) | | ✓ | ✓ |
+| Search/filter enquiries | | ✓ | ✓ |
+| Change status (New -&gt; In Progress -&gt; Resolved) | | ✓ | ✓ |
+| Resolve with reply note | | ✓ | ✓ |
+| Delete an enquiry | | | ✓ |
+
+&gt; Permissions extend during BUILD as new stories surface new actions. Additions are recorded here as they come up, with your approval. Removing a permission, or changing who the roles are, stops for you to review.
+
+---
+
+## Authentication
+
+| Field | Value |
+|---|---|
+| Method | `server-side` |
+| Auth login endpoint (if server-side) | N/A — simulated client-side per PI-01 |
+| Auth userinfo endpoint (if server-side) | N/A — simulated client-side per PI-01 |
+| Auth logout endpoint (if server-side) | N/A — simulated client-side per PI-01 |
+| Custom auth notes | Prototype with simulated server-side auth. Per PI-01, all server behaviour is simulated client-side. Seeded users: visitor@example.com / Test123 (Visitor), agent@example.com / Test123 (Support Agent), admin@example.com / Test123 (Admin). |
+
+&gt; Auth method is never inferred — the user must confirm explicitly per [authentication-intake.md](.claude/policies/authentication-intake.md).
+
+---
+
+## Data Source &amp; Backend Integration
+
+| Field | Value |
+|---|---|
+| Data source | `mock-only` |
+| Backend status | `N/A` |
+| Mock layer required | yes |</pre>
+  <div class="verdict">
+    <label><input type="radio" name="r-intake-facts-correct" value="pass"> Yes</label>
+    <label><input type="radio" name="r-intake-facts-correct" value="fail"> No</label>
+    <label><input type="radio" name="r-intake-facts-correct" value="skip" checked> Skip</label>
+    <input type="text" class="cite" placeholder="Evidence citation (required for Yes)">
+  </div>
+</section>
+<section class="check" data-id="intake-detail-pointed">
+  <h2>Is detail pointed-to, not dumped — no permissions/endpoints/palette/NFRs inlined, even paraphrased?</h2>
+  <p class="guidance">PASS: specifics live in the pointed-to docs; the overview stays headline-level. FAIL: endpoints/permissions/palette/NFRs spelled out here, even paraphrased.</p>
+  <pre class="evidence">## Project Overview
+
+**Contact &amp; Enquiry Management** — A public-facing contact form for Visitors to submit enquiries (name, email, optional address, category, and comment), with a role-gated back-office inbox where Support Agents triage enquiries through a status lifecycle (New -&gt; In Progress -&gt; Resolved) and Admins can additionally delete spam or duplicates.
+
+- **Roles:** Visitor (submits enquiries, views own), Support Agent (triages inbox), Admin (can also delete)
+- **Auth:** Server-side (simulated client-side for prototype)
+- **Data:** Mock-only with in-memory fixtures</pre>
+  <div class="verdict">
+    <label><input type="radio" name="r-intake-detail-pointed" value="pass"> Yes</label>
+    <label><input type="radio" name="r-intake-detail-pointed" value="fail"> No</label>
+    <label><input type="radio" name="r-intake-detail-pointed" value="skip" checked> Skip</label>
+    <input type="text" class="cite" placeholder="Evidence citation (required for Yes)">
+  </div>
+</section>
+<p>
+  <label>Reviewer: <input id="reviewer" type="text" placeholder="your name"></label>
+  <button id="build">Build verdict</button>
+  <button id="copy">Copy</button>
+</p>
+<div id="err"></div>
+<textarea id="out" readonly placeholder="the verdict JSON appears here"></textarea>
+<script>
+const STAMP = "5748153faf0a28c7e44ca4c2358cb70df0e418df5250e848c07a78f59753332e";
+const assembleVerdict = function assembleVerdict(selections, stamp, reviewer, nowIso) {
+  const errors = [];
+  const results = {};
+  const citations = {};
+  for (const s of selections) {
+    results[s.id] = s.outcome;
+    const cite = (typeof s.citation === "string" ? s.citation : "").trim();
+    if (cite) citations[s.id] = cite;
+    if (s.outcome === "pass" && !cite) errors.push('"' + s.id + '": a Yes needs a one-line evidence citation.');
+  }
+  if (errors.length) return { ok: false, errors };
+  return { ok: true, errors: [], verdict: { stamp, reviewer, reviewedAt: nowIso, results, citations } };
+};
+function collect() {
+  return [...document.querySelectorAll('.check')].map(function (sec) {
+    const id = sec.getAttribute('data-id');
+    const picked = sec.querySelector('input[type=radio]:checked');
+    return { id: id, outcome: picked ? picked.value : 'skip', citation: (sec.querySelector('.cite').value || '') };
+  });
+}
+document.getElementById('build').addEventListener('click', function () {
+  const reviewer = (document.getElementById('reviewer').value || '').trim();
+  const res = assembleVerdict(collect(), STAMP, reviewer, new Date().toISOString());
+  const err = document.getElementById('err'), out = document.getElementById('out');
+  if (!res.ok) { err.textContent = 'Fix before building:\n- ' + res.errors.join('\n- '); out.value = ''; return; }
+  err.textContent = ''; out.value = JSON.stringify(res.verdict, null, 2);
+});
+document.getElementById('copy').addEventListener('click', function () {
+  const out = document.getElementById('out');
+  if (!out.value) { document.getElementById('err').textContent = 'Build the verdict first.'; return; }
+  out.select();
+  if (navigator.clipboard) navigator.clipboard.writeText(out.value); else document.execCommand('copy');
+});
+</script>
+</body>
+</html>
