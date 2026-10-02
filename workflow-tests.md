@@ -246,9 +246,9 @@ merge always waiting for you. It runs two ways: by hand (a person drives it), **
 scores the run, and files a report — the score is **record-only, it never fails the run**. The
 **live** run needs an AI, so it isn't part of `npm test`; but its non-AI assertion functions (the
 `/plan` trace checks and the artifact-lint scoring) **do** have an npm-runnable Pester unit suite,
-`npm run test:tier3-unit`. (One exception: the newer **output-quality judge**'s deterministic logic
-runs under **vitest**, not that Pester suite — see [tier-3.md](tier-3.md).) Tier 3 is run before a
-release, and each clean pass is a good moment to re-record the Tier 2 fixture.
+`npm run test:tier3-unit`. (The subjective output-quality criteria are **human-reviewed**, not AI-judged —
+the LLM judge was retired 2026-10-02; see the human-review harness in [tier-3.md](tier-3.md).) Tier 3 is
+run before a release, and each clean pass is a good moment to re-record the Tier 2 fixture.
 
 ---
 
@@ -639,9 +639,11 @@ surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") an
   surface probe is the follow-up if cross-version-clean is wanted. Plans:
   `test-plans/{intake-claudemd-project-overview,merge-claudemd-recheck,upgrade-backfill-claudemd}-test-plan.md`;
   benchmark rationale (why `contact-form`) in the Tier-2 test header.
-- **Tier-3 output-quality judge — record-only** (`tier-3-automated/judge/`). Rubric + calibration +
-  scoring math run **under vitest** (in the vitest `include`), *not* the Pester `test:tier3-unit`
-  suite; the model call is an unimplemented `JudgeAdapter` seam. See [tier-3.md](tier-3.md).
+- **Output-quality criteria — human review (AI judge RETIRED 2026-10-02).** The LLM judge
+  (`tier-3-automated/judge/`) was removed; its 5 subjective criteria (ACs 3/4/5/7/8) are re-homed in
+  `helpers/verbosity-review-checks.ts` and judged by a person via the human-review harness
+  (`helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`) — recorded verdict, gates (a No
+  is red; under `REQUIRE_REVIEW` an unreviewed check is red). See `test-plans/human-review-harness-plan.md`.
 
 ### Planned coverage for the post-v1.2.0 changes
 

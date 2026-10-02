@@ -168,18 +168,16 @@ So a rule id like `plan-parked` is *record-only* when observed live in Tier 3, b
 trace is a *gating* invariant when replayed over the golden run in Tier 2. Nothing is
 double-counted: Tier 2 gates the traces; Tier 3 confirms only what can't be replayed.
 
-## Output-quality judge (record-only) — `tier-3-automated/judge/`
+## Output-quality criteria — human review (the AI judge was retired)
 
 The subjective output-discipline criteria (act-from-first-line, at-a-glance, only-the-actionable-part,
-shown-once, no-blind-approvals) have no mechanical ground truth, so the design is for a live run to be
-scored by an LLM judge against a fixed rubric (`rubric.ts`, one item per criterion). **Today only the
-deterministic scaffolding is built — the model call is a typed but unimplemented seam (`JudgeAdapter`),
-so no live grading actually runs yet.** What exists and runs (**under vitest** —
-`tier-3-automated/judge/**/*.test.ts` is in the vitest `include`, *not* the Pester `test:tier3-unit`
-suite): the rubric integrity check and the **calibration math** — before the judge's verdicts could
-count, it must agree with a fixed human-labelled good/bad set and catch every planted canary
-(`calibration.ts` + `calibration-set.ts`). By design the judge is **record-only**
-(`JUDGE_GATES_THE_BUILD === false`) — it will never gate the build.
+shown-once, no-blind-approvals — ACs 5/4/3/7/8) have no mechanical ground truth. **The AI/LLM judge that
+was to score them (`tier-3-automated/judge/`) was retired on 2026-10-02** (decision: no AI judge). These
+five criteria are now **human-review checks** — a person answers Yes/No on the review page and the recorded
+verdict gates deterministically. The criteria are re-homed in `helpers/verbosity-review-checks.ts`
+(5 checks, ACs 3/4/5/7/8, intact), and the review harness is `helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`
+(see `test-plans/human-review-harness-plan.md`). Unlike the old record-only judge, a reviewed **No** turns
+the check **red**, and under `REQUIRE_REVIEW` an unreviewed check is red too.
 
 ## Behaviours confirmed by hand for the not-yet-in-v1.3.0 reworks
 

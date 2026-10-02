@@ -85,9 +85,9 @@ Tier 3 has two parts:
   pwsh -NoProfile -Command "Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-3-automated/tests -Output Detailed"
   ```
 
-  > Note: the **output-quality judge's** deterministic logic (`tier-3-automated/judge/`) runs under
-  > **vitest** (it's in the vitest `include`), so it's covered by `npm test` / `test:raw`, **not** by
-  > `test:tier3-unit` (which is Pester-only). The judge itself is record-only — it never gates.
+  > Note: the subjective **output-quality criteria** are **human-reviewed** (the AI judge was retired
+  > 2026-10-02). The review harness runs under **vitest** (`helpers/*review*.ts`, covered by `npm test` /
+  > `test:raw`); a recorded No gates red. See `test-plans/human-review-harness-plan.md`.
 
 - **The live AI build** — the whole workflow driven by a real AI (below).
 

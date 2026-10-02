@@ -1,5 +1,11 @@
 # Test plan — INTAKE writes a lean `## Project Overview` into CLAUDE.md
 
+> **UPDATE (2026-10-02) — no AI judge.** Where this plan says the Tier-3 subjective checks are verified by
+> a **"semantic judge" / "Tier-3 judge"** (e.g. #476 facts-correct, #478 detail-pointed-not-dumped), that
+> verification is now done by a **person via the human-review harness** — the LLM judge was retired and
+> `tier-3-automated/judge/` deleted. Read "judge" below as "the human reviewer answering Yes/No on the
+> review page" (recorded verdict, gates). Design: `test-plans/human-review-harness-plan.md`.
+
 **Testing against:** the template clone at `C:\TestsArchives\stadium8-tests\28-09-2026`
 (commit `34a574a`). This clone carries the **dev** marker (`<!-- stadium8-claude: template-dev -->`),
 so the shipped end-user CLAUDE.md lives here as **`CLAUDE.user.md`** — the publish pipeline swaps it

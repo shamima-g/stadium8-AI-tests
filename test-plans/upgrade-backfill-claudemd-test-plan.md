@@ -1,5 +1,9 @@
 # Test plan — an in-flight project backfills its project section at the next merge (no migration step, no question)
 
+> **UPDATE (2026-10-02) — no AI judge.** Any "judge" in the Tier-3 (live) column below means the **human
+> reviewer** on the review page (the LLM judge was retired; `tier-3-automated/judge/` deleted). See
+> `test-plans/human-review-harness-plan.md`.
+
 **Testing against:** the template clone at `C:\TestsArchives\stadium8-tests\28-09-2026` (commit
 `34a574a`, dev marker — shipped user file is `CLAUDE.user.md`, see the intake plan's "Which file is
 under test"). **Third in the series:** pairs with `intake-claudemd-project-overview-test-plan.md`

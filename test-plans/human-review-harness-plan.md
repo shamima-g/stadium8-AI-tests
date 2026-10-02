@@ -1,7 +1,12 @@
 # Plan — human-review harness (no AI judge) — councilled v2
 
-**Status:** PLAN ONLY (not built). Decided 2026-10-02; **revised after a 3-lens council** (feasibility,
-honesty, coverage/integration) that corrected v1's blocker, honesty holes, and several mis-mappings.
+**Status (updated 2026-10-02):** Steps 1–6 **BUILT** (each councilled) — the verdict core + stamp
+(`helpers/human-review.ts`), the review-page generator + `writeReview` (`build-review.ts`), the
+`ingest-verdict` command, the test wiring + `REQUIRE_REVIEW` (`review-suite.ts`/`review-logic.ts`), the
+broken-case calibration, and the **AI judge is RETIRED** (`tier-3-automated/judge/` deleted; its 5
+verbosity criteria re-homed in `helpers/verbosity-review-checks.ts`). **Step 7 remaining:** wire the first
+real check end-to-end against a capture. (Originally plan-only; revised after a 3-lens council that fixed
+v1's blocker, honesty holes, and mis-mappings.)
 
 Replaces model-graded subjective checks with a human-in-the-loop browser review whose verdict is recorded
 and read deterministically. No AI at test time.
@@ -62,7 +67,7 @@ barred on `file://` and non-Chromium). So:
 | **Intake #476** | role→**action** mapping is right; the auth **forbid clause** is correct | **role set-equality** vs project.md (`roleSetEquals`/`auditOverview`, already gating Tier-2) |
 | **Intake #478** | a **within-shape paraphrase** leak using no never-present token (e.g. "meets GDPR") | the extra-bullet whitelist + `neverPresentTokenLeaks` (already catch literal/structural leaks) |
 | **Plan #214** | does the "what moved" diff read as **plain language** | **"at approval, not at build"** placement = a transcript-position fact (deterministic once extracted — same class as #480; needs the B14 extraction, which is the real hard part) |
-| **Verbosity ACs 3/4/5/7/8** | all five (first-line-actionable, at-a-glance, only-actionable-part, shown-once, no-blind-approvals) — **currently the built AI-judge seam** | — |
+| **Verbosity ACs 3/4/5/7/8** | all five (first-line-actionable, at-a-glance, only-actionable-part, shown-once, no-blind-approvals) — **re-homed to `helpers/verbosity-review-checks.ts`** when the AI judge was retired | — |
 
 **Correctly EXCLUDED (not subjective):** #480 silence (zero `AskUserQuestion`) — deterministic once the
 stream extractor exists; it needs B1/AUQ extraction, not review.
@@ -71,10 +76,9 @@ stream extractor exists; it needs B1/AUQ extraction, not review.
 
 ## 5. Integration — reconcile, don't run a second parallel path (council's biggest fix)
 
-- **Retire the built AI-judge seam.** `tier-3-automated/judge/` (rubric/calibration/`JudgeAdapter`, ACs
-  3/4/5/7/8) is the *actual* AI judge and the user doesn't want it. This plan must **remove it** and route
-  its five verbosity criteria into this human-review harness (they become five review checks). Until then
-  it is orphaned but still in the vitest `include`.
+- **AI-judge seam retired ✅ (2026-10-02).** `tier-3-automated/judge/` (rubric/calibration/`JudgeAdapter`,
+  ACs 3/4/5/7/8) is **deleted** and dropped from the vitest `include`; its five verbosity criteria are
+  re-homed in `helpers/verbosity-review-checks.ts` (to become five review checks when wired at Step 7).
 - **plain-stops — keep both, split by role (DECIDED).** The manual doc (`manual-tests/B-plain-stops.md`,
   `qa/test-plans` branch) **stays** as the live behavioural walkthrough (delete brief+story → `/continue`
   restores silently; the give-up loop fires). The **plain-language verdict** ("does the message read
@@ -105,8 +109,8 @@ percent-encoded spaces; mind Windows MAX_PATH) so the verdict and the review pag
 result file.
 
 ## 8. Open decisions for you
-1. ✅ **DECIDED (2026-10-02): retire `tier-3-automated/judge/`** and move its 5 verbosity criteria
-   (ACs 3/4/5/7/8) into human review. (A build action when we build the harness.)
+1. ✅ **DONE (2026-10-02): retired `tier-3-automated/judge/`** (deleted) and re-homed its 5 verbosity
+   criteria (ACs 3/4/5/7/8) to `helpers/verbosity-review-checks.ts`; they become review checks at Step 7.
 2. ✅ **DECIDED (2026-10-02): the design cores #14/#15 GATE** — a "No" on read-back or ask-before-overwrite
    turns the check **red and fails the run** (no longer record-only). Consequence: these two cores move
    into the gating review harness; their verdict lives in the harness `verdict.json` (the single store),

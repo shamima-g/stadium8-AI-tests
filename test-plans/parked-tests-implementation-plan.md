@@ -13,7 +13,14 @@ and green.
 > longer separate Tier-3 todos. **Remaining parked:** intake **5** Tier-3 (#476 facts-judge, #478
 > detail-judge, #479 budget near-ceiling, #480 silence, #482 merge-recheck) + plan-scope **10** = **15**
 > (was 22). Built in Phase 1: **B5, B6 (build-capture variant), B8** (on top of the Phase-0 B1–B4 work).
-> Phases 2–4 below are unchanged and still gated on §6 (judge decision, real-GitHub merge sandbox).
+> Phases 2–4 below are unchanged and still gated on §6 (real-GitHub merge sandbox).
+>
+> **UPDATE (2026-10-02) — the AI judge is RETIRED; B7 / §6.3 / "Phase 2 — Judge" are SUPERSEDED.** The
+> subjective checks (#476 facts, #478 detail, #214 told-what-moved, plain-stops, and the 5 verbosity ACs
+> 3/4/5/7/8) are now judged by a person via the **human-review harness** (recorded verdict, gates), not an
+> LLM. `tier-3-automated/judge/` is deleted; the verbosity criteria are re-homed in
+> `helpers/verbosity-review-checks.ts`. Authoritative design + remaining build:
+> `test-plans/human-review-harness-plan.md`. Read the judge references below as historical.
 
 **Grounding:** a capability inventory of `tier-3-automated/` and the Tier-2 golden-run infra. A council
 verified the harness facts (all citations correct) and found several dependency/effort/feasibility
@@ -58,7 +65,7 @@ where the feature actually exists.
 | **B4** | Local/two-root target for `Resolve-Tier3Template` via a **copy-cloner** | S→M | Upgrade needs a **base + feature pair** of local roots; the default `git clone --depth1 --branch` can't check out an **uncommitted** feature and `targets.json` points at GitHub URLs (feature must be pushed). **Note:** the existing `-Target dev` may already reach the feature if it's pushed to `stadium-software/stadium-8` — B4's local variant may be *optional for Phase 1*, required for upgrade. |
 | **B5** | Tier-2 orchestrator helper (golden `CLAUDE.md` → resolve → run the pure checks) | S | Analysis functions already exist. |
 | **B6** | `intake` scenario + capture | M | **Risk:** "stop after the intake commit" is prompt-hope in a single call, and `New-Tier3Scaffold` excludes `.git`, so intake git-scoring relies on `/start` initialising git mid-run (verify). **Cheaper fallback:** score the deterministic intake todos off a normal `build` capture (its history already contains the intake commit) — no new stop needed. B6 does **not** need B9. |
-| **B7** | JudgeAdapter (real model call) + calibration gate + **test-only gate mode** + **repeat-sampling** | **M→L** | Gated on decision §6.3; hard-needs B1; needs model **auth + per-run cost** (not in Setup); calibration may need rubric iteration to pass. Without a test-gate mode these todos stay *recorded, not green*. |
+| ~~**B7**~~ | ~~JudgeAdapter (real model call) + calibration + gate mode~~ **— RETIRED 2026-10-02** | — | Superseded: no AI judge. The subjective checks move to the **human-review harness** (`helpers/*review*.ts`, `test-plans/human-review-harness-plan.md`); `tier-3-automated/judge/` deleted; verbosity criteria re-homed in `helpers/verbosity-review-checks.ts`. |
 | **B8** | Multi-golden slot (`loadGoldenRun(slot)` + per-slot `.gitignore`) | M | Single `fixtures/golden-run/` slot occupied by `minimal-concurrent`. |
 | **B9** | Two-phase / interruptible driver | L | Prereq for B10/B12 + pre-staling + per-gate answers. **Sequencing risk:** if B6's prompt-stop proves unreliable, B9 moves ahead of Phase 1. |
 | **B10** | `design` scenario (swap) | L | = **B9 + a NEW design-diff scorer** (`parkedDesignUpdate`/`designFingerprint`/`designDecisions[]`, digest-not-on-main, told-what-moved) **+ a B8 slot** — not "mostly free once B9". Fixture is complete. |
@@ -192,8 +199,9 @@ the big lift and a *sequencing risk* (if B6's prompt-stop is unreliable, B9 jump
 - Target resolution: `Resolve-Tier3Template` `Run-QATests.ps1:167-208`, injectable `$Cloner :166`,
   cloner `git clone --depth1 --branch :196-199`; `targets.json` (repo root) has `dev`/`release` (GitHub
   URLs), no `local`; default no-`-Target` builds against the nested `..` template `:175-176`.
-- Judge: `judge/rubric.ts` `JudgeAdapter` unimplemented `:97-99`, `JUDGE_GATES_THE_BUILD=false :78`;
-  `calibration.ts` math complete, N≈10 smoke gate, repeat-sampling "handled by the live runner, not here".
+- ~~Judge: `judge/rubric.ts` …~~ **(historical — `tier-3-automated/judge/` was DELETED 2026-10-02; these
+  line citations no longer resolve.** The 5 criteria are re-homed in `helpers/verbosity-review-checks.ts`;
+  verification is now human review, not an LLM judge.)
 - Golden run: `helpers/golden-run.ts:26-29` single slot, `:62` `loadGoldenRun()` no args, bundle = `git
   bundle --all` (git topology + every state.json + top-level CLAUDE.md); slot = `minimal-concurrent`.
 - Analysis helpers: `helpers/project-overview.ts` extractSection:127, analyzeStructure:191,
