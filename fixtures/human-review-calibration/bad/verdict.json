@@ -1,0 +1,11 @@
+{
+  "stamp": "fd8760933d4baa574fbe3d0812acc99a9a78eccd560f4755b99febac5af69f3d",
+  "reviewer": "calibration",
+  "reviewedAt": "2026-10-02",
+  "results": {
+    "plain-language": "fail"
+  },
+  "citations": {
+    "plain-language": "full of dev jargon (tsc, Tier-4, isLoading) — not plain English"
+  }
+}

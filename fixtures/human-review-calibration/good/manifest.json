@@ -1,0 +1,10 @@
+{
+  "captureLabel": "calibration-good",
+  "items": [
+    {
+      "id": "plain-language",
+      "criterion": "Does this message read as plain English (no jargon)?",
+      "evidence": "Your draft was restored — nothing was lost. Pick up where you left off, or start fresh."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "captureLabel": "calibration-bad",
+  "items": [
+    {
+      "id": "plain-language",
+      "criterion": "Does this message read as plain English (no jargon)?",
+      "evidence": "HALT: Tier-4 gate blocked at story-2-<slug>; isLoading skeleton; re-run tsc then eslint --fix."
+    }
+  ]
+}
