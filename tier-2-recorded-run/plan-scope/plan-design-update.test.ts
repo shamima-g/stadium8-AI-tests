@@ -44,7 +44,9 @@ describe.skipIf(!golden.present || !golden.hasGit)('plan recorded run — parked
   it('#200 (AC2): the approved project-fact change is present on main', () => {
     expect(meta.factNeedle, 'meta.factNeedle must record the landed fact (set at capture)').toBeTruthy();
     const projectMd = fs.readFileSync(path.join(root, 'generated-docs', 'project.md'), 'utf8');
-    expect(projectMd, `project.md on main should contain the approved fact "${meta.factNeedle}"`).toContain(meta.factNeedle as string);
+    // "did the fact land" — match case-insensitively; the tool may render the field name in any case.
+    expect(projectMd.toLowerCase(), `project.md on main should contain the approved fact "${meta.factNeedle}"`)
+      .toContain((meta.factNeedle as string).toLowerCase());
   });
 
   it('#201 (AC5): the parked epic state carries parkedDesignUpdate + a fingerprint + decisions[]', () => {

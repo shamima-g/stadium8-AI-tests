@@ -1,0 +1,9 @@
+{
+  "parkedStatePath": "generated-docs/epics/design-update-board-task/state.json",
+  "capturedFrom": "stadium-builder-release-mock",
+  "benchmark": "design-taskboard",
+  "scenario": "plan-design-update",
+  "note": "live intake + /plan parked design-update (pink wins); no build/merge; bundling verifies a real conforming park, not full spec-conformance (see the Tier-2 suite)",
+  "factNeedle": "Priority",
+  "planCommit": "ca387b83326850542309183bfa094822996a1f0f"
+}

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "epicId": "18660e2b-f45b-4efb-82f8-993d7c971bfa",
+    "slug": "design-update-board-task",
+    "name": "Design Update: Board and Task Screens",
+    "createdAt": "2026-10-02T07:33:47.286Z",
+    "dependsOn": [
+      "task-board"
+    ],
+    "introducesSharedSurface": false,
+    "unverifiedAssumptions": [],
+    "manualTestResults": [],
+    "parkedDesignUpdate": true,
+    "designFingerprint": "a847b976e44ec6b0f47f988c0dd1c1f5c612d9d3",
+    "designDecisions": [
+      {
+        "outcome": "design-wins",
+        "line": "Primary colour is pink #ec4899 (the new design wins over the earlier blue #2563eb decision)",
+        "supersedes": "- **Primary colour:** `#2563eb` (blue) — confirmed from the design tokens."
+      }
+    ]
+  },
+  "phase": "READY-TO-BUILD",
+  "stories": {
+    "1": {
+      "storyId": "9a7beb87-fcbc-467e-945d-69a34a7c439f",
+      "status": "pending",
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "2": {
+      "storyId": "46855f6d-2f04-45a9-87c1-7d49df65b4ef",
+      "status": "pending",
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "3": {
+      "storyId": "7f7f1aa7-598c-4df1-b3ea-68f2d3aad76f",
+      "status": "pending",
+      "e2eStatus": "deferred",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "halt": null,
+  "lastUpdated": "2026-10-02T07:36:00.000Z"
+}

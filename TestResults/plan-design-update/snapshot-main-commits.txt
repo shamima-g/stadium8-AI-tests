@@ -1,0 +1,4 @@
+ca387b8 docs(plan): plan epic design-update-board-task (ready to build)
+1cda72a chore(project): add Priority field (Low/Medium/High) to Task data model
+d034631 docs(project): project setup + epic plan
+0e6273e chore: scaffold design-taskboard (pre-intake)

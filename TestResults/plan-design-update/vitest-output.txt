@@ -1,0 +1,19 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/AI/Stadium8-AI-tests-DO_NOT_DELETE/AI-tests[39m
+
+
+[QA-TESTS] No Stadium-8 template (.claude/) found at: C:\AI\Stadium8-AI-tests-DO_NOT_DELETE
+[QA-TESTS] Template-dependent suites will be SKIPPED.
+[QA-TESTS] Run from inside a Stadium-8 repo, or set REPO_ROOT=/path/to/repo.
+[QA-TESTS] Template-independent tests still run.
+
+ [32m✓[39m tier-2-recorded-run/plan-scope/plan-design-update.test.ts[2m > [22mplan recorded run — parked design-update[2m > [22mthe capture is checked out on the integration branch (main)
+ [32m✓[39m tier-2-recorded-run/plan-scope/plan-design-update.test.ts[2m > [22mplan recorded run — parked design-update[2m > [22m#200 (AC2): the approved project-fact change is present on main
+ [32m✓[39m tier-2-recorded-run/plan-scope/plan-design-update.test.ts[2m > [22mplan recorded run — parked design-update[2m > [22m#201 (AC5): the parked epic state carries parkedDesignUpdate + a fingerprint + decisions[]
+ [32m✓[39m tier-2-recorded-run/plan-scope/plan-design-update.test.ts[2m > [22mplan recorded run — parked design-update[2m > [22m#201 (AC5): nothing of the design landed on main at plan time (plan.md Step 3b)
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 11:39:58
+[2m   Duration [22m 968ms[2m (transform 83ms, setup 0ms, collect 363ms, tests 103ms, environment 0ms, prepare 130ms)[22m
+
