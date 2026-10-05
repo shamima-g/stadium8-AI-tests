@@ -13,7 +13,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { reviewSuite } from '../../helpers/review-suite';
-import { INTAKE_REVIEW_CHECKS } from '../../helpers/intake-review';
+import { INTAKE_REVIEW_CHECKS, buildIntakeReviewManifestFromCapture } from '../../helpers/intake-review';
+import { loadGoldenRun } from '../../helpers/golden-run';
 import { stampFor, type EvidenceItem } from '../../helpers/human-review';
 
 const REVIEW_DIR = path.resolve(process.cwd(), 'fixtures', 'golden-runs', 'intake-contact-form', 'review');
@@ -45,6 +46,20 @@ describe.skipIf(!present)('intake review bundle — well-formed', () => {
   });
   it('the manifest carries exactly the two subjective intake checks', () => {
     expect(items.map((i) => i.id).sort()).toEqual(INTAKE_REVIEW_CHECKS.map((c) => c.id).sort());
+  });
+});
+
+// Drift guard: the committed bundle must still equal what the builder produces now.
+describe.skipIf(!present)('committed bundle has NOT drifted from the builder', () => {
+  it('the committed manifest stamp equals a fresh rebuild from the capture (regenerate if this reds)', () => {
+    const g = loadGoldenRun('intake-contact-form');
+    try {
+      expect(g.present, g.reason).toBe(true);
+      const rebuilt = buildIntakeReviewManifestFromCapture(g.root as string, 'intake-contact-form');
+      expect(stampFor(rebuilt.items)).toBe(stampFor(items));
+    } finally {
+      g.cleanup();
+    }
   });
 });
 

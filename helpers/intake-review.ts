@@ -8,7 +8,9 @@
  *   #478 detail-pointed — is detail pointed-to not dumped, even paraphrased (what the token-gate can't catch)?
  * Pure over strings; the caller reads the capture (via loadGoldenRun + resolveShippedUserFile).
  */
-import { extractSection } from './project-overview';
+import fs from 'node:fs';
+import path from 'node:path';
+import { extractSection, resolveShippedUserFile } from './project-overview';
 import type { ReviewManifest } from './build-review';
 import type { ReviewCheck } from './review-logic';
 
@@ -30,6 +32,16 @@ export function factSections(projectMd: string): string {
     if (keep) out.push(line);
   }
   return out.join('\n').trim() || projectMd.trim();
+}
+
+/** Extract the shipped CLAUDE.md + project.md from a checked-out capture root, then build the manifest.
+ *  Shared by the bundle generator AND the drift-guard test (committed == what the builder produces now). */
+export function buildIntakeReviewManifestFromCapture(root: string, label = 'intake'): ReviewManifest {
+  const shipped = resolveShippedUserFile(root);
+  const claudeMd = shipped ? fs.readFileSync(shipped.path, 'utf8') : '';
+  const pm = path.join(root, 'generated-docs', 'project.md');
+  const projectMd = fs.existsSync(pm) ? fs.readFileSync(pm, 'utf8') : '';
+  return buildIntakeReviewManifest(claudeMd, projectMd, label);
 }
 
 /** Build the intake review manifest from a captured CLAUDE.md + project.md. Evidence = the written overview
