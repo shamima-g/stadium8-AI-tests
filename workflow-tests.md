@@ -247,8 +247,10 @@ scores the run, and files a report — the score is **record-only, it never fail
 **live** run needs an AI, so it isn't part of `npm test`; but its non-AI assertion functions (the
 `/plan` trace checks and the artifact-lint scoring) **do** have an npm-runnable Pester unit suite,
 `npm run test:tier3-unit`. (The subjective output-quality criteria are **human-reviewed**, not AI-judged —
-the LLM judge was retired 2026-10-02; see the human-review harness in [tier-3.md](tier-3.md).) Tier 3 is
-run before a release, and each clean pass is a good moment to re-record the Tier 2 fixture.
+the LLM judge was retired 2026-10-02; see the human-review harness in [tier-3.md](tier-3.md). The
+**artifact-reviewable** subjective checks (intake #476/#478, design #14/#15 residue) DO gate — a reviewed
+No, or an unreviewed check under `REQUIRE_REVIEW`, reds; the message-based criteria stay manual by hand.)
+Tier 3 is run before a release, and each clean pass is a good moment to re-record the Tier 2 fixture.
 
 ---
 
@@ -580,23 +582,28 @@ really is present there. If cross-version-clean is wanted, gate them on a behavi
 
 ### Post-v1.3.0 additions (branch `test/continue-no-epic-and-resume-confirm`)
 
-New test modules added for four template reworks. Each follows [section 2](#2-the-rules-every-test-follows)
-(good **and** broken case, isolated); the test-first ones are **feature-detected** where noted — they
-skip, never fail, on templates without the surface (one exception is called out below). **Honest split —
-built vs test-first, and none of these folds into the v1.3.0 baseline count above.** `/plan` epic-scope
-(Tier-1) and CLAUDE.md `## Project Overview` (Tier-1 guards **plus** a captured Tier-2 intake run — which
-surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") and Plain-language stops are
-**test-first** for features not in v1.3.0:
+New test modules for the post-v1.2.0 template reworks, plus the human-review test infrastructure (the
+retired AI judge's replacement). Each follows [section 2](#2-the-rules-every-test-follows) (good **and**
+broken case, isolated); the test-first ones are **feature-detected** where noted — they skip, never fail,
+on templates without the surface (one exception is called out below). **Honest split — built vs test-first,
+and none of these folds into the v1.3.0 baseline count above.** **BUILT:** `/plan` epic-scope (Tier-1
+guards **plus** the #200/#201 Tier-2 recorded-run, now green from a live parked-design-update capture);
+CLAUDE.md `## Project Overview` (Tier-1 guards **plus** the Tier-2 intake run — which surfaced a tracked
+product gap); and the **human-review harness** (replaces the retired AI judge — two captures wired).
+**TEST-FIRST** (features not in v1.3.0): Verbosity ("Voice and volume") and Plain-language stops.
 
 - **`/plan` epic-scope — BUILT, green vs v1.3.0** (`tier-1-unit/plan-scope/`). `/plan` handling
   project-fact-change and design-update epics is *shipped*, so these are real Tier-1 coverage:
   mutation-coupled **wording regression-guards** (pass on the real wording, red on the deletion they
-  guard). The behavioural verifications are registered as `it.todo` (8 Tier-3 behavioural + 2 Tier-2 recorded-run), blocked on
-  live-run infra + a `plan-facts-changed` scorer fix (the current scorer flags any planner `project.md`
-  change as a defect — the opposite of a project-fact epic). See the `/plan` epic-scope test plan
-  (on the template checkout's `qa/test-plans` branch).
+  guard). The **2 Tier-2 recorded-run** verifications (#200/#201) are now **GREEN** (the live
+  parked-design-update capture landed + the B10 scorer + the `plan-facts-changed` scorer split — see the
+  design-update entry below). **8 Tier-3 behavioural** remain `it.todo`, blocked on live-run infra. (The
+  old `plan-facts-changed` scorer caveat — it flagged any planner `project.md` change as a defect, the
+  opposite of a project-fact epic — is now fixed, part of what turned #200 green.) See the `/plan`
+  epic-scope test plan (on the template checkout's `qa/test-plans` branch).
 - **Verbosity ("Voice and volume") — TEST-FIRST, feature-detected** (`tier-1-unit/voice-and-volume/`
-  + `tier-2-recorded-run/voice-and-volume/` + the Tier-3 judge below). Detector unit tests + Tier-2
+  + `tier-2-recorded-run/voice-and-volume/` + the **manual verbosity review** — the AI judge was retired
+  2026-10-02; these message-based criteria stay by hand, see the AI-judge-retired entry below). Detector unit tests + Tier-2
   invariant functions are the always-run contract; the template/capture regressions are **red-pending
   and feature-detected** (skip on templates without the rework). Not in v1.3.0.
 - **Plain-language stops — TEST-FIRST + MANUAL** (`tier-1-unit/plain-stops/`). Static wording guards
@@ -628,10 +635,12 @@ surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") an
   (one also dropped the Auth bullet) — so the non-conformance is **reproducible but the failure mode is
   not deterministic**. Tracked for the template owner in
   `findings/intake-project-overview-nonconformance.md`; the pin catches a *change* in failure mode, and
-  the `.fails` flips **red** (its cue to be removed) if the template is fixed. **Still `it.todo` (5 Tier-3
-  behavioural):** the facts / pointered-detail judges, the near-ceiling budget stress, the
-  zero-`AskUserQuestion` silence check, and the B7.2.6 merge re-check — blocked on a live judge +
-  `AskUserQuestion` extractor, a near-ceiling budget fixture, and a mergeable / `-Target release` sandbox.
+  the `.fails` flips **red** (its cue to be removed) if the template is fixed. **The subjective facts-correct
+  (#476) and detail-pointed (#478) checks are now WIRED as human-review** (no AI judge) over this capture —
+  `tier-2-recorded-run/intake-overview/intake-review.test.ts`, skip-until-reviewed (see the human-review
+  harness entry below). **Remaining `it.todo` (3 Tier-3 behavioural):** the near-ceiling budget stress
+  (#479), the zero-`AskUserQuestion` silence check (#480), and the B7.2.6 merge re-check (#482) — blocked on
+  an `AskUserQuestion` extractor, a near-ceiling budget fixture, and a mergeable / `-Target release` sandbox.
   (The deterministic placeholder-gone and CR/Policies self-diff the plan once listed for Tier 3 are now
   covered in Tier 2, not pending; the `/upgrade` backfill is a separate planned module, not one of these
   todos.) Not in v1.3.0; must not be folded into the baseline. **Caveat:** the Tier-1 regression block is gated on
@@ -648,6 +657,30 @@ surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") an
   **artifact-reviewable** subjective set: intake #476/#478 and the design artifact residue of #14/#15
   (digest faithfulness + held-decision clarity) — recorded verdict, a No reds, unreviewed reds under
   `REQUIRE_REVIEW`. See `test-plans/human-review-harness-plan.md`.
+- **Human-review harness — BUILT (replaces the AI judge for subjective checks).** How a person's judgement
+  becomes a deterministic test result, no model at test time (`helpers/human-review.ts` verdict core +
+  content-hash **stamp**; `build-review.ts` generates a self-contained offline `review.html` + `writeReview`;
+  `ingest-verdict` CLI / `npm run ingest-verdict` places the copied verdict; `review-suite.ts`/`review-logic.ts`
+  register the vitest checks). Flow: a capture emits a `review.html` → a person answers Yes/No (**a Yes needs
+  an evidence citation**) → `ingest-verdict` files `verdict.json` → the test reads it: **unreviewed = skip**
+  (dev) / **red** under `REQUIRE_REVIEW`; a reviewed No = red; a reviewed Yes = green. The **stamp ties the
+  verdict to the exact capture**, so a changed capture forces re-review (an old Yes can't pass). A
+  **planted-bad calibration** (`fixtures/human-review-calibration/`) proves the harness can fail (rule 1).
+  **Wired to two real captures**, both skip-until-reviewed with a drift guard (committed bundle == a fresh
+  rebuild): intake #476 facts / #478 detail (`tier-2-recorded-run/intake-overview/intake-review.test.ts`) and
+  design digest-faithfulness / decision-clarity (`.../plan-scope/plan-design-review.test.ts`). **Scope
+  (decided 2026-10-02):** only **artifact-reviewable** checks are auto-wired; **message-based** checks (the 5
+  verbosity ACs, the plainness half of #214, plain-stops plainness, the live #14/#15 shown?/asked? cores)
+  stay **manual by hand** — they judge user-facing messages that can't be extracted without the declined
+  message-tagging (B14) or a paid live capture. All councilled. See `test-plans/human-review-harness-plan.md`.
+- **`/plan` parked design-update — Tier-2 #200/#201 GREEN (live capture landed).** A live `/plan` run that
+  parks a design-update epic (benchmark `design-taskboard`; added a Priority fact; pink wins over the recorded
+  blue) is frozen at `fixtures/golden-runs/plan-design-update/` and flips the two deterministic plan-scope
+  Tier-2 invariants green (`tier-2-recorded-run/plan-scope/plan-design-update.test.ts`): **#200** the approved
+  project fact is on `main`; **#201** the parked epic carries `parkedDesignUpdate` + a non-null
+  `designFingerprint` + `designDecisions[]`, and no design landed on `main` at plan time (B10 scorer,
+  `helpers/plan-scope.ts`). B13's same-fact-conflict scorer is built + Pester-tested (`live-driver.ps1`),
+  awaiting a colliding live run. No build / no GitHub — `/plan` ran on a bare local remote.
 
 ### Planned coverage for the post-v1.2.0 changes
 
@@ -922,5 +955,6 @@ $env:REPO_ROOT="C:\path\to\a\template-checkout"; $env:EXPECT_TEMPLATE="1"; $env:
 | Template-identity guard (`EXPECT_TEMPLATE_REF`) | The suite runs against a stale/wrong checkout and passes green instead of failing |
 | `/plan` epic-scope wording guards | The `/plan` project-fact / design-update wording regresses (a dead-end redirect returns, design leaks to `main` at plan time) — v1.3.0 |
 | Output-discipline (verbosity / plain-stops) | Internal mechanism leaks to the user, a stop reads as developer jargon, or old halt/Tier-4 vocab lingers — **test-first, not in v1.3.0** |
-| Output-quality judge (record-only) | The subjective wording criteria go ungraded on a live run (never gates) |
+| Subjective human review — artifact-reviewable (gates) | A wrong fact, an unfaithful design digest, or an unclear held decision slips through un-reviewed (or an unreviewed check passes under `REQUIRE_REVIEW`) |
+| Subjective message-based criteria (manual) | The verbosity / plain-language / read-back-&-conflict checks go unchecked by hand (AI judge retired 2026-10-02) |
 | Tier 3 — full walkthrough | Anything the automated tiers miss |

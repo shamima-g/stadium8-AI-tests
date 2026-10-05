@@ -10,9 +10,11 @@ and green.
 > documented `it.fails` **KNOWN PRODUCT GAP** — the live INTAKE output doesn't conform to the template's
 > own `project-overview.md` (see `findings/intake-project-overview-nonconformance.md`). The deterministic
 > #477 (placeholder-gone) and #481 (CR/Policies self-diff) are now covered in Tier 2, so they're no
-> longer separate Tier-3 todos. **Remaining parked:** intake **5** Tier-3 (#476 facts-judge, #478
-> detail-judge, #479 budget near-ceiling, #480 silence, #482 merge-recheck) + plan-scope **10** = **15**
-> (was 22). Built in Phase 1: **B5, B6 (build-capture variant), B8** (on top of the Phase-0 B1–B4 work).
+> longer separate Tier-3 todos. **Remaining parked:** intake **3** Tier-3 (#479 budget near-ceiling, #480
+> silence, #482 merge-recheck) — #476/#478 are now **wired as human-review** (artifact-reviewable; see the
+> 2026-10-02 update below) — + plan-scope **8** Tier-3 (#200/#201 Tier-2 are now **GREEN** from the live
+> parked-design-update capture) = **11** (was 22). Built in Phase 1: **B5, B6 (build-capture variant), B8**
+> (on top of the Phase-0 B1–B4 work).
 > Phases 2–4 below are unchanged and still gated on §6 (real-GitHub merge sandbox).
 >
 > **UPDATE (2026-10-02) — the AI judge is RETIRED; B7 / §6.3 / "Phase 2 — Judge" are SUPERSEDED.** No LLM

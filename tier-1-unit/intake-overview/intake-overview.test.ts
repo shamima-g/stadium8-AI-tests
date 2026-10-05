@@ -580,18 +580,15 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — spec + wiring present in the 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// Tier 3 — behavioural (PENDING, the real AC verification). Only the irreducibly-LIVE checks remain
-// here. Two deterministic items the plan once listed for Tier 3 — placeholder-gone and the
-// Critical-Rules/Policies self-diff — are now covered deterministically in Tier 2 over the real capture
-// (tier-2-recorded-run/intake-overview/), so they are NOT duplicated as pending Tier-3 work; likewise the
-// "landed on main" half of the silence check is Tier-2 #465. Blocked on: a live judge, an AskUserQuestion
-// extractor over the raw *-claude.jsonl(.gz) for the silence check, a near-ceiling budget fixture, and
-// -Target release resolution. See the test plan § Tier 3 + § Feasibility.
+// Tier 3 — behavioural (PENDING). Note what has MOVED OUT since: the subjective facts-correct (#476) and
+// detail-pointed (#478) checks are now WIRED as human-review (no AI judge) over the intake capture —
+// tier-2-recorded-run/intake-overview/intake-review.test.ts, skip-until-reviewed. The deterministic
+// placeholder-gone and CR/Policies self-diff are in Tier 2, and the "landed on main" half of silence is
+// Tier-2 #465. What remains below is the irreducibly-LIVE set. Blocked on: an AskUserQuestion extractor over
+// the raw *-claude.jsonl(.gz) for the silence check, a near-ceiling budget fixture, and -Target release.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 describe('Tier 3 — behavioural (pending harness infra)', () => {
-  it.todo('facts stated, correct, and agree with project.md — incl. role→action mapping and the auth forbid clause (judge)');
-  it.todo('detail is pointered not present — semantic judge per never-present category (paraphrase-proof)');
   it.todo('budget ≤12 lines / ≤150 words on the copied section; stressed by a near-ceiling fixture (3+ / long verbatim roles)');
   it.todo('ZERO AskUserQuestion between intake-approval and the CLAUDE.md commit (silence check; landed-on-main is Tier-2 #465)');
   it.todo('second write point: B7.2.6 corrects a staled fact without rewriting, or leaves the file untouched when nothing is stale');
