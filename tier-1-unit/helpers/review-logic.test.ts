@@ -51,13 +51,15 @@ describe('reviewDecision — skip/red/green + REQUIRE', () => {
   });
 });
 
-describe('reviewCoverage — N of M answered', () => {
-  it('counts pass + fail as reviewed, skips as not', () => {
+describe('reviewCoverage — N of M settled', () => {
+  it('counts an honoured Yes + a recorded No as settled, skips as not', () => {
     const v = verdict({ results: { a: 'pass', b: 'fail' }, citations: { a: 'c' } });
     expect(reviewCoverage(v, ['a', 'b', 'c'])).toEqual({ reviewed: 2, total: 3, state: 'reviewed' });
   });
-  it('a citation-less Yes counts as answered (it is a fail, not a skip)', () => {
-    expect(reviewCoverage(verdict({ results: { a: 'pass' }, citations: {} }), ['a']).reviewed).toBe(1);
+  it('a citation-less Yes does NOT count as settled (the gate fails it, so it must not read as done)', () => {
+    // Was previously (wrongly) counted as answered — that let the coverage line go green + silenced the notice
+    // while the check actually failed. It must now keep the set incomplete.
+    expect(reviewCoverage(verdict({ results: { a: 'pass' }, citations: {} }), ['a']).reviewed).toBe(0);
   });
   it('absent => 0 reviewed, "awaiting review"; stale => "verdict STALE"', () => {
     expect(reviewCoverage(verdict({ present: false }), ['a', 'b'])).toEqual({ reviewed: 0, total: 2, state: 'awaiting review' });

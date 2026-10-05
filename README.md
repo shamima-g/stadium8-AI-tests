@@ -36,6 +36,7 @@ npm run compare         # diff the latest report against the previous one
 | `npm run test:watch` | Tests in watch mode. |
 | `npm run test:tier1` | Tier 1 — fast unit tests. |
 | `npm run test:tier2` | Tier 2 — invariants over a recorded run. |
+| `npm run review:status` | List which subjective human-review checks are reviewed / pending / stale (see below). |
 | `npm run test:pester` | Tier 1 — PowerShell hook tests (Pester 5). |
 | `npm run test:tier3-unit` | Tier 3 — the runner's own unit tests (Pester 5). |
 | `npm run test:full` | Everything (template + web + e2e + gates). |
@@ -46,6 +47,22 @@ npm run compare         # diff the latest report against the previous one
 | `npm run compare:targets` | Static template-shape diff between two versions. |
 | `Run-QATests.ps1 -IncludeTier3` | Tier 3 — the live AI build (from `tier-3-automated/`). |
 | `Compare-Tier3-Reports.ps1` | Diff two Tier 3 live runs (from `tier-3-automated/`). |
+
+## Subjective checks need a human review
+
+A few Tier-2 checks can't be settled by a lookup — they ask a person "does this read correctly?" Those stay
+**pending** (they skip in dev, and go **red** under `REQUIRE_REVIEW`) until a human records a verdict. You
+won't miss them:
+
+- **During a run**, each pending/stale check prints a notice naming the page to open and the command to file
+  the answer — so a `npm run test:tier2` won't hide them behind a "skipped" count.
+- **On demand**, `npm run review:status` lists every review slot as reviewed / pending / stale, with the same
+  `open` + `ingest-verdict` lines.
+
+To record one: open the slot's `review.html`, answer Yes/No (a **Yes needs a one-line evidence citation**),
+copy the verdict, and run `npm run ingest-verdict <slotReviewDir>`. It files `verdict.json` + a human-readable
+`PROOF.md` under `TestResults/review/<benchmark>/<yyyyMMdd-HHmmss>/`, after which the check goes green (or red
+on a No). Full design: [test-plans/human-review-harness-plan.md](test-plans/human-review-harness-plan.md).
 
 ## Heavier checks
 

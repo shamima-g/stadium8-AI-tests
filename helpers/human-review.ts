@@ -125,3 +125,153 @@ export function checkOutcome(v: LoadedVerdict, id: string): { outcome: Outcome; 
   if (r === 'fail') return { outcome: 'fail', reason: `#${id}: reviewer said No` };
   return { outcome: 'skip', reason: `#${id}: not reviewed` };
 }
+
+export type CheckStatus = 'honoured' | 'rejected' | 'uncited' | 'unreviewed';
+
+/**
+ * Classify one check against a verdict using the SAME honouring rule as `checkOutcome` — the single source of
+ * truth for "is this a completed, trustworthy human decision?". Every "are we done?" surface (coverage line,
+ * the in-run notice, `review:status`, the PROOF.md count) MUST derive from this, so none of them can disagree
+ * with the gate:
+ *   - `honoured`   — a Yes WITH an evidence citation (green at test time).
+ *   - `rejected`   — a reviewer No (a real recorded decision; red, but the review IS complete).
+ *   - `uncited`    — a Yes with no (usable) citation. The gate fails it ("not honoured"), so it must NOT read
+ *                    as done anywhere — the reviewer has to go back and cite.
+ *   - `unreviewed` — no answer yet.
+ */
+export function classifyCheck(v: Pick<LoadedVerdict, 'results' | 'citations'>, id: string): CheckStatus {
+  const r = v.results[id];
+  if (r === 'fail') return 'rejected';
+  if (r === 'pass') {
+    const raw = v.citations[id];
+    return typeof raw === 'string' && raw.trim() ? 'honoured' : 'uncited';
+  }
+  return 'unreviewed';
+}
+
+/** A completed human decision: an honoured Yes or a recorded No. A citation-less Yes / no answer is NOT settled. */
+export function isSettled(v: Pick<LoadedVerdict, 'results' | 'citations'>, id: string): boolean {
+  const s = classifyCheck(v, id);
+  return s === 'honoured' || s === 'rejected';
+}
+
+// ── Where a RECORDED verdict lives (separate from the committed review INPUTS) ───────────────────────
+//
+// The fixtures slot keeps the review inputs (review.html + manifest.json). The recorded human decision is
+// an OUTPUT, filed under the same TestResults root + timestamp convention as Tier-3:
+//   <repo>/TestResults/review/<benchmark>/<yyyyMMdd-HHmmss>/{verdict.json, PROOF.md}
+// So each review makes a new dated folder (a history), and the test reads the newest verdict whose stamp
+// still matches the current capture. `__dirname` is helpers/, so `..` is the AI-tests repo root — the same
+// root Run-QATests.ps1 uses (`$PSScriptRoot/../TestResults`). REVIEW_RESULTS_ROOT overrides it (for tests).
+
+/** The dated run-folder shape, shared by the writer (ingest) and the reader (loadLatestVerdict). */
+export const REVIEW_TS_RE = /^\d{8}-\d{6}$/; // yyyyMMdd-HHmmss
+
+/** Root of the review results tree: `<repo>/TestResults/review` (or $REVIEW_RESULTS_ROOT). */
+export function reviewResultsRoot(): string {
+  const override = process.env.REVIEW_RESULTS_ROOT;
+  return override && override.trim()
+    ? path.resolve(override)
+    : path.resolve(__dirname, '..', 'TestResults', 'review');
+}
+
+/** The per-benchmark review results dir: `<root>/<benchmark>`. */
+export function reviewResultsDir(benchmark: string): string {
+  return path.join(reviewResultsRoot(), benchmark);
+}
+
+/** Tier-3 run-folder stamp: fixed-width local-time `yyyyMMdd-HHmmss` (matches Run-QATests.ps1's pattern,
+ *  with seconds so two reviews in the same minute don't collide). Every field is zero-padded, including the
+ *  year, so lexicographic order == chronological order — the invariant `loadLatestVerdict`'s sort relies on. */
+export function formatReviewTimestamp(d: Date): string {
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${p(d.getFullYear(), 4)}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+/**
+ * Resolve + normalize the benchmark a slot's verdicts are filed under, read from the slot's `meta.json` (one
+ * dir up from its review/). Trimmed, and rejected if it holds path separators or `..` — so the writer
+ * (ingest) and the reader (the suite) always agree on one safe folder name. This is the SINGLE source of
+ * the benchmark for both sides. Throws (fail-closed) when meta.json is missing or has no usable benchmark.
+ */
+export function readSlotBenchmark(slotReviewDir: string): string {
+  const metaPath = path.join(path.dirname(slotReviewDir), 'meta.json');
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { benchmark?: unknown };
+  const raw = typeof meta.benchmark === 'string' ? meta.benchmark.trim() : '';
+  if (!raw) {
+    throw new Error(`${metaPath} has no string "benchmark" — needed to file the verdict under TestResults/review/<benchmark>/`);
+  }
+  if (/[\\/]|\.\./.test(raw)) {
+    throw new Error(`${metaPath} "benchmark" must not contain path separators or "..": ${JSON.stringify(raw)}`);
+  }
+  return raw;
+}
+
+/** An absolute path as a clickable `file:///` URL (forward slashes) — opens straight from a terminal/editor. */
+export function fileUrl(absPath: string): string {
+  return 'file:///' + absPath.replace(/\\/g, '/').replace(/^\//, '');
+}
+
+/** `absPath` relative to the AI-tests repo root (forward slashes), e.g. `fixtures/golden-runs/<slot>/review`
+ *  — the shape the `ingest-verdict` command documents. Falls back to the absolute path if it's outside the
+ *  repo (e.g. a different drive), so the printed command is always runnable. */
+export function repoRelative(absPath: string): string {
+  const rel = path.relative(path.resolve(__dirname, '..'), absPath);
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.replace(/\\/g, '/') : absPath;
+}
+
+export interface LoadedLatestVerdict extends LoadedVerdict {
+  /** the dated run dir the active verdict came from (null when none is active). */
+  from: string | null;
+}
+
+/**
+ * Load the ACTIVE verdict for a benchmark from its dated review folders. Among every
+ * `TestResults/review/<benchmark>/<ts>/verdict.json` whose stamp matches `currentStamp`, the NEWEST (folder
+ * name is `yyyyMMdd-HHmm`, so lexicographic order == chronological) wins — a re-review supersedes, while an
+ * older review of byte-identical evidence (same stamp) is still honoured. Fail-closed, exactly like
+ * `loadVerdict`: a benchmark dir holding verdicts but none matching the current stamp reports **stale**
+ * (re-review); no dir / no verdict files reports **not-present** (skip). Never a vacuous pass.
+ */
+export function loadLatestVerdict(benchmarkDir: string, currentStamp: string): LoadedLatestVerdict {
+  const notPresent = (reason: string): LoadedLatestVerdict =>
+    ({ present: false, stale: false, reason, results: {}, citations: {}, from: null });
+  if (!fs.existsSync(benchmarkDir)) return notPresent(`no reviews under ${benchmarkDir} — awaiting review`);
+
+  let dirs: string[];
+  try {
+    dirs = fs
+      .readdirSync(benchmarkDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      // Only genuine yyyyMMdd-HHmmss run folders. A stray/junk/uppercase name (e.g. "latest", a backup) must
+      // NOT be considered — letters sort ABOVE digits, so an unfiltered junk folder could masquerade as the
+      // newest and resurrect a superseded verdict (a vacuous green). Filtering keeps the sort honest.
+      .filter((n) => REVIEW_TS_RE.test(n))
+      .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)); // newest (highest timestamp) first
+  } catch {
+    return notPresent(`cannot read ${benchmarkDir} — awaiting review`);
+  }
+
+  let sawVerdict = false;
+  let newestStaleReason = '';
+  for (const name of dirs) {
+    const dir = path.join(benchmarkDir, name);
+    if (!fs.existsSync(path.join(dir, 'verdict.json'))) continue;
+    sawVerdict = true;
+    const v = loadVerdict(dir, currentStamp); // reuse the same fail-closed reader (reads <dir>/verdict.json)
+    if (v.present && !v.stale) return { ...v, from: dir };
+    if (!newestStaleReason) newestStaleReason = v.reason; // the newest file's reason (dirs are newest-first)
+  }
+  if (sawVerdict) {
+    return {
+      present: true,
+      stale: true,
+      reason: newestStaleReason || 'no recorded verdict matches the current capture — re-review',
+      results: {},
+      citations: {},
+      from: null,
+    };
+  }
+  return notPresent(`no verdict.json under ${benchmarkDir} — awaiting review`);
+}

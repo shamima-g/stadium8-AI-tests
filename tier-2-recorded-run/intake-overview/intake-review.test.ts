@@ -17,9 +17,12 @@ import { INTAKE_REVIEW_CHECKS, buildIntakeReviewManifestFromCapture } from '../.
 import { loadGoldenRun } from '../../helpers/golden-run';
 import { stampFor, type EvidenceItem } from '../../helpers/human-review';
 
-const REVIEW_DIR = path.resolve(process.cwd(), 'fixtures', 'golden-runs', 'intake-contact-form', 'review');
+const SLOT_DIR = path.resolve(process.cwd(), 'fixtures', 'golden-runs', 'intake-contact-form');
+const REVIEW_DIR = path.join(SLOT_DIR, 'review'); // committed INPUTS (review.html + manifest.json)
 const manifestPath = path.join(REVIEW_DIR, 'manifest.json');
 const present = fs.existsSync(manifestPath);
+// reviewSuite resolves the benchmark (from the slot meta) and thus the TestResults/review/<benchmark>/<ts>/
+// results dir internally — via the SAME helper the ingest writer uses, so writer and reader can't disagree.
 const items: EvidenceItem[] = present
   ? (JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as { items: EvidenceItem[] }).items
   : [];

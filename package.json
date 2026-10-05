@@ -21,7 +21,8 @@
     "reconcile:check": "node scripts/reconcile-template.cjs --check",
     "test:target": "node scripts/run-target.cjs",
     "compare:targets": "node scripts/compare-targets.cjs",
-    "ingest-verdict": "vite-node helpers/ingest-verdict-cli.ts"
+    "ingest-verdict": "vite-node helpers/ingest-verdict-cli.ts",
+    "review:status": "vite-node helpers/review-status-cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

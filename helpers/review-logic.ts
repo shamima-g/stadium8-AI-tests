@@ -3,7 +3,7 @@
  * vitest import, so it is reusable at runtime and unit-testable without the test runner (the vitest glue
  * lives in review-suite.ts). See test-plans/human-review-harness-plan.md.
  */
-import { checkOutcome, type LoadedVerdict, type EvidenceItem } from './human-review';
+import { checkOutcome, isSettled, type LoadedVerdict, type EvidenceItem } from './human-review';
 
 export type ReviewAction = 'pass' | 'fail' | 'skip';
 export interface ReviewCheck {
@@ -29,9 +29,14 @@ export function reviewDecision(v: LoadedVerdict, id: string, requireReview: bool
   return { action: o.outcome, reason: o.reason };
 }
 
-/** Pure: coverage summary. `reviewed` = checks the reviewer actually answered (pass or fail), not skips. */
+/**
+ * Pure: coverage summary. `reviewed` = checks that are SETTLED (an honoured Yes or a recorded No) — a
+ * citation-less Yes does NOT count, because the gate won't honour it; counting it here would let the coverage
+ * line go green and silence the in-run notice while the check actually fails ("done" surfaces must agree with
+ * the gate). Uses the same `isSettled` the status command and PROOF.md count use.
+ */
 export function reviewCoverage(v: LoadedVerdict, ids: string[]): { reviewed: number; total: number; state: string } {
-  const reviewed = ids.filter((id) => checkOutcome(v, id).outcome !== 'skip').length;
+  const reviewed = ids.filter((id) => isSettled(v, id)).length;
   const state = v.stale ? 'verdict STALE — re-review' : !v.present ? 'awaiting review' : 'reviewed';
   return { reviewed, total: ids.length, state };
 }

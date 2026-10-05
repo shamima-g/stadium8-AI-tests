@@ -7,10 +7,14 @@ the step-by-step "plan to build" is spent.
 
 ## What it is
 A capture emits a self-contained **`review.html`**; a person answers **Yes/No** per criterion (a Yes needs a
-one-line evidence citation); they copy the verdict and run **`npm run ingest-verdict <slot>`**, which
-validates it and writes `verdict.json`; the test reads it:
+one-line evidence citation); they copy the verdict and run **`npm run ingest-verdict <slotReviewDir>`**, which
+validates it and files the recorded result — kept **separate from the committed review inputs** — under the
+Tier-3 results convention: **`TestResults/review/<benchmark>/<yyyyMMdd-HHmmss>/`** (both `verdict.json` and a
+human-readable `PROOF.md`). The test reads the **newest dated verdict whose stamp still matches** the capture:
 - unreviewed/stale ⇒ **skip** (dev) / **red** under **`REQUIRE_REVIEW`**; reviewed **No** ⇒ red; reviewed
-  **Yes** (with citation) ⇒ green. An aggregate **"N of M reviewed"** line keeps coverage visible.
+  **Yes** (with citation) ⇒ green. An aggregate **"N of M reviewed"** line keeps coverage visible. Each
+  review makes a new dated folder, so the results are a history; a re-review supersedes, and an older review of
+  byte-identical evidence (same stamp) is still honoured.
 
 Files: `helpers/human-review.ts` (verdict core + stamp), `build-review.ts` (`review.html` + `writeReview`),
 `ingest-verdict.ts` (+ the `ingest-verdict` npm script), `review-suite.ts` / `review-logic.ts` (vitest
@@ -52,9 +56,18 @@ deterministic-once-extracted (need the stream extractor, not review).
 3. **plain-stops** — the manual doc stays the live walkthrough; its plainness verdict is message-based, so it
    stays **manual** too (not on the review screen). Grep tripwires remain code checks.
 
+## How a user knows a review is waiting
+A pending/stale review is never buried in a "skipped" count:
+- **In-run notice** — `reviewSuite` prints `[review pending|stale] <label> …` with the `review.html` to open
+  and the exact `npm run ingest-verdict <dir>` command, during a normal `npm run test:tier2`.
+- **On-demand** — **`npm run review:status`** (`helpers/review-status.ts`) lists every slot as
+  reviewed / pending / stale with the same open + ingest lines, without running the suite.
+
 ## Proof
-Each wired capture's `PROOF.md` (when a review lands) lists `verdict.json` + `review.html` as clickable
-`file:///` links so they open straight from the result.
+`ingest-verdict` writes a **`PROOF.md`** next to each `verdict.json` under
+`TestResults/review/<benchmark>/<yyyyMMdd-HHmmss>/`: the benchmark/slot, reviewer + when, every criterion with
+its Yes/No/— outcome and citation, and clickable `file:///` links to `review.html` and `verdict.json` so they
+open straight from the result.
 
 ## What would unblock the manual set
 The message-based checks become auto-wireable only if **message-tagging (B14)** is revisited (so user-facing

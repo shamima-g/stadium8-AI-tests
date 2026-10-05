@@ -7,7 +7,19 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { canonicalizeText, stampFor, loadVerdict, checkOutcome, type EvidenceItem } from '../../helpers/human-review';
+import {
+  canonicalizeText,
+  stampFor,
+  loadVerdict,
+  loadLatestVerdict,
+  formatReviewTimestamp,
+  readSlotBenchmark,
+  classifyCheck,
+  isSettled,
+  repoRelative,
+  checkOutcome,
+  type EvidenceItem,
+} from '../../helpers/human-review';
 
 const EV: EvidenceItem[] = [
   { id: 'a', criterion: 'Is A right?', evidence: 'line one\nline two' },
@@ -122,6 +134,176 @@ describe('loadVerdict — fail-closed', () => {
         expect(v.results).toEqual({});
       });
     }
+  });
+});
+
+describe('formatReviewTimestamp — the Tier-3 yyyyMMdd-HHmmss convention', () => {
+  it('zero-pads month/day/hour/minute/second', () => {
+    expect(formatReviewTimestamp(new Date(2026, 0, 5, 9, 3, 7))).toBe('20260105-090307');
+  });
+  it('a late-year double-digit date', () => {
+    expect(formatReviewTimestamp(new Date(2026, 11, 25, 14, 30, 45))).toBe('20261225-143045');
+  });
+  it('fixed-width always (padded year + seconds) — every output is exactly 15 chars', () => {
+    expect(formatReviewTimestamp(new Date(2026, 0, 1, 0, 0, 0))).toHaveLength(15);
+    expect(formatReviewTimestamp(new Date(2026, 0, 1, 0, 0, 0))).toMatch(/^\d{8}-\d{6}$/);
+  });
+  it('sorts lexicographically == chronologically (so newest-dir-first is newest-run-first)', () => {
+    const a = formatReviewTimestamp(new Date(2026, 9, 5, 13, 23, 10));
+    const b = formatReviewTimestamp(new Date(2026, 9, 5, 13, 23, 55)); // 45s later, same minute
+    expect(a < b).toBe(true); // seconds keep same-minute runs distinct AND ordered
+  });
+});
+
+describe('loadLatestVerdict — newest matching dated verdict wins, fail-closed', () => {
+  const stamp = stampFor(EV);
+  // Make a benchmark dir with dated run subfolders, each optionally holding a verdict.json.
+  function withBenchmarkDir(fn: (dir: string, put: (ts: string, v: unknown) => void) => void) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hr-latest-'));
+    const put = (ts: string, v: unknown) => {
+      const d = path.join(dir, ts);
+      fs.mkdirSync(d, { recursive: true });
+      fs.writeFileSync(path.join(d, 'verdict.json'), typeof v === 'string' ? v : JSON.stringify(v));
+    };
+    try { fn(dir, put); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }
+
+  it('no benchmark dir => not present (skip), not stale', () => {
+    const v = loadLatestVerdict(path.join(os.tmpdir(), 'hr-does-not-exist-xyz'), stamp);
+    expect(v.present).toBe(false);
+    expect(v.stale).toBe(false);
+    expect(v.from).toBeNull();
+  });
+
+  it('dir with no verdict files => not present (skip)', () => {
+    withBenchmarkDir((dir) => {
+      fs.mkdirSync(path.join(dir, '20260101-000000'), { recursive: true }); // empty dated folder
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.present).toBe(false);
+      expect(v.stale).toBe(false);
+    });
+  });
+
+  it('a matching verdict => present, readable, with its source dir', () => {
+    withBenchmarkDir((dir, put) => {
+      put('20260101-090000', { stamp, results: { a: 'pass' }, citations: { a: 'ok' } });
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.present).toBe(true);
+      expect(v.stale).toBe(false);
+      expect(v.results.a).toBe('pass');
+      expect(v.from).toBe(path.join(dir, '20260101-090000'));
+    });
+  });
+
+  it('the NEWEST matching verdict wins (a re-review supersedes an earlier one)', () => {
+    withBenchmarkDir((dir, put) => {
+      put('20260101-090000', { stamp, results: { a: 'fail' }, citations: {} });
+      put('20260202-103000', { stamp, results: { a: 'pass' }, citations: { a: 'now correct' } });
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.results.a).toBe('pass');
+      expect(v.from).toBe(path.join(dir, '20260202-103000'));
+    });
+  });
+
+  it('an older verdict of IDENTICAL evidence (same stamp) is still honoured when the newest is stale', () => {
+    withBenchmarkDir((dir, put) => {
+      put('20260101-090000', { stamp, results: { a: 'pass' }, citations: { a: 'ok' } }); // matches current
+      put('20260202-103000', { stamp: 'deadbeef', results: { a: 'pass' }, citations: { a: 'x' } }); // different capture
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.present).toBe(true);
+      expect(v.stale).toBe(false);
+      expect(v.from).toBe(path.join(dir, '20260101-090000'));
+    });
+  });
+
+  it('FAIL-CLOSED: verdicts exist but NONE match the current stamp => stale (re-review), never a vacuous pass', () => {
+    withBenchmarkDir((dir, put) => {
+      put('20260101-090000', { stamp: 'deadbeef', results: { a: 'pass' }, citations: { a: 'x' } });
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.present).toBe(true);
+      expect(v.stale).toBe(true);
+      expect(v.results).toEqual({});
+      expect(v.from).toBeNull();
+    });
+  });
+
+  it('FAIL-CLOSED: a NON-timestamp folder (latest/, UPPERCASE) can NOT beat the newest real timestamp', () => {
+    withBenchmarkDir((dir, put) => {
+      // The real, newest re-review says No.
+      put('20260202-103000', { stamp, results: { a: 'fail' }, citations: {} });
+      // Junk folders holding a stale "Yes" — their names sort ABOVE digits lexicographically. Must be ignored.
+      put('latest', { stamp, results: { a: 'pass' }, citations: { a: 'resurrected' } });
+      put('ZZZ-backup', { stamp, results: { a: 'pass' }, citations: { a: 'resurrected' } });
+      fs.mkdirSync(path.join(dir, '.git'), { recursive: true });
+      const v = loadLatestVerdict(dir, stamp);
+      expect(v.results.a).toBe('fail'); // the real newest timestamp wins — the junk "Yes" did NOT resurrect
+      expect(v.from).toBe(path.join(dir, '20260202-103000'));
+    });
+  });
+});
+
+describe('readSlotBenchmark — one trimmed, path-safe benchmark for writer and reader', () => {
+  function withSlot(metaBenchmark: unknown): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hr-slot-'));
+    const reviewDir = path.join(root, 'review');
+    fs.mkdirSync(reviewDir, { recursive: true });
+    fs.writeFileSync(path.join(root, 'meta.json'), JSON.stringify({ benchmark: metaBenchmark }));
+    return reviewDir;
+  }
+
+  it('returns the trimmed benchmark (writer and reader can never disagree on whitespace)', () => {
+    expect(readSlotBenchmark(withSlot('  contact-form  '))).toBe('contact-form');
+  });
+  it('throws when there is no usable benchmark', () => {
+    expect(() => readSlotBenchmark(withSlot(''))).toThrow(/benchmark/);
+    expect(() => readSlotBenchmark(withSlot(42))).toThrow(/benchmark/);
+  });
+  it('rejects path separators and traversal (no escaping TestResults/review)', () => {
+    expect(() => readSlotBenchmark(withSlot('a/b'))).toThrow(/path separators|\.\./);
+    expect(() => readSlotBenchmark(withSlot('..'))).toThrow(/path separators|\.\./);
+    expect(() => readSlotBenchmark(withSlot('a\\b'))).toThrow(/path separators|\.\./);
+  });
+});
+
+describe('classifyCheck / isSettled — the single honouring source of truth', () => {
+  const v = (results: Record<string, 'pass' | 'fail'>, citations: Record<string, string> = {}) => ({ results, citations });
+
+  it('a Yes WITH a citation => honoured + settled', () => {
+    const d = v({ a: 'pass' }, { a: 'because X' });
+    expect(classifyCheck(d, 'a')).toBe('honoured');
+    expect(isSettled(d, 'a')).toBe(true);
+  });
+  it('a reviewer No => rejected + settled (a completed decision, even though it reds)', () => {
+    const d = v({ a: 'fail' });
+    expect(classifyCheck(d, 'a')).toBe('rejected');
+    expect(isSettled(d, 'a')).toBe(true);
+  });
+  it('a Yes WITHOUT a (usable) citation => uncited + NOT settled', () => {
+    expect(classifyCheck(v({ a: 'pass' }, {}), 'a')).toBe('uncited');
+    expect(classifyCheck(v({ a: 'pass' }, { a: '   ' }), 'a')).toBe('uncited');
+    expect(isSettled(v({ a: 'pass' }, {}), 'a')).toBe(false);
+  });
+  it('no answer => unreviewed + NOT settled', () => {
+    expect(classifyCheck(v({}), 'a')).toBe('unreviewed');
+    expect(isSettled(v({}), 'a')).toBe(false);
+  });
+  it('agrees with checkOutcome: settled-or-not lines up with honoured-pass vs everything-else', () => {
+    // honoured => checkOutcome pass; uncited/rejected => fail; unreviewed => skip. isSettled = honoured||rejected.
+    expect(checkOutcome({ present: true, stale: false, reason: '', results: { a: 'pass' }, citations: { a: 'c' } }, 'a').outcome).toBe('pass');
+    expect(checkOutcome({ present: true, stale: false, reason: '', results: { a: 'pass' }, citations: {} }, 'a').outcome).toBe('fail'); // uncited
+  });
+});
+
+describe('repoRelative — the ingest-command path shape', () => {
+  it('an in-repo path relativizes to forward-slash, no leading .. (the documented ingest arg)', () => {
+    const abs = path.resolve(__dirname, '..', '..', 'fixtures', 'golden-runs', 'intake-contact-form', 'review');
+    expect(repoRelative(abs)).toBe('fixtures/golden-runs/intake-contact-form/review');
+  });
+  it('a path outside the repo falls back to the absolute path (never a broken ..)', () => {
+    const outside = path.resolve(os.tmpdir(), 'somewhere-else', 'review');
+    const out = repoRelative(outside);
+    expect(out).toBe(outside);
+    expect(out.startsWith('..')).toBe(false);
   });
 });
 

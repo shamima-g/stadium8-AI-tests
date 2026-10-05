@@ -2,21 +2,33 @@
  * Human-review harness — Step 3: the `ingest-verdict` command.
  *
  * A browser can't save a file to a chosen folder, so the reviewer copies the verdict JSON and this command
- * PLACES it in the slot's review/ dir — after validating its stamp against the capture (fail-closed), so a
- * verdict for a different/changed capture is refused, not filed. The validation is a pure, unit-tested
- * function; the clipboard/Downloads/file gathering + the write are the thin I/O wrapper.
+ * FILES it under `TestResults/review/<benchmark>/<yyyyMMdd-HHmmss>/` (verdict.json + PROOF.md) — after
+ * validating its stamp against the capture (fail-closed), so a verdict for a different/changed capture is
+ * refused, not filed. The recorded verdict is kept separate from the committed review INPUTS (review.html +
+ * manifest.json) that stay in the slot dir. The validation is a pure, unit-tested function; the
+ * clipboard/Downloads/file gathering + the write are the thin I/O wrapper.
  *
- * Usage (run via tsx):
+ * Usage (run via vite-node):
  *   ingest-verdict <slotReviewDir> [--file <path> | --from-clipboard | --text <json>]
  *   (default source: newest verdict*.json in ~/Downloads)
- * The slot review dir must contain `manifest.json` ({ items: EvidenceItem[] }) — the capture writes it
- * next to review.html, and it is the single source of the expected stamp (stampFor(items)).
+ * The slot review dir must contain `manifest.json` ({ items: EvidenceItem[] }) — the capture writes it next
+ * to review.html, and it is the single source of the expected stamp (stampFor(items)). The benchmark the
+ * verdict is filed under comes from the slot's `meta.json` (one dir up).
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { stampFor, type EvidenceItem, type Outcome } from './human-review';
+import {
+  stampFor,
+  reviewResultsDir,
+  readSlotBenchmark,
+  formatReviewTimestamp,
+  fileUrl,
+  isSettled,
+  type EvidenceItem,
+  type Outcome,
+} from './human-review';
 
 export interface IngestResult {
   ok: boolean;
@@ -124,12 +136,71 @@ function readManifestItems(reviewDir: string): EvidenceItem[] {
   return m.items;
 }
 
+export interface CleanVerdict {
+  stamp: string;
+  reviewer: string;
+  reviewedAt: string;
+  results: Record<string, Outcome>;
+  citations: Record<string, string>;
+}
+
+/**
+ * The human-readable PROOF.md filed next to verdict.json: which benchmark/slot, who reviewed and when, every
+ * criterion with its Yes/No/— outcome and the evidence citation, and clickable file:// links back to the
+ * review page and the recorded verdict. Pure (no I/O) so it is unit-tested directly.
+ */
+export function buildProofMd(opts: {
+  benchmark: string;
+  slot: string;
+  items: EvidenceItem[];
+  verdict: CleanVerdict;
+  reviewHtmlPath: string;
+  verdictJsonPath: string;
+}): string {
+  const { benchmark, slot, items, verdict, reviewHtmlPath, verdictJsonPath } = opts;
+  const mark = (o: Outcome | undefined, cite: string): string => {
+    if (o === 'pass') return cite.trim() ? 'Yes' : 'Yes (no citation — NOT honoured)';
+    if (o === 'fail') return 'No';
+    return '—';
+  };
+  const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  const rows = items.map((it) => {
+    const o = verdict.results[it.id];
+    const cite = typeof verdict.citations[it.id] === 'string' ? verdict.citations[it.id] : '';
+    return `| ${esc(it.id)} | ${esc(it.criterion)} | ${mark(o, cite)} | ${esc(cite) || '—'} |`;
+  });
+  // Count SETTLED (honoured Yes or recorded No) — the same rule as the coverage line / review:status, so a
+  // citation-less Yes (rendered "NOT honoured" in the rows below) does not inflate this header count.
+  const settled = items.filter((it) => isSettled(verdict, it.id)).length;
+  return [
+    `# Review proof — ${slot}`,
+    '',
+    `- **Benchmark:** ${benchmark}`,
+    `- **Slot:** ${slot}`,
+    `- **Reviewer:** ${verdict.reviewer || '(unnamed)'}`,
+    `- **Reviewed at:** ${verdict.reviewedAt || '(not recorded)'}`,
+    `- **Coverage:** ${settled}/${items.length} settled`,
+    `- **Stamp:** \`${verdict.stamp}\``,
+    '',
+    '| Check | Criterion | Verdict | Evidence citation |',
+    '|---|---|---|---|',
+    ...rows,
+    '',
+    '## Files',
+    `- Review page (inputs): [${path.basename(reviewHtmlPath)}](${fileUrl(reviewHtmlPath)})`,
+    `- Recorded verdict: [${path.basename(verdictJsonPath)}](${fileUrl(verdictJsonPath)})`,
+    '',
+  ].join('\n');
+}
+
 export function runCli(argv: string[]): number {
-  const reviewDir = argv[0];
-  if (!reviewDir) {
+  if (!argv[0]) {
     console.error('usage: ingest-verdict <slotReviewDir> [--file <path> | --from-clipboard | --text <json>]');
     return 2;
   }
+  // Resolve to an absolute path up front, so the PROOF.md file:// link and the console line are valid even
+  // when called with the documented repo-relative dir (fixtures/golden-runs/<slot>/review).
+  const reviewDir = path.resolve(argv[0]);
   try {
     const fileIdx = argv.indexOf('--file');
     const textIdx = argv.indexOf('--text');
@@ -150,9 +221,26 @@ export function runCli(argv: string[]): number {
       console.error('REFUSED: ' + res.error);
       return 1;
     }
-    const out = path.join(reviewDir, 'verdict.json');
-    fs.writeFileSync(out, JSON.stringify(res.verdict, null, 2));
-    console.log('verdict placed -> ' + out);
+    // File the recorded verdict (an OUTPUT) under TestResults/review/<benchmark>/<yyyyMMdd-HHmm>/, separate
+    // from the committed review inputs in reviewDir — same TestResults root + timestamp convention as Tier-3.
+    const benchmark = readSlotBenchmark(reviewDir); // may throw: no meta.json / no (safe) benchmark field
+    const slot = path.basename(path.dirname(reviewDir));
+    const outDir = path.join(reviewResultsDir(benchmark), formatReviewTimestamp(new Date()));
+    fs.mkdirSync(outDir, { recursive: true });
+
+    const verdictPath = path.join(outDir, 'verdict.json');
+    fs.writeFileSync(verdictPath, JSON.stringify(res.verdict, null, 2));
+
+    const reviewHtmlPath = path.join(reviewDir, 'review.html');
+    const proofPath = path.join(outDir, 'PROOF.md');
+    fs.writeFileSync(
+      proofPath,
+      buildProofMd({ benchmark, slot, items, verdict: res.verdict as CleanVerdict, reviewHtmlPath, verdictJsonPath: verdictPath }),
+    );
+
+    console.log('verdict placed -> ' + verdictPath);
+    console.log('proof written  -> ' + proofPath);
+    console.log('open review    -> ' + fileUrl(reviewHtmlPath));
     return 0;
   } catch (e) {
     // a missing --file, missing/malformed manifest.json, or an unreadable path lands here as a clean
