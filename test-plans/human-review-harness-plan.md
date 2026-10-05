@@ -4,9 +4,23 @@
 (`helpers/human-review.ts`), the review-page generator + `writeReview` (`build-review.ts`), the
 `ingest-verdict` command, the test wiring + `REQUIRE_REVIEW` (`review-suite.ts`/`review-logic.ts`), the
 broken-case calibration, and the **AI judge is RETIRED** (`tier-3-automated/judge/` deleted; its 5
-verbosity criteria re-homed in `helpers/verbosity-review-checks.ts`). **Step 7 remaining:** wire the first
-real check end-to-end against a capture. (Originally plan-only; revised after a 3-lens council that fixed
-v1's blocker, honesty holes, and mis-mappings.)
+verbosity criteria re-homed in `helpers/verbosity-review-checks.ts`). **Step 7 DONE** — two real captures
+wired end-to-end (each councilled + drift-guarded): intake #476/#478 (`intake-contact-form`) and design
+digest/decision (`plan-design-update`), both skip-until-reviewed.
+
+**Scope boundary — DECIDED 2026-10-02.** The harness auto-wires the **artifact-reviewable** subjective
+checks (judged from the committed capture files): intake #476/#478, and the design **artifact residue** of
+#14/#15 (digest faithfulness + held-decision clarity). The **message-based** checks — the 5 verbosity ACs,
+the "does it read plainly" half of #214, and the **live** #14/#15 cores (was the read-back SHOWN / the
+conflict ASKED) — judge the tool's *user-facing messages*, which these capture slots don't commit and which
+can't be singled out cleanly (the raw stream exists but is un-tagged — the correct hand-back can't be
+isolated without the declined message-tagging/B14, or a paid live capture + best-effort guessing).
+**The user chose to keep those BY HAND** (the manual-tests docs / coverage matrix), not auto-wired.
+(Note: #214's "at approval, not at build" PLACEMENT half is deterministic-once-extracted, not subjective —
+it's pending the stream extractor, same class as #480, not a manual review.) The build is COMPLETE for the
+artifact-reviewable set; the message-based set stays manual unless B14 is revisited or a live capture is funded.
+
+(Originally plan-only; revised after a 3-lens council that fixed v1's blocker, honesty holes, and mis-mappings.)
 
 Replaces model-graded subjective checks with a human-in-the-loop browser review whose verdict is recorded
 and read deterministically. No AI at test time.
@@ -78,17 +92,20 @@ stream extractor exists; it needs B1/AUQ extraction, not review.
 
 - **AI-judge seam retired ✅ (2026-10-02).** `tier-3-automated/judge/` (rubric/calibration/`JudgeAdapter`,
   ACs 3/4/5/7/8) is **deleted** and dropped from the vitest `include`; its five verbosity criteria are
-  re-homed in `helpers/verbosity-review-checks.ts` (to become five review checks when wired at Step 7).
+  re-homed in `helpers/verbosity-review-checks.ts` as the canonical criteria LIST — but kept MANUAL (by
+  hand), NOT auto-wired (message-based; see the scope boundary at the top, decided 2026-10-02).
 - **plain-stops — keep both, split by role (DECIDED).** The manual doc (`manual-tests/B-plain-stops.md`,
   `qa/test-plans` branch) **stays** as the live behavioural walkthrough (delete brief+story → `/continue`
   restores silently; the give-up loop fires). The **plain-language verdict** ("does the message read
   plainly") **moves onto the gating review screen**; the manual doc points to that verdict instead of
   re-asking it. No duplicated Yes/No; grep tripwires stay as code checks.
-- **Decide the design cores #14/#15.** They are **record-only eyeball cores** today (`DESIGN-CAPTURE-LOG.md`;
-  "record-only, never gate"). Converting them to **gating** review checks is a real change of policy —
-  decide gating-vs-record-only, and pick **one** verdict store (this harness's `verdict.json` OR
-  `DESIGN-CAPTURE-LOG.md`), not both. v1's claim that this "fits the existing record-only model" was wrong:
-  this harness **gates**, so it's a new mechanism that needs this reconciliation.
+- **Design cores #14/#15 — split (RESOLVED 2026-10-02).** Their ARTIFACT residue IS wired and gates: the
+  digest (read-back artifact, #14) via `plan-design-digest-faithful`, and the held conflict outcome (#15)
+  via `plan-design-decision-clear` — both skip-until-reviewed, a No reds. The LIVE cores — was the read-back
+  actually SHOWN at intake (#14), was the conflict actually ASKED at plan time (#15) — are message/live,
+  stay MANUAL (the walkthrough + `DESIGN-CAPTURE-LOG.md`, record-only/eyeballed), NOT auto-wired. So the
+  earlier "a No on the design check fails the build" holds for the artifact-checkable parts; the live
+  "shown?/asked?" behaviour remains a manual eyeball.
 
 ---
 
@@ -110,16 +127,17 @@ result file.
 
 ## 8. Open decisions for you
 1. ✅ **DONE (2026-10-02): retired `tier-3-automated/judge/`** (deleted) and re-homed its 5 verbosity
-   criteria (ACs 3/4/5/7/8) to `helpers/verbosity-review-checks.ts`; they become review checks at Step 7.
-2. ✅ **DECIDED (2026-10-02): the design cores #14/#15 GATE** — a "No" on read-back or ask-before-overwrite
-   turns the check **red and fails the run** (no longer record-only). Consequence: these two cores move
-   into the gating review harness; their verdict lives in the harness `verdict.json` (the single store),
-   and `DESIGN-CAPTURE-LOG.md` / `DESIGN-SCENARIO.md` / `DESIGN-COVERAGE.md` must be updated from
-   "record-only, never gate" to "gating human-review" when built.
-3. ✅ **DECIDED (2026-10-02): BOTH** — keep the separate manual doc **and** add it to the review screen,
-   split so the same thing isn't judged twice: the **manual doc stays as the live behavioural walkthrough**
-   (the steps only a person running the scenario can do — delete brief+story → `/continue` restores
-   silently; the give-up loop actually fires), and the **"does the message read plainly" judgement moves
-   onto the gating review screen** (Yes/No on the captured message). The manual doc points to the review
-   screen for the plainness verdict rather than duplicating that Yes/No. (The grep tripwires stay as code
-   checks either way.)
+   criteria (ACs 3/4/5/7/8) to `helpers/verbosity-review-checks.ts`; kept MANUAL (message-based — see the
+   scope boundary, decided 2026-10-02), not auto-wired.
+2. ✅ **DECIDED (2026-10-02): design #14/#15 — split by artifact vs live.** The ARTIFACT residue GATES and
+   IS wired: `plan-design-digest-faithful` (the read-back digest, #14) + `plan-design-decision-clear` (the
+   held conflict outcome, #15) — skip-until-reviewed, a No reds. The **LIVE cores** (was the read-back
+   SHOWN at intake / the conflict ASKED at plan time) are message/live and **stay MANUAL** (the walkthrough
+   + `DESIGN-CAPTURE-LOG.md`, record-only/eyeballed), not auto-wired. So "a No fails the build" holds for
+   what's artifact-checkable; the live "shown?/asked?" behaviour stays a manual eyeball. (Later: if you want
+   the live cores to gate too, that needs the message pipeline — currently declined.)
+3. ✅ **DECIDED (2026-10-02): plain-stops — BOTH, but the plainness verdict stays MANUAL.** The manual doc
+   stays as the live behavioural walkthrough (delete brief+story → `/continue` restores silently; the
+   give-up loop fires). The "does the message read plainly" judgement is **message-based**, so per the scope
+   boundary it stays a **manual** check (the verbosity manual doc / coverage matrix), NOT auto-wired onto
+   the review screen. (The grep tripwires stay as code checks either way.)

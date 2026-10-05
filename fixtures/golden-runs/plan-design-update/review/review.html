@@ -22,10 +22,9 @@
 <p>Judge each check, add a one-line citation for every <b>Yes</b>, then <b>Build verdict</b> and <b>Copy</b>.
 Place it with <code>npm run ingest-verdict</code> (it will not save to a folder from the browser).</p>
 <section class="check" data-id="plan-design-digest-faithful">
-  <h2>Does the design digest describe the design correctly and in plain language (screens, palette, and honestly flagging what it could NOT determine)?</h2>
-  <p class="guidance">PASS: the digest faithfully and plainly captures the screens/palette and flags what it could not determine. FAIL: a wrong/invented fact, jargon, or an uncertainty silently dropped.</p>
-  <pre class="evidence">(This is the design digest on main — the BASELINE design. A design UPDATE was parked off-main; its held choice is the decision-clarity check, so this baseline digest may still show the pre-update values.)
-
+  <h2>Does the design digest describe the design correctly and in plain language (screens, palette, and honestly flagging what it could NOT determine) — checked against the design source?</h2>
+  <p class="guidance">PASS: the digest matches the design source and plainly captures the screens/palette and flags what it could not determine. FAIL: a fact that contradicts/invents beyond the source, jargon, or an uncertainty silently dropped.</p>
+  <pre class="evidence">--- the design digest on main (the BASELINE design; a design UPDATE was parked off-main, so this baseline may still show pre-update values — its held choice is the decision-clarity check) ---
 # Design Digest — TaskBoard
 
 A small team task board application with three screens: a kanban-style board showing tasks in columns (To do, In progress, Done), a task detail/edit screen, and a user settings screen.
@@ -142,7 +141,70 @@ A small team task board application with three screens: a kanban-style board sho
 - **Assignee dropdown options not specified.** The Task detail screen has an Assignee dropdown but no options are defined. How are assignees populated (e.g., from a user list, hardcoded values)?
 - **Navigation to Settings screen not shown.** The Settings screen exists but there is no visible navigation element to reach it from Board or Task detail. Where should the Settings link appear?
 - **Validation rules not specified.** No field validation rules or error messages are defined for any screen. Are there required fields or format constraints?
-- **New task vs edit task flow.** The Task detail screen is used for editing; confirm it is also used for creating new tasks (with `New task` button) and whether field labels or button text differ in create mode.</pre>
+- **New task vs edit task flow.** The Task detail screen is used for editing; confirm it is also used for creating new tasks (with `New task` button) and whether field labels or button text differ in create mode.
+
+--- the design SOURCE to check the digest against (documentation/design) ---
+--- design-notes.md ---
+# TaskBoard — design notes
+
+A small team task board. These notes plus `mockup.html` and `tokens.css` in this folder are
+the **design** — build the app to match them. (Text reads most reliably; the mockup and tokens
+back it up.)
+
+## Screens
+
+### Board
+The landing screen. Three columns — **To do**, **In progress**, **Done** — each holding task
+cards. A card shows the task **title** and its **assignee** initials.
+
+- Primary action button, top-right: **New task**
+- A filter control, top-left, labelled **All assignees** (a dropdown).
+- Empty column copy: **Nothing here yet**
+
+### Task detail
+Opens when a card is clicked. Shows and edits one task.
+
+- Fields: **Title** (text), **Assignee** (dropdown), **Status** (To do / In progress / Done),
+  **Due date** (date).
+- Buttons: **Save changes**, and a text link **Delete task**.
+
+### Settings
+- One field: **Your display name** (text), with a **Save** button.
+- Heading copy: **Your settings**
+
+## Palette &amp; type
+Brand colours are in `tokens.css`. Primary is the blue used for buttons and the active column
+header. Body font is Inter.
+
+## Brand logo
+The brand logo is provided as `brand-export.bin` — an export from the design tool. Use it for the
+app&#39;s logo/mark.
+
+## Deliberately not specified
+The **due-date format** (e.g. `2026-05-01` vs `1 May 2026`) is not decided here — pick a sensible
+default and flag it so we can confirm.
+
+&lt;!-- AC5 &quot;truly unusable&quot; case: brand-export.bin is deliberately a garbled binary blob the
+     design-interpreter cannot decode. A correct run must SHOW this under Uncertainties (e.g.
+     &quot;couldn&#39;t read brand-export.bin — please re-supply the logo in a readable format&quot;), not
+     silently ignore it. This exercises the live can&#39;t-use path that the synthetic good/broken in
+     tier-1-unit/design/design-traces.test.ts (surfacesUncertainty) covers deterministically. --&gt;
+
+--- tokens.css ---
+/* TaskBoard design tokens — brand colours and type. Part of the design. */
+:root {
+  --color-primary: #2563eb;   /* buttons, active column header */
+  --color-primary-hover: #1d4ed8;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-done: #16a34a;
+
+  --font-sans: &quot;Inter&quot;, system-ui, sans-serif;
+  --radius: 8px;
+  --space: 16px;
+}</pre>
   <div class="verdict">
     <label><input type="radio" name="r-plan-design-digest-faithful" value="pass"> Yes</label>
     <label><input type="radio" name="r-plan-design-digest-faithful" value="fail"> No</label>
@@ -173,7 +235,7 @@ A small team task board application with three screens: a kanban-style board sho
 <div id="err"></div>
 <textarea id="out" readonly placeholder="the verdict JSON appears here"></textarea>
 <script>
-const STAMP = "67535c906456891f75bf7989cd8d73e62c5a9f304fe873be5f4237399a97c17c";
+const STAMP = "dcdc93fe9c19ebbc1ef98d088521f846964a25f5799741db92b1e2092605c13d";
 const assembleVerdict = function assembleVerdict(selections, stamp, reviewer, nowIso) {
   const errors = [];
   const results = {};

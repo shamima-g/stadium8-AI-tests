@@ -173,11 +173,14 @@ double-counted: Tier 2 gates the traces; Tier 3 confirms only what can't be repl
 The subjective output-discipline criteria (act-from-first-line, at-a-glance, only-the-actionable-part,
 shown-once, no-blind-approvals — ACs 5/4/3/7/8) have no mechanical ground truth. **The AI/LLM judge that
 was to score them (`tier-3-automated/judge/`) was retired on 2026-10-02** (decision: no AI judge). These
-five criteria are now **human-review checks** — a person answers Yes/No on the review page and the recorded
-verdict gates deterministically. The criteria are re-homed in `helpers/verbosity-review-checks.ts`
-(5 checks, ACs 3/4/5/7/8, intact), and the review harness is `helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`
-(see `test-plans/human-review-harness-plan.md`). Unlike the old record-only judge, a reviewed **No** turns
-the check **red**, and under `REQUIRE_REVIEW` an unreviewed check is red too.
+five criteria judge the tool's **user-facing messages**, which the capture slots don't commit and which
+can't be singled out without the declined message-tagging (B14) — so (decision 2026-10-02) they stay
+**checked BY HAND** (the verbosity manual test doc / coverage matrix), NOT auto-wired. They are re-homed in
+`helpers/verbosity-review-checks.ts` as the canonical criteria LIST for that manual check (5 checks, ACs
+3/4/5/7/8, intact). What the browser review **harness** (`helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`,
+see `test-plans/human-review-harness-plan.md`) auto-wires-and-gates is the **artifact-reviewable** subjective
+set instead: intake #476/#478 and the design artifact residue of #14/#15 (digest faithfulness + held-decision
+clarity) — a reviewed **No** reds, and under `REQUIRE_REVIEW` an unreviewed check reds.
 
 ## Behaviours confirmed by hand for the not-yet-in-v1.3.0 reworks
 

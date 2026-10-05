@@ -26,20 +26,30 @@ describe('decisionsEvidence', () => {
   });
 });
 
+const SOURCE = '--- design-notes.md ---\nBoard, Task detail, Settings. Primary blue #2563eb.\n\n--- tokens.css ---\n--color-primary: #2563eb;';
+
 describe('buildPlanReviewManifest', () => {
-  const m = buildPlanReviewManifest(DIGEST, STATE, 'plan-design-update');
+  const m = buildPlanReviewManifest(DIGEST, STATE, SOURCE, 'plan-design-update');
 
   it('produces exactly the two design checks with the catalog ids', () => {
     expect(m.items.map((i) => i.id)).toEqual(PLAN_REVIEW_CHECKS.map((c) => c.id));
   });
-  it('the digest check shows the digest; the decision check shows the held decision', () => {
-    expect(m.items.find((i) => i.id === 'plan-design-digest-faithful')!.evidence).toContain('Board, Task detail, Settings');
+  it('the digest check shows the digest AND the design source to check it against', () => {
+    const faithful = m.items.find((i) => i.id === 'plan-design-digest-faithful')!.evidence;
+    expect(faithful).toContain('Board, Task detail, Settings'); // the digest
+    expect(faithful).toContain('tokens.css');                   // the source, so "correctly" is answerable
+    expect(faithful).toContain('--color-primary: #2563eb');
+  });
+  it('the decision check shows the held decision', () => {
     expect(m.items.find((i) => i.id === 'plan-design-decision-clear')!.evidence).toContain('pink #ec4899');
+  });
+  it('notes when the design source is unavailable (judge plainness only)', () => {
+    expect(buildPlanReviewManifest(DIGEST, STATE, '').items[0].evidence).toMatch(/design source not available/);
   });
   it('the captureLabel carries the slot name', () => {
     expect(m.captureLabel).toMatch(/plan-design-update/);
   });
   it('falls back gracefully on an empty digest', () => {
-    expect(buildPlanReviewManifest('', STATE).items[0].evidence).toMatch(/no design digest/);
+    expect(buildPlanReviewManifest('', STATE, SOURCE).items[0].evidence).toMatch(/no design digest/);
   });
 });

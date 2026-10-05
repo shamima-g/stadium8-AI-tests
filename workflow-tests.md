@@ -639,11 +639,15 @@ surfaced a tracked product gap) are **built**; Verbosity ("Voice and volume") an
   surface probe is the follow-up if cross-version-clean is wanted. Plans:
   `test-plans/{intake-claudemd-project-overview,merge-claudemd-recheck,upgrade-backfill-claudemd}-test-plan.md`;
   benchmark rationale (why `contact-form`) in the Tier-2 test header.
-- **Output-quality criteria — human review (AI judge RETIRED 2026-10-02).** The LLM judge
-  (`tier-3-automated/judge/`) was removed; its 5 subjective criteria (ACs 3/4/5/7/8) are re-homed in
-  `helpers/verbosity-review-checks.ts` and judged by a person via the human-review harness
-  (`helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`) — recorded verdict, gates (a No
-  is red; under `REQUIRE_REVIEW` an unreviewed check is red). See `test-plans/human-review-harness-plan.md`.
+- **Output-quality criteria — AI judge RETIRED 2026-10-02; verbosity stays MANUAL.** The LLM judge
+  (`tier-3-automated/judge/`) was removed. Its 5 subjective criteria (ACs 3/4/5/7/8) judge the tool's
+  user-facing messages, which can't be singled out without the declined message-tagging (B14) — so they
+  stay **checked BY HAND** (the verbosity manual doc / coverage matrix); `helpers/verbosity-review-checks.ts`
+  is the canonical criteria LIST. What the browser review **harness**
+  (`helpers/{human-review,build-review,ingest-verdict,review-suite}.ts`) auto-wires-and-gates is the
+  **artifact-reviewable** subjective set: intake #476/#478 and the design artifact residue of #14/#15
+  (digest faithfulness + held-decision clarity) — recorded verdict, a No reds, unreviewed reds under
+  `REQUIRE_REVIEW`. See `test-plans/human-review-harness-plan.md`.
 
 ### Planned coverage for the post-v1.2.0 changes
 

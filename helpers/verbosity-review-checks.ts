@@ -1,9 +1,13 @@
 /**
- * Human-review harness — the VERBOSITY ("Voice and volume") subjective checks, re-homed here when the
- * AI/LLM judge (tier-3-automated/judge/) was retired (user decision 2026-10-02: no AI judge). These are
- * the five output-quality criteria the judge graded (ACs 3/4/5/7/8); a person now answers them on the
- * review page. The capture supplies the `evidence` (the actual message shown to the user); these supply
- * the question + what a pass/fail looks like.
+ * The VERBOSITY ("Voice and volume") subjective criteria (ACs 3/4/5/7/8), re-homed here when the AI/LLM
+ * judge (tier-3-automated/judge/) was retired (2026-10-02: no AI judge).
+ *
+ * These are judged on the tool's USER-FACING MESSAGES, which aren't reliably extractable from a capture
+ * (would need the declined message-tagging/B14 or a paid live capture + guessing). DECISION 2026-10-02:
+ * they stay checked BY HAND (the manual-tests docs / coverage matrix), NOT auto-wired into the browser
+ * review harness. So this file is the canonical CRITERIA LIST for that manual check — the question + what a
+ * pass/fail looks like — not a pending auto-wiring. (Contrast: the artifact-reviewable intake/design checks
+ * ARE auto-wired — see helpers/intake-review.ts + helpers/plan-review.ts.)
  */
 export interface VerbosityCheckDef {
   /** stable review-check id */

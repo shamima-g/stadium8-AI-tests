@@ -15,12 +15,15 @@ and green.
 > (was 22). Built in Phase 1: **B5, B6 (build-capture variant), B8** (on top of the Phase-0 B1–B4 work).
 > Phases 2–4 below are unchanged and still gated on §6 (real-GitHub merge sandbox).
 >
-> **UPDATE (2026-10-02) — the AI judge is RETIRED; B7 / §6.3 / "Phase 2 — Judge" are SUPERSEDED.** The
-> subjective checks (#476 facts, #478 detail, #214 told-what-moved, plain-stops, and the 5 verbosity ACs
-> 3/4/5/7/8) are now judged by a person via the **human-review harness** (recorded verdict, gates), not an
-> LLM. `tier-3-automated/judge/` is deleted; the verbosity criteria are re-homed in
-> `helpers/verbosity-review-checks.ts`. Authoritative design + remaining build:
-> `test-plans/human-review-harness-plan.md`. Read the judge references below as historical.
+> **UPDATE (2026-10-02) — the AI judge is RETIRED; B7 / §6.3 / "Phase 2 — Judge" are SUPERSEDED.** No LLM
+> judge. The subjective checks split two ways: **ARTIFACT-reviewable** ones are auto-wired-and-gated in the
+> **human-review harness** — #476 facts, #478 detail, and the design artifact residue of #14/#15 (digest
+> faithfulness + held-decision clarity). **MESSAGE-based** ones stay **MANUAL (by hand)** — the 5 verbosity
+> ACs (3/4/5/7/8), the plain-language half of #214, plain-stops plainness, and the live #14/#15
+> shown?/asked? cores (they judge user-facing messages, not extractable without the declined B14). The
+> verbosity criteria are re-homed as a LIST in `helpers/verbosity-review-checks.ts`.
+> `tier-3-automated/judge/` is deleted. Authoritative design: `test-plans/human-review-harness-plan.md`.
+> Read the judge references below as historical.
 
 **Grounding:** a capability inventory of `tier-3-automated/` and the Tier-2 golden-run infra. A council
 verified the harness facts (all citations correct) and found several dependency/effort/feasibility
