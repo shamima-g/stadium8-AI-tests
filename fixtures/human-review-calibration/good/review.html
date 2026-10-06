@@ -8,7 +8,19 @@
   body { font: 15px/1.5 system-ui, sans-serif; max-width: 900px; margin: 1rem auto; padding: 0 1rem; }
   .check { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
   .guidance { color: #555; font-style: italic; }
-  .evidence { background: #f6f8fa; padding: .75rem; border-radius: 6px; white-space: pre-wrap; overflow-x: auto; }
+  .evidence { background: #f6f8fa; padding: .75rem; border-radius: 6px; overflow-x: auto; }
+  .evidence.md > *:first-child { margin-top: 0; }
+  .evidence.md > *:last-child { margin-bottom: 0; }
+  .evidence h3, .evidence h4, .evidence h5, .evidence h6 { margin: .6rem 0 .3rem; line-height: 1.3; }
+  .evidence p { margin: .4rem 0; }
+  .evidence ul { margin: .4rem 0; padding-left: 1.2rem; }
+  .evidence code { background: #eaeef2; padding: .05rem .3rem; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .evidence .swatch { display: inline-block; width: .85em; height: .85em; margin: 0 .15rem 0 .35rem; border: 1px solid rgba(0,0,0,.25); border-radius: 3px; vertical-align: middle; }
+  .evidence blockquote { margin: .5rem 0; padding: .1rem .75rem; border-left: 3px solid #d0d7de; color: #555; }
+  .evidence hr { border: none; border-top: 1px solid #d0d7de; margin: .75rem 0; }
+  .evidence table.md-table { border-collapse: collapse; margin: .5rem 0; font-size: 14px; }
+  .evidence table.md-table th, .evidence table.md-table td { border: 1px solid #d0d7de; padding: .3rem .55rem; text-align: left; vertical-align: top; }
+  .evidence table.md-table th { background: #eaeef2; }
   .mockup { width: 100%; height: 320px; border: 1px solid #ddd; border-radius: 6px; }
   .verdict { margin-top: .5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
   .cite { flex: 1; min-width: 200px; padding: .3rem; }
@@ -24,7 +36,7 @@ Place it with <code>npm run ingest-verdict</code> (it will not save to a folder 
 <section class="check" data-id="plain-language">
   <h2>Does this message read as plain English (no jargon)?</h2>
   
-  <pre class="evidence">Your draft was restored — nothing was lost. Pick up where you left off, or start fresh.</pre>
+  <div class="evidence md"><p>Your draft was restored — nothing was lost. Pick up where you left off, or start fresh.</p></div>
   <div class="verdict">
     <label><input type="radio" name="r-plain-language" value="pass"> Yes</label>
     <label><input type="radio" name="r-plain-language" value="fail"> No</label>

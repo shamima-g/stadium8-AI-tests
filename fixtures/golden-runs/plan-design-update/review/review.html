@@ -8,7 +8,19 @@
   body { font: 15px/1.5 system-ui, sans-serif; max-width: 900px; margin: 1rem auto; padding: 0 1rem; }
   .check { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
   .guidance { color: #555; font-style: italic; }
-  .evidence { background: #f6f8fa; padding: .75rem; border-radius: 6px; white-space: pre-wrap; overflow-x: auto; }
+  .evidence { background: #f6f8fa; padding: .75rem; border-radius: 6px; overflow-x: auto; }
+  .evidence.md > *:first-child { margin-top: 0; }
+  .evidence.md > *:last-child { margin-bottom: 0; }
+  .evidence h3, .evidence h4, .evidence h5, .evidence h6 { margin: .6rem 0 .3rem; line-height: 1.3; }
+  .evidence p { margin: .4rem 0; }
+  .evidence ul { margin: .4rem 0; padding-left: 1.2rem; }
+  .evidence code { background: #eaeef2; padding: .05rem .3rem; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .evidence .swatch { display: inline-block; width: .85em; height: .85em; margin: 0 .15rem 0 .35rem; border: 1px solid rgba(0,0,0,.25); border-radius: 3px; vertical-align: middle; }
+  .evidence blockquote { margin: .5rem 0; padding: .1rem .75rem; border-left: 3px solid #d0d7de; color: #555; }
+  .evidence hr { border: none; border-top: 1px solid #d0d7de; margin: .75rem 0; }
+  .evidence table.md-table { border-collapse: collapse; margin: .5rem 0; font-size: 14px; }
+  .evidence table.md-table th, .evidence table.md-table td { border: 1px solid #d0d7de; padding: .3rem .55rem; text-align: left; vertical-align: top; }
+  .evidence table.md-table th { background: #eaeef2; }
   .mockup { width: 100%; height: 320px; border: 1px solid #ddd; border-radius: 6px; }
   .verdict { margin-top: .5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
   .cite { flex: 1; min-width: 200px; padding: .3rem; }
@@ -24,187 +36,60 @@ Place it with <code>npm run ingest-verdict</code> (it will not save to a folder 
 <section class="check" data-id="plan-design-digest-faithful">
   <h2>Does the design digest describe the design correctly and in plain language (screens, palette, and honestly flagging what it could NOT determine) — checked against the design source?</h2>
   <p class="guidance">PASS: the digest matches the design source and plainly captures the screens/palette and flags what it could not determine. FAIL: a fact that contradicts/invents beyond the source, jargon, or an uncertainty silently dropped.</p>
-  <pre class="evidence">--- the design digest on main (the BASELINE design; a design UPDATE was parked off-main, so this baseline may still show pre-update values — its held choice is the decision-clarity check) ---
-# Design Digest — TaskBoard
-
-A small team task board application with three screens: a kanban-style board showing tasks in columns (To do, In progress, Done), a task detail/edit screen, and a user settings screen.
-
-| Field | Value |
-|---|---|
-| Read from | `documentation/design/mockup.html`, `documentation/design/tokens.css`, `documentation/design/design-notes.md`, `documentation/design/brand-export.bin` (unreadable) |
-| Artifact verdict | design — three screens with palette and typography fully specified |
-| Interpreter confidence | high |
-| Last updated | 2026-10-02T00:00:00Z |
-
----
-
-## Your Decisions
-
-- **Primary colour:** `#2563eb` (blue) — confirmed from the design tokens.
-
----
-
-## Screens
-
-### Board
-
-- **Purpose:** Landing screen displaying all tasks organised into three status columns for an at-a-glance view of work.
-- **Layout:** Header bar with a filter dropdown on the left and a primary action button on the right. Below, a three-column grid layout with columns for each status. Each column has a heading and contains task cards or empty-state text.
-- **Fields:** Filter dropdown labelled `All assignees` (top-left header).
-- **Validation:** None specified.
-- **Navigation:** Clicking a task card opens the Task detail screen. `New task` button opens the Task detail screen (for creation).
-- **Copy:**
-  - Column headings: `To do`, `In progress`, `Done`
-  - Primary button: `New task`
-  - Filter label: `All assignees`
-  - Empty column text: `Nothing here yet`
-  - Task card shows: task title and assignee initials
-
-### Task detail
-
-- **Purpose:** View and edit a single task&#39;s details; also used for creating new tasks.
-- **Layout:** A form with labelled fields stacked vertically, a primary save button, and a delete link.
-- **Fields:**
-  - Label `Title`, input type text
-  - Label `Assignee`, dropdown (options not specified in design)
-  - Label `Status`, dropdown with options: `To do`, `In progress`, `Done`
-  - Label `Due date`, input type date
-- **Validation:** None specified.
-- **Navigation:** `Save changes` button saves and returns to Board. `Delete task` link deletes the task and returns to Board.
-- **Copy:**
-  - Field labels: `Title`, `Assignee`, `Status`, `Due date`
-  - Status options: `To do`, `In progress`, `Done`
-  - Primary button: `Save changes`
-  - Delete link: `Delete task`
-
-### Settings
-
-- **Purpose:** Allow the user to update their display name.
-- **Layout:** A heading, a single text input with label, and a save button.
-- **Fields:**
-  - Label `Your display name`, input type text
-- **Validation:** None specified.
-- **Navigation:** `Save` button saves settings (destination not specified).
-- **Copy:**
-  - Heading: `Your settings`
-  - Field label: `Your display name`
-  - Button: `Save`
-
----
-
-## Palette &amp; Typography
-
-| Token | Value | Where found |
-|---|---|---|
-| Primary | `#2563eb` | `tokens.css` `:root` block (--color-primary) |
-| Primary hover | `#1d4ed8` | `tokens.css` `:root` block (--color-primary-hover) |
-| Background | `#f8fafc` | `tokens.css` `:root` block (--color-bg) |
-| Surface | `#ffffff` | `tokens.css` `:root` block (--color-surface) |
-| Text | `#0f172a` | `tokens.css` `:root` block (--color-text) |
-| Muted | `#64748b` | `tokens.css` `:root` block (--color-muted) |
-| Done (accent) | `#16a34a` | `tokens.css` `:root` block (--color-done) |
-
-- **Font (headings):** Inter (via --font-sans)
-- **Font (body):** Inter (via --font-sans: &quot;Inter&quot;, system-ui, sans-serif)
-- **Theme:** light only
-- **Border radius:** 8px (--radius)
-- **Spacing unit:** 16px (--space)
-
----
-
-## Data Shapes
-
-- **Task** — id, title, assignee (reference to User), status (enum: To do / In progress / Done), dueDate
-- **User** — id, displayName (initials derived from this for card display)
-
----
-
-## Assets
-
-- `documentation/design/brand-export.bin` — brand logo export (binary file, could not be read)
-
----
-
-## Translate, Don&#39;t Copy
-
-- **Placeholder / fake data -&gt; real data.** The mockup contains sample task data (&quot;Draft launch email&quot;, assignee &quot;JD&quot;) which are canned examples; wire to the configured data source.
-- **Remote CDN icons/images -&gt; local components/assets.** No remote assets referenced in this design.
-- **Placeholder handlers -&gt; real handlers.** The mockup&#39;s buttons and links are inert targets; implement real navigation and form submission handlers.
-- **Inline styles / utility soup -&gt; design tokens + Shadcn primitives.** The mockup uses inline styles referencing CSS variables; re-express through design tokens in globals.css and Shadcn primitives.
-
----
-
-## Uncertainties
-
-- **Brand logo unreadable.** The file `documentation/design/brand-export.bin` is a binary file that could not be read or decoded. Please provide the logo in a readable format (e.g., SVG, PNG) if it should appear in the app.
-- **Due date display format not specified.** The design notes explicitly state the due-date format (e.g., `2026-05-01` vs `1 May 2026`) is not decided. Please confirm the preferred format.
-- **Assignee dropdown options not specified.** The Task detail screen has an Assignee dropdown but no options are defined. How are assignees populated (e.g., from a user list, hardcoded values)?
-- **Navigation to Settings screen not shown.** The Settings screen exists but there is no visible navigation element to reach it from Board or Task detail. Where should the Settings link appear?
-- **Validation rules not specified.** No field validation rules or error messages are defined for any screen. Are there required fields or format constraints?
-- **New task vs edit task flow.** The Task detail screen is used for editing; confirm it is also used for creating new tasks (with `New task` button) and whether field labels or button text differ in create mode.
-
---- the design SOURCE to check the digest against (documentation/design) ---
---- design-notes.md ---
-# TaskBoard — design notes
-
-A small team task board. These notes plus `mockup.html` and `tokens.css` in this folder are
-the **design** — build the app to match them. (Text reads most reliably; the mockup and tokens
-back it up.)
-
-## Screens
-
-### Board
-The landing screen. Three columns — **To do**, **In progress**, **Done** — each holding task
-cards. A card shows the task **title** and its **assignee** initials.
-
-- Primary action button, top-right: **New task**
-- A filter control, top-left, labelled **All assignees** (a dropdown).
-- Empty column copy: **Nothing here yet**
-
-### Task detail
-Opens when a card is clicked. Shows and edits one task.
-
-- Fields: **Title** (text), **Assignee** (dropdown), **Status** (To do / In progress / Done),
-  **Due date** (date).
-- Buttons: **Save changes**, and a text link **Delete task**.
-
-### Settings
-- One field: **Your display name** (text), with a **Save** button.
-- Heading copy: **Your settings**
-
-## Palette &amp; type
-Brand colours are in `tokens.css`. Primary is the blue used for buttons and the active column
-header. Body font is Inter.
-
-## Brand logo
-The brand logo is provided as `brand-export.bin` — an export from the design tool. Use it for the
-app&#39;s logo/mark.
-
-## Deliberately not specified
-The **due-date format** (e.g. `2026-05-01` vs `1 May 2026`) is not decided here — pick a sensible
-default and flag it so we can confirm.
-
-&lt;!-- AC5 &quot;truly unusable&quot; case: brand-export.bin is deliberately a garbled binary blob the
-     design-interpreter cannot decode. A correct run must SHOW this under Uncertainties (e.g.
-     &quot;couldn&#39;t read brand-export.bin — please re-supply the logo in a readable format&quot;), not
-     silently ignore it. This exercises the live can&#39;t-use path that the synthetic good/broken in
-     tier-1-unit/design/design-traces.test.ts (surfacesUncertainty) covers deterministically. --&gt;
-
---- tokens.css ---
-/* TaskBoard design tokens — brand colours and type. Part of the design. */
-:root {
-  --color-primary: #2563eb;   /* buttons, active column header */
-  --color-primary-hover: #1d4ed8;
-  --color-bg: #f8fafc;
-  --color-surface: #ffffff;
-  --color-text: #0f172a;
-  --color-muted: #64748b;
-  --color-done: #16a34a;
-
-  --font-sans: &quot;Inter&quot;, system-ui, sans-serif;
-  --radius: 8px;
-  --space: 16px;
-}</pre>
+  <div class="evidence md"><p>--- the design digest on main (the BASELINE design; a design UPDATE was parked off-main, so this baseline may still show pre-update values — its held choice is the decision-clarity check) ---</p>
+<h3>Design Digest — TaskBoard</h3>
+<p>A small team task board application with three screens: a kanban-style board showing tasks in columns (To do, In progress, Done), a task detail/edit screen, and a user settings screen.</p>
+<table class="md-table"><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td>Read from</td><td><code>documentation/design/mockup.html</code>, <code>documentation/design/tokens.css</code>, <code>documentation/design/design-notes.md</code>, <code>documentation/design/brand-export.bin</code> (unreadable)</td></tr><tr><td>Artifact verdict</td><td>design — three screens with palette and typography fully specified</td></tr><tr><td>Interpreter confidence</td><td>high</td></tr><tr><td>Last updated</td><td>2026-10-02T00:00:00Z</td></tr></tbody></table>
+<hr>
+<h4>Your Decisions</h4>
+<ul><li><strong>Primary colour:</strong> <code>#2563eb</code><span class="swatch" style="background:#2563eb" title="#2563eb"></span> (blue) — confirmed from the design tokens.</li></ul>
+<hr>
+<h4>Screens</h4>
+<h5>Board</h5>
+<ul><li><strong>Purpose:</strong> Landing screen displaying all tasks organised into three status columns for an at-a-glance view of work.</li><li><strong>Layout:</strong> Header bar with a filter dropdown on the left and a primary action button on the right. Below, a three-column grid layout with columns for each status. Each column has a heading and contains task cards or empty-state text.</li><li><strong>Fields:</strong> Filter dropdown labelled <code>All assignees</code> (top-left header).</li><li><strong>Validation:</strong> None specified.</li><li><strong>Navigation:</strong> Clicking a task card opens the Task detail screen. <code>New task</code> button opens the Task detail screen (for creation).</li><li><strong>Copy:</strong></li><li>Column headings: <code>To do</code>, <code>In progress</code>, <code>Done</code></li><li>Primary button: <code>New task</code></li><li>Filter label: <code>All assignees</code></li><li>Empty column text: <code>Nothing here yet</code></li><li>Task card shows: task title and assignee initials</li></ul>
+<h5>Task detail</h5>
+<ul><li><strong>Purpose:</strong> View and edit a single task&#39;s details; also used for creating new tasks.</li><li><strong>Layout:</strong> A form with labelled fields stacked vertically, a primary save button, and a delete link.</li><li><strong>Fields:</strong></li><li>Label <code>Title</code>, input type text</li><li>Label <code>Assignee</code>, dropdown (options not specified in design)</li><li>Label <code>Status</code>, dropdown with options: <code>To do</code>, <code>In progress</code>, <code>Done</code></li><li>Label <code>Due date</code>, input type date</li><li><strong>Validation:</strong> None specified.</li><li><strong>Navigation:</strong> <code>Save changes</code> button saves and returns to Board. <code>Delete task</code> link deletes the task and returns to Board.</li><li><strong>Copy:</strong></li><li>Field labels: <code>Title</code>, <code>Assignee</code>, <code>Status</code>, <code>Due date</code></li><li>Status options: <code>To do</code>, <code>In progress</code>, <code>Done</code></li><li>Primary button: <code>Save changes</code></li><li>Delete link: <code>Delete task</code></li></ul>
+<h5>Settings</h5>
+<ul><li><strong>Purpose:</strong> Allow the user to update their display name.</li><li><strong>Layout:</strong> A heading, a single text input with label, and a save button.</li><li><strong>Fields:</strong></li><li>Label <code>Your display name</code>, input type text</li><li><strong>Validation:</strong> None specified.</li><li><strong>Navigation:</strong> <code>Save</code> button saves settings (destination not specified).</li><li><strong>Copy:</strong></li><li>Heading: <code>Your settings</code></li><li>Field label: <code>Your display name</code></li><li>Button: <code>Save</code></li></ul>
+<hr>
+<h4>Palette &amp; Typography</h4>
+<table class="md-table"><thead><tr><th>Token</th><th>Value</th><th>Where found</th></tr></thead><tbody><tr><td>Primary</td><td><code>#2563eb</code><span class="swatch" style="background:#2563eb" title="#2563eb"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-primary)</td></tr><tr><td>Primary hover</td><td><code>#1d4ed8</code><span class="swatch" style="background:#1d4ed8" title="#1d4ed8"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-primary-hover)</td></tr><tr><td>Background</td><td><code>#f8fafc</code><span class="swatch" style="background:#f8fafc" title="#f8fafc"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-bg)</td></tr><tr><td>Surface</td><td><code>#ffffff</code><span class="swatch" style="background:#ffffff" title="#ffffff"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-surface)</td></tr><tr><td>Text</td><td><code>#0f172a</code><span class="swatch" style="background:#0f172a" title="#0f172a"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-text)</td></tr><tr><td>Muted</td><td><code>#64748b</code><span class="swatch" style="background:#64748b" title="#64748b"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-muted)</td></tr><tr><td>Done (accent)</td><td><code>#16a34a</code><span class="swatch" style="background:#16a34a" title="#16a34a"></span></td><td><code>tokens.css</code> <code>:root</code> block (--color-done)</td></tr></tbody></table>
+<ul><li><strong>Font (headings):</strong> Inter (via --font-sans)</li><li><strong>Font (body):</strong> Inter (via --font-sans: &quot;Inter&quot;, system-ui, sans-serif)</li><li><strong>Theme:</strong> light only</li><li><strong>Border radius:</strong> 8px (--radius)</li><li><strong>Spacing unit:</strong> 16px (--space)</li></ul>
+<hr>
+<h4>Data Shapes</h4>
+<ul><li><strong>Task</strong> — id, title, assignee (reference to User), status (enum: To do / In progress / Done), dueDate</li><li><strong>User</strong> — id, displayName (initials derived from this for card display)</li></ul>
+<hr>
+<h4>Assets</h4>
+<ul><li><code>documentation/design/brand-export.bin</code> — brand logo export (binary file, could not be read)</li></ul>
+<hr>
+<h4>Translate, Don&#39;t Copy</h4>
+<ul><li><strong>Placeholder / fake data -&gt; real data.</strong> The mockup contains sample task data (&quot;Draft launch email&quot;, assignee &quot;JD&quot;) which are canned examples; wire to the configured data source.</li><li><strong>Remote CDN icons/images -&gt; local components/assets.</strong> No remote assets referenced in this design.</li><li><strong>Placeholder handlers -&gt; real handlers.</strong> The mockup&#39;s buttons and links are inert targets; implement real navigation and form submission handlers.</li><li><strong>Inline styles / utility soup -&gt; design tokens + Shadcn primitives.</strong> The mockup uses inline styles referencing CSS variables; re-express through design tokens in globals.css and Shadcn primitives.</li></ul>
+<hr>
+<h4>Uncertainties</h4>
+<ul><li><strong>Brand logo unreadable.</strong> The file <code>documentation/design/brand-export.bin</code> is a binary file that could not be read or decoded. Please provide the logo in a readable format (e.g., SVG, PNG) if it should appear in the app.</li><li><strong>Due date display format not specified.</strong> The design notes explicitly state the due-date format (e.g., <code>2026-05-01</code> vs <code>1 May 2026</code>) is not decided. Please confirm the preferred format.</li><li><strong>Assignee dropdown options not specified.</strong> The Task detail screen has an Assignee dropdown but no options are defined. How are assignees populated (e.g., from a user list, hardcoded values)?</li><li><strong>Navigation to Settings screen not shown.</strong> The Settings screen exists but there is no visible navigation element to reach it from Board or Task detail. Where should the Settings link appear?</li><li><strong>Validation rules not specified.</strong> No field validation rules or error messages are defined for any screen. Are there required fields or format constraints?</li><li><strong>New task vs edit task flow.</strong> The Task detail screen is used for editing; confirm it is also used for creating new tasks (with <code>New task</code> button) and whether field labels or button text differ in create mode.</li></ul>
+<p>--- the design SOURCE to check the digest against (documentation/design) --- --- design-notes.md ---</p>
+<h3>TaskBoard — design notes</h3>
+<p>A small team task board. These notes plus <code>mockup.html</code> and <code>tokens.css</code> in this folder are the <strong>design</strong> — build the app to match them. (Text reads most reliably; the mockup and tokens back it up.)</p>
+<h4>Screens</h4>
+<h5>Board</h5>
+<p>The landing screen. Three columns — <strong>To do</strong>, <strong>In progress</strong>, <strong>Done</strong> — each holding task cards. A card shows the task <strong>title</strong> and its <strong>assignee</strong> initials.</p>
+<ul><li>Primary action button, top-right: <strong>New task</strong></li><li>A filter control, top-left, labelled <strong>All assignees</strong> (a dropdown).</li><li>Empty column copy: <strong>Nothing here yet</strong></li></ul>
+<h5>Task detail</h5>
+<p>Opens when a card is clicked. Shows and edits one task.</p>
+<ul><li>Fields: <strong>Title</strong> (text), <strong>Assignee</strong> (dropdown), <strong>Status</strong> (To do / In progress / Done),</li></ul>
+<p><strong>Due date</strong> (date).</p>
+<ul><li>Buttons: <strong>Save changes</strong>, and a text link <strong>Delete task</strong>.</li></ul>
+<h5>Settings</h5>
+<ul><li>One field: <strong>Your display name</strong> (text), with a <strong>Save</strong> button.</li><li>Heading copy: <strong>Your settings</strong></li></ul>
+<h4>Palette &amp; type</h4>
+<p>Brand colours are in <code>tokens.css</code>. Primary is the blue used for buttons and the active column header. Body font is Inter.</p>
+<h4>Brand logo</h4>
+<p>The brand logo is provided as <code>brand-export.bin</code> — an export from the design tool. Use it for the app&#39;s logo/mark.</p>
+<h4>Deliberately not specified</h4>
+<p>The <strong>due-date format</strong> (e.g. <code>2026-05-01</code> vs <code>1 May 2026</code>) is not decided here — pick a sensible default and flag it so we can confirm.</p>
+<p>&lt;!-- AC5 &quot;truly unusable&quot; case: brand-export.bin is deliberately a garbled binary blob the      design-interpreter cannot decode. A correct run must SHOW this under Uncertainties (e.g.      &quot;couldn&#39;t read brand-export.bin — please re-supply the logo in a readable format&quot;), not      silently ignore it. This exercises the live can&#39;t-use path that the synthetic good/broken in      tier-1-unit/design/design-traces.test.ts (surfacesUncertainty) covers deterministically. --&gt;</p>
+<p>--- tokens.css --- /* TaskBoard design tokens — brand colours and type. Part of the design. */ :root {   --color-primary: #2563eb<span class="swatch" style="background:#2563eb" title="#2563eb"></span>;   /* buttons, active column header */   --color-primary-hover: #1d4ed8<span class="swatch" style="background:#1d4ed8" title="#1d4ed8"></span>;   --color-bg: #f8fafc<span class="swatch" style="background:#f8fafc" title="#f8fafc"></span>;   --color-surface: #ffffff<span class="swatch" style="background:#ffffff" title="#ffffff"></span>;   --color-text: #0f172a<span class="swatch" style="background:#0f172a" title="#0f172a"></span>;   --color-muted: #64748b<span class="swatch" style="background:#64748b" title="#64748b"></span>;   --color-done: #16a34a<span class="swatch" style="background:#16a34a" title="#16a34a"></span>;</p>
+<p>--font-sans: &quot;Inter&quot;, system-ui, sans-serif;   --radius: 8px;   --space: 16px; }</p></div>
   <div class="verdict">
     <label><input type="radio" name="r-plan-design-digest-faithful" value="pass"> Yes</label>
     <label><input type="radio" name="r-plan-design-digest-faithful" value="fail"> No</label>
@@ -215,11 +100,7 @@ default and flag it so we can confirm.
 <section class="check" data-id="plan-design-decision-clear">
   <h2>Is each held design decision recorded clearly and correctly — which value won, over what it superseded, in plain words?</h2>
   <p class="guidance">PASS: each decision states the winning value and what it superseded, in plain words. FAIL: ambiguous, the wrong winner, or unreadable.</p>
-  <pre class="evidence">#1: {
-  &quot;outcome&quot;: &quot;design-wins&quot;,
-  &quot;line&quot;: &quot;Primary colour is pink #ec4899 (the new design wins over the earlier blue #2563eb decision)&quot;,
-  &quot;supersedes&quot;: &quot;- **Primary colour:** `#2563eb` (blue) — confirmed from the design tokens.&quot;
-}</pre>
+  <div class="evidence md"><p>#1: {   &quot;outcome&quot;: &quot;design-wins&quot;,   &quot;line&quot;: &quot;Primary colour is pink #ec4899<span class="swatch" style="background:#ec4899" title="#ec4899"></span> (the new design wins over the earlier blue #2563eb<span class="swatch" style="background:#2563eb" title="#2563eb"></span> decision)&quot;,   &quot;supersedes&quot;: &quot;- <strong>Primary colour:</strong> <code>#2563eb</code><span class="swatch" style="background:#2563eb" title="#2563eb"></span> (blue) — confirmed from the design tokens.&quot; }</p></div>
   <div class="verdict">
     <label><input type="radio" name="r-plan-design-decision-clear" value="pass"> Yes</label>
     <label><input type="radio" name="r-plan-design-decision-clear" value="fail"> No</label>
