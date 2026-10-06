@@ -26,7 +26,7 @@
 param(
     [switch]$IncludeTier3,
     [string]$Tier3Model = 'opus',
-    [string]$Benchmark = 'transactions',
+    [string]$Benchmark = 'contact-form',
     [ValidateSet('build', 'plan', 'concurrent')][string]$Scenario = 'build',
     [string]$Target,
     [string]$Ref,

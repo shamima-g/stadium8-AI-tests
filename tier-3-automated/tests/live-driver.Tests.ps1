@@ -334,6 +334,65 @@ Describe 'Cross-segment progress (resume accumulation)' {
     }
 }
 
+Describe 'Transcript-store tokens — authoritative total across segments + sub-agents' {
+    BeforeAll {
+        function New-UsageLine {
+            param([string]$Id, [int]$In = 0, [int]$Out = 0, [int]$CacheRead = 0, [int]$Create = 0, [string]$Model = 'claude-opus-4-8')
+            (@{ type = 'assistant'; message = @{ id = $Id; model = $Model; usage = @{ input_tokens = $In; output_tokens = $Out; cache_read_input_tokens = $CacheRead; cache_creation_input_tokens = $Create } } } | ConvertTo-Json -Depth 6 -Compress)
+        }
+    }
+
+    It 'PASS: sums deduped + cache-inclusive across main + sub-agent files; store matched case-insensitively' {
+        # This is the fix for the resumed-run undercount: the store is the complete record, matched
+        # case-insensitively (the folder casing differs from the slug), summed deduped by message id.
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tx-" + [Guid]::NewGuid().ToString('N'))
+        $projects = Join-Path $root 'projects'
+        $workingDir = 'C:\fake\proj-x'
+        $slug = ($workingDir -replace '[^A-Za-z0-9]', '-')
+        $store = Join-Path $projects ($slug.ToUpperInvariant())   # differs from the slug ONLY by case
+        $sub = Join-Path $store 'agent-abc'
+        New-Item -ItemType Directory -Path $sub -Force | Out-Null
+
+        $main = @(
+            (New-UsageLine -Id 'm1' -In 100 -Out 10 -CacheRead 1000 -Create 200)                # 1310
+            (New-UsageLine -Id 'm2' -In 50  -Out 5  -CacheRead 100  -Create 0)                   # 155 (superseded)
+            (New-UsageLine -Id 'm2' -In 100 -Out 100 -CacheRead 300 -Create 0)                   # 500 (final snapshot wins)
+            '{"type":"user","message":{"id":"u1","usage":{"input_tokens":99999}}}'               # non-assistant -> skip
+            '{"type":"assistant","message":{"id":"syn","model":"<synthetic>","usage":{"input_tokens":99999}}}' # synthetic -> skip
+            '{"type":"assistant","message":{"id":"nou","model":"claude-opus-4-8"}}'              # no usage -> skip
+            'not json at all'                                                                     # junk -> skip
+        )
+        Set-Content -Path (Join-Path $store 's1.jsonl') -Value $main -Encoding utf8
+        Set-Content -Path (Join-Path $sub 'a1.jsonl') -Value @((New-UsageLine -Id 'a1' -In 300)) -Encoding utf8  # nested -> tests -Recurse
+
+        $r = Get-Tier3TranscriptTokens -WorkingDir $workingDir -ProjectsRoot $projects
+        $r.ok       | Should -BeTrue
+        $r.messages | Should -Be 3           # m1, m2 (deduped), a1
+        $r.tokens   | Should -Be 2110        # 1310 + 500 + 300
+        Remove-Item $root -Recurse -Force
+    }
+
+    It 'PASS: the 1h cache_creation shape is counted (5m + 1h writes)' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tx-" + [Guid]::NewGuid().ToString('N'))
+        $projects = Join-Path $root 'projects'
+        $slug = ('C:\fake\one-hour' -replace '[^A-Za-z0-9]', '-')
+        New-Item -ItemType Directory -Path (Join-Path $projects $slug) -Force | Out-Null
+        $line = '{"type":"assistant","message":{"id":"h1","model":"claude-opus-4-8","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":1000,"ephemeral_1h_input_tokens":2000}}}}'
+        Set-Content -Path (Join-Path (Join-Path $projects $slug) 's.jsonl') -Value $line -Encoding utf8
+        (Get-Tier3TranscriptTokens -WorkingDir 'C:\fake\one-hour' -ProjectsRoot $projects).tokens | Should -Be 3000
+        Remove-Item $root -Recurse -Force
+    }
+
+    It 'FAIL-guard: a missing store yields ok=false + zero (caller keeps the stream tally, never fails)' {
+        $projects = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-tx-none-" + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $projects -Force | Out-Null
+        $r = Get-Tier3TranscriptTokens -WorkingDir 'C:\fake\absent' -ProjectsRoot $projects
+        $r.ok     | Should -BeFalse
+        $r.tokens | Should -Be 0
+        Remove-Item $projects -Recurse -Force
+    }
+}
+
 Describe 'App zip — snapshot the built app, skip the heavy junk' {
     It 'PASS: zips the source but excludes node_modules/.next; skips nothing readable' {
         $root = Join-Path ([System.IO.Path]::GetTempPath()) ("tier3-zip-" + [Guid]::NewGuid().ToString('N'))

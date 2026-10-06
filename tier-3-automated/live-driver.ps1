@@ -836,6 +836,59 @@ function Get-Tier3SegmentRecord {
     }
 }
 
+# Authoritative token total for a run, read from Claude Code's own transcript store rather than
+# the per-segment stream tally. WHY: the stream tally only captures a segment's CACHE tokens from
+# its final `result` event (Invoke-ClaudeHeadless returns $state.tokens only when sawResult). A
+# segment KILLED or STOPPED before that event contributes just its non-cache input+output partial,
+# so a resumed run whose early segments were interrupted silently loses their (dominant) cache
+# tokens — e.g. a 3-segment build reported 39.7M when the true figure was ~90.9M. The transcript
+# store is the complete record across ALL segments + sub-agents (the same source /build-report
+# reads via report-core's gatherUsageRecords), so summing it is immune to where a segment ended.
+#
+# Mirrors report-core.mjs: the store folder is the run's cwd slugified (every non-alphanumeric ->
+# '-'); it is matched case-insensitively because Claude Code names the folder from the cwd it was
+# launched with, whose drive-letter / path casing often differs from the slug (e.g. `C:\temp` ->
+# store `C--Temp-...`) — a case-sensitive match would find nothing and drop the whole run's spend.
+# Assistant usage is summed deduped by message id (streamed snapshots repeat an id; the last wins),
+# cache-inclusive (input + output + cache_read + 5m/1h cache_creation). Best-effort: a missing or
+# unreadable store returns ok=$false so the caller keeps the stream tally rather than failing.
+# $ProjectsRoot is injectable for tests (defaults to ~/.claude/projects).
+function Get-Tier3TranscriptTokens {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$WorkingDir, [string]$ProjectsRoot)
+    if (-not $ProjectsRoot) { $ProjectsRoot = Join-Path $HOME '.claude/projects' }
+    $miss = @{ ok = $false; tokens = [long]0; messages = 0; store = $null }
+    if (-not (Test-Path $ProjectsRoot)) { return $miss }
+    $resolved = try { (Resolve-Path -LiteralPath $WorkingDir -ErrorAction Stop).Path } catch { $WorkingDir }
+    $slug = ($resolved -replace '[^A-Za-z0-9]', '-')
+    $slugLc = $slug.ToLowerInvariant()
+    $entries = @(Get-ChildItem -LiteralPath $ProjectsRoot -Directory -ErrorAction SilentlyContinue)
+    # Exact-case wins (a case-sensitive FS can hold `…/App` and `…/app` as two projects); else fold.
+    $store = ($entries | Where-Object { $_.Name -eq $slug } | Select-Object -First 1)
+    if (-not $store) { $store = ($entries | Where-Object { $_.Name.ToLowerInvariant() -eq $slugLc } | Select-Object -First 1) }
+    if (-not $store) { return $miss }
+    $byId = @{}
+    foreach ($f in (Get-ChildItem -LiteralPath $store.FullName -Recurse -Filter '*.jsonl' -File -ErrorAction SilentlyContinue)) {
+        foreach ($line in [System.IO.File]::ReadLines($f.FullName)) {
+            if ([string]::IsNullOrWhiteSpace($line) -or ($line -notmatch '"usage"')) { continue }  # cheap pre-filter
+            $o = $null; try { $o = $line | ConvertFrom-Json } catch { continue }
+            if ((Get-JsonProp $o 'type') -ne 'assistant') { continue }
+            $m = Get-JsonProp $o 'message'; if (-not $m) { continue }
+            if ((Get-JsonProp $m 'model') -eq '<synthetic>') { continue }
+            $u = Get-JsonProp $m 'usage'; if (-not $u) { continue }
+            $id = Get-JsonProp $m 'id'; if (-not $id) { $id = Get-JsonProp $o 'uuid' }
+            if (-not $id) { continue }
+            $cc = Get-JsonProp $u 'cache_creation'
+            $w5 = if ($cc) { [int](Get-JsonProp $cc 'ephemeral_5m_input_tokens' 0) } else { [int](Get-JsonProp $u 'cache_creation_input_tokens' 0) }
+            $w1 = if ($cc) { [int](Get-JsonProp $cc 'ephemeral_1h_input_tokens' 0) } else { 0 }
+            $byId[[string]$id] = [int](Get-JsonProp $u 'input_tokens' 0) + [int](Get-JsonProp $u 'output_tokens' 0) +
+                [int](Get-JsonProp $u 'cache_read_input_tokens' 0) + $w5 + $w1
+        }
+    }
+    $total = [long]0; foreach ($v in $byId.Values) { $total += [long]$v }
+    return @{ ok = ($byId.Count -gt 0); tokens = $total; messages = $byId.Count; store = $store.FullName }
+}
+
 # ---- PLAN-A scenario: plan an epic ahead, park it ready to build (record-only) --------------
 #
 # The plan-ahead command's live behaviours (worktree planning, parking on `main` at
@@ -1479,6 +1532,15 @@ function Invoke-Tier3LiveRun {
     Write-Tier3Progress -Path $progressPath -Record $combined
     $memSummary = Get-MemorySummaryFromProgress -P $combined
 
+    # Authoritative token total from the transcript store — complete across ALL segments + sub-agents.
+    # $combined.tokens (the per-segment stream tally) UNDERCOUNTS a resumed run whose early segments
+    # were interrupted before their final `result` event (those segments lose their cache tokens; see
+    # Get-Tier3TranscriptTokens). Prefer the store whenever it reads a larger figure; fall back to the
+    # stream tally if the store can't be found/read, so this never fails or reduces a run's total.
+    $tokensTotal = [long]$combined.tokens
+    $txTok = Get-Tier3TranscriptTokens -WorkingDir $WorkingDir
+    if ($txTok.ok -and $txTok.tokens -gt $tokensTotal) { $tokensTotal = [long]$txTok.tokens }
+
     # Per-phase timing: Claude's CUMULATIVE time distributed by cumulative per-phase output tokens.
     $phaseTiming = Get-DistributedPhaseTiming -Spans @($summary.spans) -GateTokens $combined.gateTokens -TotalClaudeSeconds $combined.claudeSeconds
 
@@ -1560,9 +1622,9 @@ function Invoke-Tier3LiveRun {
             epicsBuilt = $epicsBuilt
             complete = $complete
             conformanceScored = $conf.ran
-            tokensTotal = $combined.tokens
+            tokensTotal = $tokensTotal
             segments = $combined.segments
-            builds = @(@{ attempt = 1; result = $buildResult; compiled = $built.ok; tokens = $combined.tokens; turns = $combined.turns; reason = $buildReason })
+            builds = @(@{ attempt = 1; result = $buildResult; compiled = $built.ok; tokens = $tokensTotal; turns = $combined.turns; reason = $buildReason })
             rulesMissed = @($rulesMissed)
         }
         _scaffold = $WorkingDir
