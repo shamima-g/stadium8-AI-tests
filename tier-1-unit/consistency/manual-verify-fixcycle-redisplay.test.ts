@@ -5,7 +5,7 @@
  * fixes it, walks back through the epic-end checks, and RE-DISPLAYS the approval —
  * regenerating `manual-tests.html` from `state.json.epic.manualTestResults` so that
  * previously-passed tests stay ticked and ONLY the tests the fix affected come back
- * unchecked for re-verification. The loop is capped at 3 manual-test fix cycles.
+ * unchecked for re-verification. The loop stops after three fix attempts on the epic.
  *
  * Canonical source: `.claude/commands/continue.md` § Step B7.1 (and the
  * check-off page's pre-tick rule in `.claude/shared/approval-pattern.md`).
@@ -44,9 +44,9 @@ describeTemplate('manual-test approval — fix-cycle re-display', () => {
     expect(md).toMatch(/uncheck only the tests the fix affected/i);
   });
 
-  it('PASS: the manual-test fix loop is capped at 3 cycles', () => {
+  it('PASS: the manual-test fix loop stops after three attempts', () => {
     const md = fs.readFileSync(CONTINUE, 'utf8');
-    expect(md).toMatch(/3 manual-test fix cycles/i);
+    expect(md).toMatch(/three fix attempts on this epic/i);
   });
 
   it('PASS: the check-off page pre-ticks from prior results (approval-pattern.md)', () => {

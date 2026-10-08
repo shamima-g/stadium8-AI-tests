@@ -212,21 +212,25 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — stops in continue.md', () => 
     expect(stops.filter((s) => s.strings.length > 0).length).toBeGreaterThanOrEqual(5);
   });
 
-  // The CI-failure stop is an accepted, scoped exception (AC2 amended — ruled intended by the AC
-  // owner, 2026-09-21). Every OTHER stop must still be free of developer-facing phrasing.
-  it('no developer-facing phrasing in any stop (CI-failure stop excepted)', () => {
+  // The CI-failure escape-hatch stop was REMOVED (dev @ 6908c8c, "render the approval pages from
+  // scripts instead of prose"). Historically it was an accepted, scoped exception: "Diagnose
+  // locally" / "Force merge anyway" were allowed in that ONE stop. With the stop gone, every stop
+  // must be free of developer-facing phrasing with no exception in play.
+  it('no developer-facing phrasing in any stop', () => {
     const bad = findBadPhrasesInStops(read(CONTINUE));
     expect(bad, bad.map((o) => `L${o.line}: "${o.string}"`).join('\n')).toEqual([]);
   });
 
-  // Fail-closed positive: the exception must correspond to a REAL, present CI stop that still
-  // carries both exempted phrases — otherwise the check above would pass vacuously.
-  it('the CI-failure stop exists and still carries the two exempted phrases', () => {
-    const ciStops = extractStops(read(CONTINUE)).filter(isCiFailureStop);
-    expect(ciStops.length, 'exactly one CI-failure stop').toBe(1);
-    const joined = ciStops[0].strings.join(' | ');
-    expect(joined).toMatch(/diagnose locally/i);
-    expect(joined).toMatch(/force merge anyway/i);
+  // Regression for the removal: the CI-failure escape-hatch stop — an AskUserQuestion menu offering
+  // "Diagnose locally" / "Force merge anyway", anchored by `gh pr rerun` / "re-run the failing
+  // checks" — no longer exists. CI handling is now plain: B7.2.3 watches checks and loops
+  // fix→re-watch on a failure; B7.2.4 asks only "Merge now" / "Hold off". Guard that it stays gone.
+  it('the CI-failure escape-hatch stop has been removed (no diagnose / force-merge stop)', () => {
+    const stops = extractStops(read(CONTINUE));
+    expect(stops.filter(isCiFailureStop).length, 'CI-failure escape-hatch stop should be gone').toBe(0);
+    const joined = stops.flatMap((s) => s.strings).join(' | ');
+    expect(joined).not.toMatch(/diagnose locally/i);
+    expect(joined).not.toMatch(/force merge anyway/i);
   });
 
   it('no slug placeholder leaks into a stop question', () => {
