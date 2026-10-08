@@ -195,9 +195,10 @@ const PEER_CMDS = ['start', 'plan', 'migrate-legacy']
   .map((c) => path.join(TEMPLATE_DIR, 'commands', `${c}.md`))
   .filter((p) => fs.existsSync(p));
 
-// AC3 SCOPE (amended 2026-09-21, ruled by the AC owner/engineer): `.claude/WORKFLOWS.md` is an
-// INTERNAL developer/maintainer reference, not text the end-user reads — so it is OUT OF SCOPE for
-// AC3's "no old vocabulary" check. AC3 covers the genuinely user-facing docs below.
+// AC3 SCOPE: the "no old vocabulary" check covers the genuinely user-facing docs below
+// (CLAUDE.user.md + Help/*). `.claude/WORKFLOWS.md` was historically excluded here as an INTERNAL
+// developer/maintainer reference; it was deleted from the template (2026-10-08), so there is no
+// longer anything to exclude.
 function userDocs(): string[] {
   const docs = [CLAUDE_USER];
   if (fs.existsSync(HELP_DIR)) docs.push(...fs.readdirSync(HELP_DIR).filter((f) => f.endsWith('.md')).map((f) => path.join(HELP_DIR, f)));
@@ -250,10 +251,10 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — stops in peer commands', () =
 });
 
 describe.skipIf(!TEMPLATE_PRESENT)('regression — user-facing docs (AC3)', () => {
-  // NOTE: `.claude/WORKFLOWS.md` is intentionally NOT scanned here — it was ruled an internal
-  // developer reference (see AC3 SCOPE note above), so its "halt"/"Tier 4" wording is out of
-  // AC3's scope. Residual gap: there is no user-facing "unexpected stop" help entry in Help/* to
-  // rewrite; if one is wanted, that's a separate must-show (Tier-3 / manual), recorded in the plan.
+  // NOTE: `.claude/WORKFLOWS.md` used to be excluded here as an internal developer reference (see
+  // the AC3 SCOPE note above), but it was deleted from the template (2026-10-08) — so there is
+  // nothing to scan or exclude. Residual gap: there is no user-facing "unexpected stop" help entry
+  // in Help/* to rewrite; if one is wanted, that's a separate must-show (Tier-3 / manual).
 
   it('CLAUDE.user.md exists and is clean of the old vocabulary', () => {
     expect(fs.existsSync(CLAUDE_USER)).toBe(true);
@@ -302,7 +303,8 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — user-facing docs (AC3)', () =
 // Two open items are DECISIONS, not deferred tests, so they live in the plan/tracker, not here
 // (a `.todo` implies a test will be written; these aren't tests until the decision is made):
 //   - whether a user-facing "unexpected stop" help entry should exist (none does today), and
-//   - whether start.md is user-facing (→ a prose vocab check) or internal like WORKFLOWS.md.
+//   - whether start.md is user-facing (→ a prose vocab check) or internal (as WORKFLOWS.md was,
+//     before it was removed from the template).
 // See plain-language-stops-test-plan.md § Implementation status.
 
 if (!TEMPLATE_PRESENT) {

@@ -15,7 +15,7 @@ the whole trick to not going stale:
    doc-name rules. The suite reads these **live** from the template it's aimed at
    (`epic-state.js`, `.claude/commands/`, `quality-gates.js`, the per-target
    contract). To learn how a given version's workflow behaves, read **that version's
-   own docs**: `<template>/.claude/WORKFLOWS.md` and `<template>/.template-docs/`.
+   own docs**: `<template>/.template-docs/` (e.g. `users/Help/Agent-Workflow-Guide.md`).
 
 That second rule is why this doc no longer prints "the stages are …": the stages are
 whatever the version under test defines. When a concrete example helps, this doc uses
@@ -367,7 +367,7 @@ how it got there in a root `CHANGELOG.md` ([Keep a
 Changelog](https://keepachangelog.com/en/1.1.0/) format). The suite reads both — the
 marker to know *which* version it's testing, the changelog to explain *why* two
 versions differ. It also reads that version's own workflow docs
-(`.claude/WORKFLOWS.md`, `.template-docs/`) as the per-version "how it works".
+(`.template-docs/`, e.g. `users/Help/Agent-Workflow-Guide.md`) as the per-version "how it works".
 
 ### Two more promises
 

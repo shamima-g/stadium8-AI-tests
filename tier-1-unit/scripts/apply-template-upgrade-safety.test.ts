@@ -64,8 +64,11 @@ describe('apply-template — /upgrade deletion safety (v1.2.0)', () => {
     expect(r.exitCode, r.stderr).toBe(0);
 
     // Sanity: the upgrade actually APPLIED machinery (so "user files survived" can't be a
-    // side effect of the script doing nothing). WORKFLOWS.md is template-owned and copied in.
-    expect(project.exists('.claude/WORKFLOWS.md'), 'upgrade did not apply machinery — it may have no-opped').toBe(true);
+    // side effect of the script doing nothing). `.claude/README.md` is a template-owned loose file
+    // (apply-template's MACHINERY_LOOSE_FILES) copied in on every upgrade, and createTempProject
+    // doesn't seed it — so its presence afterwards proves the apply actually ran. (WORKFLOWS.md,
+    // the previous probe, was deleted from the template 2026-10-08.)
+    expect(project.exists('.claude/README.md'), 'upgrade did not apply machinery — it may have no-opped').toBe(true);
 
     // Retired template files are pruned...
     for (const rel of RETIRED) {

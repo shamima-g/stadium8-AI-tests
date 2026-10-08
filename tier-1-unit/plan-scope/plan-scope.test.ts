@@ -180,7 +180,7 @@ describe.skipIf(!TEMPLATE_PRESENT)('regression — /plan epic-scope wording is p
 
   it('plan.md carries the no-/start guards and no residual dead-end redirect (AC7)', () => {
     // Fuzzy residual-redirect scan is reliable only on plan.md, whose /plan wording is
-    // controlled. start.md / WORKFLOWS.md are prose-heavy and describe legitimate INTAKE
+    // controlled. start.md is prose-heavy and describes legitimate INTAKE
     // design-reading + build routes that a static scan can't cleanly tell from a dead-end —
     // so residual-redirect detection there is a Tier-3 (semantic) concern, not this scan.
     const md = read(PLAN);

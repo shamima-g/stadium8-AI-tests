@@ -32,8 +32,7 @@ cheaply so Tier 3 only needs to run occasionally.
 
 **Ground the walkthrough in the version under test — not in this doc.** Before you
 start, read that version's own workflow docs so you're checking against what it
-actually promises: `<template>/.claude/WORKFLOWS.md` and
-`<template>/.template-docs/users/` (Getting-Started, Agent-Workflow-Guide,
+actually promises: `<template>/.template-docs/users/` (Getting-Started, Agent-Workflow-Guide,
 Quality-Gates). The stages, gates, and commands you'll see are whatever that version
 defines. What follows is the **version-independent craft** the walkthrough confirms —
 the things no unit test can judge — framed so they apply whatever the exact stage

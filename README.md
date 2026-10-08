@@ -233,4 +233,4 @@ organised (the three tiers), what each one checks, testing any template/version,
 keeping tests current, and how to add one. Start there.
 
 To understand how a given template *version's* workflow behaves, read that template's
-own docs: `<template>/.claude/WORKFLOWS.md` and `<template>/.template-docs/`.
+own docs under `<template>/.template-docs/` (e.g. `users/Help/Agent-Workflow-Guide.md`).
