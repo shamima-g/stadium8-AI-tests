@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "test:tier1": "vitest run tier-1-unit",
     "test:tier2": "vitest run tier-2-recorded-run",
+    "pretest:page-consistency": "playwright install chromium",
+    "test:page-consistency": "vitest run tier-2-recorded-run/page-consistency",
     "test:pester": "pwsh -NoProfile -Command \"Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-1-unit/hooks/powershell -Output Detailed\"",
     "test:tier3-unit": "pwsh -NoProfile -Command \"Import-Module Pester -MinimumVersion 5.0 -Force; Invoke-Pester tier-3-automated/tests -Output Detailed\"",
     "test:report": "node scripts/generate-test-report.cjs",
@@ -32,6 +34,7 @@
     "fast-check": "^3.23.0",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.0",
+    "playwright": "^1.64.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },

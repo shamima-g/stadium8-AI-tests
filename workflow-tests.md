@@ -363,11 +363,12 @@ new machinery is a thin front layer, held to every rule in
 
 > **One external prerequisite (page-consistency test).** `tier-2-recorded-run/page-consistency`
 > renders the generated review pages in a headless Chromium to compare their *computed* styles, so it
-> needs the suite's own Playwright browser. It is self-provisioning — `npm run test:page-consistency`
-> runs `playwright install chromium` first (idempotent), and the test fails with a clear
-> `npx playwright install chromium` message if the browser is missing — so "no test edits, runs
-> anywhere" still holds, with that one-time download. (This is the suite's own `playwright` version, distinct
-> from the app's Tier-3 e2e Chromium that `Setup.ps1` warms from the template lockfile.)
+> needs the suite's own Playwright browser. `npm run test:page-consistency` self-provisions it
+> (`playwright install chromium`, idempotent). The full suite (`npm test` / `test:tier2`) also sweeps this
+> file in, but does **not** install the browser — so when Chromium is absent the test **skips with an install
+> hint** (`npx playwright install chromium`) rather than erroring, keeping the default suite green on a bare
+> machine/CI. Install it once to actually exercise the checks. (This is the suite's own `playwright` version,
+> distinct from the app's Tier-3 e2e Chromium that `Setup.ps1` warms from the template lockfile.)
 
 **The template carries its own version.** Every template records where it stands in a
 `template-version.json` at its root (e.g. `{ "templateRef": "v1.1.0" }`) and documents
