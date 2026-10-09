@@ -361,6 +361,14 @@ test. It leans on the one path the suite already resolves through (`REPO_ROOT`);
 new machinery is a thin front layer, held to every rule in
 [section 2](#2-the-rules-every-test-follows).
 
+> **One external prerequisite (page-consistency test).** `tier-2-recorded-run/page-consistency`
+> renders the generated review pages in a headless Chromium to compare their *computed* styles, so it
+> needs the suite's own Playwright browser. It is self-provisioning — `npm run test:page-consistency`
+> runs `playwright install chromium` first (idempotent), and the test fails with a clear
+> `npx playwright install chromium` message if the browser is missing — so "no test edits, runs
+> anywhere" still holds, with that one-time download. (This is the suite's own `playwright` version, distinct
+> from the app's Tier-3 e2e Chromium that `Setup.ps1` warms from the template lockfile.)
+
 **The template carries its own version.** Every template records where it stands in a
 `template-version.json` at its root (e.g. `{ "templateRef": "v1.1.0" }`) and documents
 how it got there in a root `CHANGELOG.md` ([Keep a
@@ -427,6 +435,39 @@ didn't exist yet must **never** read as a bug:
 > **Two versions, two homes.** The **suite's** version is its committed `VERSION`
 > file; the **template's** version is its own `template-version.json` (`templateRef`),
 > git tag as fallback. The drift banner (Layer A) prints the two side by side.
+
+### Simulating a release build from the dev template
+
+You don't need the published release repo to test release behaviour — you can turn a
+fresh **dev** template into a **release-equivalent** checkout by hand, reproducing what
+the publish pipeline does (drop the release-only exclusions and swap in the end-user
+`CLAUDE.md`). This is why the intake tests resolve the shipped file as *`CLAUDE.md` in a
+release capture, `CLAUDE.user.md` in a dev one* — the steps below collapse that difference.
+
+**What uses this: recording.** The consumer of this procedure is the **recording** of
+live-AI captures — the golden runs that feed the Tier-2 recorded-run invariants
+([section 7](#7-tier-2--invariants-over-a-recorded-run)) and the human-review harness
+([section 8](#8-tier-3--the-human-walkthrough)). Those captures must be made against a
+release-shaped template: the live tier runs with `-Target release` (there is no `dry_run`
+target), so the file INTAKE writes is named `CLAUDE.md`, not `CLAUDE.user.md`, and the
+dev-only files named in `.release-ignore` are gone. When you don't have the published
+release repo on hand, the hand-made "release copy" below is how you produce that checkout
+locally before recording.
+
+1. **Start from a fresh copy of the Stadium 8 dev template** — "Use this template" to get
+   a clean working copy.
+2. **Delete `.release-ignore`** at the root of the repo (the list of dev-only files the
+   publish step strips).
+3. **Delete `CLAUDE.md`** (the dev/maintainer file).
+4. **Rename `CLAUDE.user.md` → `CLAUDE.md`** (promote the shipped end-user file into place).
+5. **Commit the result** — in a VS Code terminal in the project:
+
+   ```
+   git add -A; git commit -m "Make release copy"
+   ```
+
+The result is a checkout that behaves like the release channel for test purposes; aim the
+suite at it with `REPO_ROOT` (see [section 16](#16-running-the-suite)).
 
 **Commands:**
 
