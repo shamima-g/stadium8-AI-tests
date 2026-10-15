@@ -53,4 +53,21 @@ describe.skipIf(!PRESENT)('session-recording wiring', () => {
     expect(settings).toContain('transcript-sync-hook.js');
     expect(settings).toContain('UserPromptSubmit');
   });
+
+  it('the hook is wired on BOTH UserPromptSubmit (synchronous) and Stop — the redesigned lifecycle needs both', () => {
+    const settings = JSON.parse(targetFile('.claude/settings.json')) as {
+      hooks?: Record<string, Array<{ hooks?: Array<{ command?: string; async?: boolean }> }>>;
+    };
+    const syncHooks = (event: string) =>
+      (settings.hooks?.[event] ?? [])
+        .flatMap((g) => g.hooks ?? [])
+        .filter((h) => typeof h.command === 'string' && h.command.includes('transcript-sync-hook.js'));
+
+    const ups = syncHooks('UserPromptSubmit');
+    const stops = syncHooks('Stop');
+    expect(ups.length, 'transcript-sync-hook registered on UserPromptSubmit').toBeGreaterThan(0);
+    expect(stops.length, 'transcript-sync-hook registered on Stop (else nothing is ever recorded/uploaded)').toBeGreaterThan(0);
+    // UserPromptSubmit must stay synchronous: an async hook's stdout is discarded, so Claude would never be asked.
+    for (const h of ups) expect(h.async, 'the UserPromptSubmit transcript hook must stay synchronous').not.toBe(true);
+  });
 });

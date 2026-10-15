@@ -84,6 +84,35 @@ export function userPrompt(sessionId: string = uuid(), prompt = 'hello'): Record
   return { hook_event_name: 'UserPromptSubmit', session_id: sessionId, prompt };
 }
 
+/**
+ * A Stop payload for a session. `lastAssistantMessage` is Claude's final reply text (the hook's first proof
+ * route); `transcriptPath`, when given, is the session transcript the hook falls back to (the second route,
+ * `claudeTextInTranscript`) — pass '' for the message to force the transcript route.
+ */
+export function stop(
+  sessionId: string,
+  lastAssistantMessage = '',
+  transcriptPath?: string
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    hook_event_name: 'Stop',
+    session_id: sessionId,
+    last_assistant_message: lastAssistantMessage,
+  };
+  if (transcriptPath) payload.transcript_path = transcriptPath;
+  return payload;
+}
+
+/**
+ * The `additionalContext` the hook asks Claude to show (the redesigned notice channel), or '' when the hook
+ * emitted nothing. The notice is carried here — NOT as a `systemMessage`, which the VS Code extension receives
+ * but never displays.
+ */
+export function additionalContext(res: ScriptResult): string {
+  const out = (res.parsedJson as { hookSpecificOutput?: { additionalContext?: string } })?.hookSpecificOutput;
+  return out?.additionalContext ?? '';
+}
+
 /** Load the target's transcript-sync-core module in-process (for fetch-injection gating tests). */
 export function loadCore(): {
   createCore: (deps?: Record<string, unknown>) => Record<string, any>;

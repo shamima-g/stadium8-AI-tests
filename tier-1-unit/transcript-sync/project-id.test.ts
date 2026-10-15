@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createTempProject } from '../../helpers/temp-project';
-import { PRESENT, runCli, runHook, userPrompt, freshHome } from '../../helpers/transcript-sync';
+import { PRESENT, runCli, runHook, userPrompt, freshHome, additionalContext } from '../../helpers/transcript-sync';
 
 const RECEIVER = 'https://receiver.test';
 
@@ -66,9 +66,9 @@ describe.skipIf(!PRESENT)('transcript-collection project id — committed and sh
     const cloneDir = path.join(cloneRoot, 'project-b');
     git(cloneRoot, 'clone', '-q', proj.root, 'project-b');
 
-    // A session in the clone (first message) shows the notice and does NOT mint a new id.
+    // A session in the clone (first message) is asked to show the notice and does NOT mint a new id.
     const res = runHook(cloneDir, userPrompt(), { home, receiverUrl: RECEIVER });
-    expect((res.parsedJson as { systemMessage?: string })?.systemMessage ?? '').toMatch(/^SESSION RECORDING/);
+    expect(additionalContext(res), 'the clone is asked to show the notice').toContain('SESSION RECORDING');
 
     // The clone's id is the one we wrote down (criterion 2, step 4), not a fresh one.
     expect(readId(path.join(cloneDir, 'transcript-collection.json'))).toBe(projectId);
