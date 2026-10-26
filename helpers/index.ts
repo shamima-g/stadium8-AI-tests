@@ -46,6 +46,14 @@ export type { CheckpointId } from './checkpoint-fixtures';
 export { loadGoldenRun } from './golden-run';
 export type { GoldenRun } from './golden-run';
 
+// build-tests-together (#4666e23): extract + compare the accessible controls in a story's two test files.
+export { extractControlRefs, compareControls } from './control-refs';
+export type { ControlRef, QueryStrategy, Signature, ParityResult } from './control-refs';
+
+// build-tests-together: parse BUILD's test-generator Task spawns from a stream-json transcript.
+export { parseTestGeneratorSpawns, analyzeTestGeneratorSpawns } from './test-generator-spawns';
+export type { TgSpawn, TgMode, TgReturnMarker, TgSpawnAnalysis } from './test-generator-spawns';
+
 // INTAKE `## Project Overview` analysis — pure, string-only; shared across Tier 1/2/3.
 export {
   PLACEHOLDER,
