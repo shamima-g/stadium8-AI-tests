@@ -1,0 +1,7 @@
+{
+  "scenario": "build-tests-together-divergent",
+  "note": "PLANTED-BAD calibration (hand-built docs tree, no live run). A valid ONE-agent-per-story run whose Story 2 test files still disagree on a control (Vitest radiogroup vs Playwright combobox for 'Status'). Proves the Tier-2 parity invariant (T2.2) goes RED — the gap shared mock data (B0) does not close. Story 1 matches.",
+  "benchmark": "synthetic",
+  "stopPoint": "post-B0.2",
+  "expectParity": "mismatch"
+}

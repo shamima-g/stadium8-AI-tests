@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "slug": "task-board",
+    "name": "Task Board",
+    "createdAt": "2026-10-26T00:00:00.000Z",
+    "dependsOn": [],
+    "introducesSharedSurface": true,
+    "unverifiedAssumptions": [],
+    "manualTestResults": []
+  },
+  "phase": "BUILD",
+  "stories": {
+    "1": { "storyId": "11111111-1111-1111-1111-111111111111", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
+    "2": { "storyId": "22222222-2222-2222-2222-222222222222", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null }
+  },
+  "halt": null,
+  "lastUpdated": "2026-10-26T00:00:00.000Z"
+}

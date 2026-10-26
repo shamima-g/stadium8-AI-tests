@@ -37,6 +37,8 @@ export interface TgSpawn {
   description: string;
   /** The agent's return marker, when the version emits one. */
   returnMarker: TgReturnMarker;
+  /** The raw return text (tool_result content), for tag-aware checks (e.g. did it list a .test.tsx?). */
+  returnText: string;
   /** True when spawned directly by the orchestrator (caller.type === 'direct' or absent). */
   isTopLevel: boolean;
 }
@@ -133,6 +135,7 @@ export function parseTestGeneratorSpawns(jsonl: string): TgSpawn[] {
         storyKey: mode === 'epic-mocks' ? null : parseStoryKey(prompt, description),
         description,
         returnMarker: parseReturnMarker(retText),
+        returnText: retText,
         isTopLevel,
       });
     }

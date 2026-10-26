@@ -254,10 +254,15 @@ asserts over).
   (no browser needed — `--list` only parses).
 - **T3.8 — lint clean.** `(cd web && npm run lint)` reports **no errors in the new test files**.
 
-**Freeze.** Only when the capture is conforming (freeze gate holds; one agent per story; parity holds; files
-present), `git bundle create …/repo.bundle --all` into
-`fixtures/golden-runs/build-tests-together-contact-form/` + `meta.json` (benchmark, template ref
-`v1.4.0`+`4666e23`, model, timestamp, story count, stop-point = `post-B0.2`, `startedAt-all-null = true`).
+**Freeze — DOCS+WEB TREE, not a git bundle.** The capture stops after B0.2, *before* the first story's B5
+commit, so the generated test files are **uncommitted** — a `git bundle --all` would not contain them
+(confirmed against existing bundle slots). Freeze the slot as a **flat working-tree copy**: copy the
+post-B0.2 `generated-docs/` and `web/` trees into `fixtures/golden-runs/build-tests-together-contact-form/`
+(loadGoldenRun's docs-only branch → `root = slot dir`, so `root/web/...` resolves to the real files),
+alongside `transcript.jsonl`, a `recorded/` dir (`npm-test.txt`, `test-e2e-list.txt`, `lint.txt` for T2.5),
+and `meta.json` (benchmark, template ref `v1.4.0`+`4666e23`, model, timestamp, story count, stop-point =
+`post-B0.2`, `startedAt-all-null = true`). Only freeze when the capture is conforming (gate holds; one agent
+per story; parity holds; files present).
 
 ---
 
@@ -332,11 +337,13 @@ broken-case wording.
    after the first epic.)
 4. **`tier-3-automated/capture-build-tests-together.ps1`** — phased, portable, spend-gated; stops after B0.2;
    freeze gate = files-present + `startedAt`-all-null + no-dev-source; targets the first ≥2-story epic. *(pending)*
-5. ◑ **PARTIAL — calibration fixtures** built at `tier-1-unit/build-tests-together/fixtures/` (good / role- /
-   strategy- / name-divergent); the Tier-2 golden-run slots (`build-tests-together-contact-form` +
-   unjustified-missing-Vitest) land with the live capture.
-6. **`tier-2-recorded-run/build-tests-together/`** (T2.1–T2.5 over recorded outputs) + calibration assertions.
-   *(pending — needs the capture)*
+5. ◑ **PARTIAL — calibration** built: the control-refs fixture pairs at `tier-1-unit/build-tests-together/
+   fixtures/` **and** the Tier-2 planted-bad golden-run slot `fixtures/golden-runs/build-tests-together-
+   divergent/` (a docs-tree one-agent run whose Story 2 files diverge — runs now, reds T2.2). The GOOD slot
+   `build-tests-together-contact-form` + the unjustified-missing-Vitest case land with the live capture.
+6. ◑ **PARTIAL — `tier-2-recorded-run/build-tests-together/parity.test.ts`** built: T2.1–T2.4 wired over the
+   good slot (skip-until-present) + the divergent calibration runs green now (proves T2.2 reds on Story 2,
+   not Story 1). **T2.5** (recorded `npm test`/`--list`/`lint` outputs) still pending — needs the capture.
 
 **Prerequisites (verified):** Node ≥22 on the host (`web/package.json` engines + `preinstall` enforce);
 Chromium **not** needed for `test:e2e --list`; MSW (`mock-setup-agent`, B0.1) runs inside the stop window for
