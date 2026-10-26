@@ -172,6 +172,7 @@ Each area maps to a tier and to the real machinery under `.claude/`.
 | L | **Recorded-run invariants** | One captured run's branches, commits, and `generated-docs/` output | 2 |
 | M | **Live behaviour** | The full workflow with a real AI — the final word | 3 |
 | N–U | **Multi-version testing** | Channels, per-version contracts, changelog attribution, version gap/gating — see [section 12](#12-testing-any-template-any-version) | 1 → 3 |
+| V | **Tests-written-together (one agent/story)** | BUILD's single-`test-generator`-per-story contract so both a story's files expect the same controls (`continue.md` B0.2, `test-generator.md`); helpers `control-refs.ts` (control parity) + `test-generator-spawns.ts` (spawn classification). Post-v1.4.0 `[Unreleased]` — see §14 | 1 → 2 |
 
 > **Some Tier-1 tests ship next to the code.** Several template scripts carry their
 > own co-located tests (`epic-state.tests.js`, `bash-permission-checker.tests.js`,
@@ -543,6 +544,7 @@ least one failure path.
 | Collector project-status agreement | ✅ | — | dashboard ↔ build-report cross-script smoke |
 | `/upgrade` deletion-safety (`apply-template.js`) | ✅ | dev only | end-to-end smoke: retired files pruned, user work kept |
 | `/continue` — what it says with no epic, and its check before overwriting a build | ✅ | — | reads the wording in `continue.md`; the real run is checked by hand |
+| Tests-written-together (one agent/story) | ✅ | — | Tier-1 wiring guards + control-parity extractor + spawn parser; Tier-2 recorded invariants + divergent calibration (good slot + Tier-3 capture pending live run) |
 
 **What `/continue` tells the user (v1.3.0).** Two checks read `continue.md` and confirm
 how `/continue` behaves when someone runs it to pick their work back up. The first covers
@@ -621,6 +623,38 @@ branch `S8-129`; the cases now assert the corrected behaviour directly. **Caveat
 older targets:** these cases are plain `it` (not feature-detected), so aiming the suite at a
 genuine pre-fix archive (exact v1.1.0/v1.2.0) will legitimately turn them red — the defect
 really is present there. If cross-version-clean is wanted, gate them on a behaviour probe.
+
+### Post-v1.4.0 additions (branch `test/build-tests-together-same-controls`)
+
+**None of these fold into the v1.3.0 baseline count above.** The suite baseline is still v1.3.0; this is work
+ahead of it, against a template that is v1.4.0 plus `[Unreleased]` changes (`stadium-builder 26-10`, which
+carries the single-agent change as an unreleased commit).
+
+**Tests written together, so they expect the same controls.** BUILD now gives each story **one** agent to
+write both of its test files — the browser click-through and the component test — instead of two agents that
+each guessed the screen's controls on their own. When that drifts, the two files can disagree about a control
+(a status picker written as a radio group in one file and a dropdown in the other), which is what used to cost
+a late round of fix-ups. What is covered, and what is not yet:
+
+- **Tier 1 (live now).** Wording guards over `continue.md` / `test-generator.md` that the single-agent
+  contract is in place — one agent per story, writing both files, told to settle each control's role and name
+  once and find it the same way in both. The **core** guards (one call per story, the mode that writes both
+  files, the "same controls" instruction) go **red** on the real two-agent baseline wording; a few adjacent
+  guards (the file-name rule, routable-needs-a-live-test, mock-data-before-tests ordering) are unchanged
+  between the two templates, so they catch a deliberate edit, not the baseline regression. Two reusable
+  helpers back the behavioural checks and are unit-tested here: one reads the controls out of a story's two
+  files and flags any that disagree on role or on how they are found — it **cannot** tie together a control
+  that was given two *different* names, so that one case is reported for a person to eyeball rather than passed
+  silently; the other reads the build transcript to tell a one-agent run from the old two-agent split.
+- **Tier 2 (partly live).** A recorded-run check that *will* assert — over a captured build — one agent per
+  story, matching controls, both files present, and a real test per screen. It **skips until the capture is
+  recorded** (set `REQUIRE_BUILD_TESTS_TOGETHER=1` to make that skip red for a release run). What runs today
+  is a planted-bad calibration that proves the control-parity check actually reds. The "both files present + a
+  real test" part reuses the existing recorded-run e2e-spec invariant (area L); the **new** teeth are
+  control-parity and one-agent-per-story.
+- **Tier 3 (pending).** The live walkthrough and the capture it needs are not run yet. The capture will be
+  frozen as a flat copy of the generated docs and the `web/` tree (not a git snapshot — the tests are not
+  committed at the point the capture stops).
 
 ### Post-v1.3.0 additions (branch `test/continue-no-epic-and-resume-confirm`)
 
@@ -999,4 +1033,6 @@ $env:REPO_ROOT="C:\path\to\a\template-checkout"; $env:EXPECT_TEMPLATE="1"; $env:
 | Output-discipline (verbosity / plain-stops) | Internal mechanism leaks to the user, a stop reads as developer jargon, or old halt/Tier-4 vocab lingers — **test-first, not in v1.3.0** |
 | Subjective human review — artifact-reviewable (gates) | A wrong fact, an unfaithful design digest, or an unclear held decision slips through un-reviewed (or an unreviewed check passes under `REQUIRE_REVIEW`) |
 | Subjective message-based criteria (manual) | The verbosity / plain-language / read-back-&-conflict checks go unchecked by hand (AI judge retired 2026-10-02) |
+| Tests-written-together — wiring | BUILD reverts to two agents per story, or the "find each control the same way in both files" instruction is dropped — post-v1.4.0 `[Unreleased]` (Tier-1 live; Tier-2 good slot + Tier-3 pending) |
+| Tests-written-together — control parity | A story's two test files expect the same control with different roles/strategies (the radio-vs-dropdown drift) — control-parity helper live + calibrated; recorded-run check pending the capture |
 | Tier 3 — full walkthrough | Anything the automated tiers miss |
