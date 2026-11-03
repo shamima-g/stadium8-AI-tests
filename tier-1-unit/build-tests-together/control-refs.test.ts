@@ -189,15 +189,32 @@ describe('compareControls — inline', () => {
     expect(compareControls(`getByRole('button', { name: 'Save' })`, `page.locator('role=button[name="Save"]')`).status).toBe('match');
   });
 
-  it('compares multi-signature-per-name sets: match, and flags a dropped signature', () => {
+  it('multi-signature-per-name: equal sets match; an extra signature on one side is still a match (overlap)', () => {
     const v = `getByRole('button', { name: 'Filters' }); getByRole('region', { name: 'Filters' })`;
     const pMatch = `page.getByRole('region', { name: 'Filters' }); page.getByRole('button', { name: 'Filters' })`;
     expect(compareControls(v, pMatch).status).toBe('match');
+    // 'Filters' labels a button AND a region in the Vitest file; the Playwright file touches only the
+    // button. The shared control (the button) agrees, so this is a MATCH — the extra region is an element
+    // one layer checks and the other skips (test-plan-shared-controls.md Check 6). The extra signature
+    // stays visible on the shared row for PROOF.md.
     const res = compareControls(v, `page.getByRole('button', { name: 'Filters' })`);
+    expect(res.status).toBe('match');
+    const row = res.shared.find((s) => s.nameKey === 'filters')!;
+    expect(row.match).toBe(true);
+    expect(row.vitest).toEqual(['role=button', 'role=region']);
+    expect(row.playwright).toEqual(['role=button']);
+  });
+
+  it('a fully DISJOINT signature set for a shared name is still a mismatch (teeth retained)', () => {
+    // No common signature → the control is described two different ways → the real defect.
+    const res = compareControls(
+      `getByRole('button', { name: 'Filters' }); getByRole('region', { name: 'Filters' })`,
+      `page.getByRole('combobox', { name: 'Filters' })`,
+    );
     expect(res.status).toBe('mismatch');
     const m = res.mismatches.find((x) => x.nameKey === 'filters')!;
     expect(m.vitest).toEqual(['role=button', 'role=region']);
-    expect(m.playwright).toEqual(['role=button']);
+    expect(m.playwright).toEqual(['role=combobox']);
   });
 
   it('non-role strategies compare: getByText match; getByText vs getByTestId → mismatch', () => {

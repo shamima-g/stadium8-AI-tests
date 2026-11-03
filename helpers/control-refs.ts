@@ -12,9 +12,15 @@
  *   - Join key is the control's ACCESSIBLE NAME, normalised. The two files cover DISJOINT acceptance
  *     criteria (coverage is a single tag per AC: vitest | playwright | none — test-generator.md:20), so
  *     a control that appears in both is matched by name, NOT by AC id. For every name present in both
- *     files we assert the set of (strategy, role) signatures matches — this catches:
+ *     files we require the two sides' (strategy, role) signature sets to OVERLAP — share at least one
+ *     signature, so the control they both reference is described the same way. A name is a MISMATCH only
+ *     when the sets are fully DISJOINT (no common signature) — this catches:
  *       • role divergence   — getByRole('radio', {name:'Status'})  vs getByRole('combobox', {name:'Status'})
  *       • strategy divergence — getByRole('textbox', {name:'Email'}) vs getByLabel('Email')  ("same way")
+ *     Extra signatures on ONE side are not a mismatch: they belong to a DIFFERENT element sharing the
+ *     accessible name (a heading titled "Sign in" beside the "Sign in" button) that only one test layer
+ *     checks — allowed by test-plan-shared-controls.md Check 6 ("the rule is only about controls that
+ *     appear in both files"). The extras stay visible in each shared row's signature lists for PROOF.md.
  *   - It CANNOT catch same-control / different-name divergence (Vitest 'Priority' vs Playwright
  *     'Priority level') — nothing static ties those two names to one control. That residual is REPORTED
  *     (names in one file only are listed as UNCOMPARED) for a human to eyeball in PROOF.md, never
@@ -66,7 +72,8 @@ export type Signature = string;
 export interface ParityResult {
   /** Normalised names present in BOTH files, with each side's signatures and whether they match. */
   shared: Array<{ nameKey: string; vitest: Signature[]; playwright: Signature[]; match: boolean }>;
-  /** The subset of `shared` whose signatures differ — the real defects. */
+  /** The subset of `shared` whose signature sets are fully DISJOINT — a name described with no common
+   *  (strategy, role) between the two files (the real defects). Overlapping-but-unequal sets are a match. */
   mismatches: Array<{ nameKey: string; vitest: Signature[]; playwright: Signature[] }>;
   /** The parity check could not compare these — reported, never counted as a pass. */
   uncompared: {
@@ -338,8 +345,8 @@ function byName(refs: ControlRef[]): Map<string, Set<Signature>> {
 }
 
 const sorted = (s: Set<Signature>): Signature[] => [...s].sort();
-const setsEqual = (a: Set<Signature>, b: Set<Signature>): boolean =>
-  a.size === b.size && [...a].every((x) => b.has(x));
+/** True when the two signature sets share at least one (strategy,role) signature. */
+const setsOverlap = (a: Set<Signature>, b: Set<Signature>): boolean => [...a].some((x) => b.has(x));
 
 /**
  * Compare the two files a story's single agent wrote. Returns a structured parity result:
@@ -356,7 +363,13 @@ export function compareControls(vitestSrc: string, playwrightSrc: string): Parit
   for (const [nameKey, vSigs] of v) {
     const pSigs = p.get(nameKey);
     if (!pSigs) continue;
-    const match = setsEqual(vSigs, pSigs);
+    // A shared NAME agrees when the two files share at least one (strategy,role) signature — the control
+    // they both reference is described the same way. Extra signatures on one side come from a DIFFERENT
+    // element that happens to share the accessible name (a heading titled "Sign in" beside the "Sign in"
+    // button) and that only one test layer checks — allowed, per test-plan-shared-controls.md Check 6
+    // ("the rule is only about controls that appear in both files"). A MISMATCH is a fully DISJOINT set:
+    // the name is described with no common signature at all (radiogroup vs combobox / getByRole vs getByLabel).
+    const match = setsOverlap(vSigs, pSigs);
     const row = { nameKey, vitest: sorted(vSigs), playwright: sorted(pSigs), match };
     shared.push(row);
     if (!match) mismatches.push({ nameKey, vitest: row.vitest, playwright: row.playwright });
