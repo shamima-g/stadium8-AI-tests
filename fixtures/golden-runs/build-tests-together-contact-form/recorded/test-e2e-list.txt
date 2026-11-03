@@ -1,0 +1,20 @@
+# cmd: npm run test:e2e -- --list
+# cwd: C:\temp\build-tests-together-run\web
+# exit: 0
+# ----------------------------------------
+
+> web@1.0.0 test:e2e
+> playwright test --list
+
+Listing tests:
+  [chromium] › epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.spec.ts:65:7 › Epic sign-in-and-app-shell, Story 1: Sign in, land on your page, and sign out › each seeded account lands on its role page after signing in
+  [chromium] › epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.spec.ts:78:7 › Epic sign-in-and-app-shell, Story 1: Sign in, land on your page, and sign out › a signed-out user opening any app URL, including the root, is sent to sign-in
+  [chromium] › epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.spec.ts:90:7 › Epic sign-in-and-app-shell, Story 1: Sign in, land on your page, and sign out › after signing out, the Back button returns to sign-in rather than the previous app page
+  [chromium] › epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.spec.ts:107:7 › Epic sign-in-and-app-shell, Story 1: Sign in, land on your page, and sign out › the sign-in screen is accessible, labelled and completable with the keyboard alone
+  [chromium] › epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.spec.ts:103:7 › Epic 1, Story 2: Role-based menu and permission-denied banner › a Visitor opening /inbox directly sees the banner naming the missing permission and is linked back to Contact
+  [chromium] › epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.spec.ts:125:7 › Epic 1, Story 2: Role-based menu and permission-denied banner › a Support Agent opening /contact or /my-messages directly sees the banner and is linked back to the Inbox
+  [chromium] › epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.spec.ts:62:7 › Epic 1, Story 3: Session timeouts and account lockout › a locked account can sign in with the correct password once 15 minutes have passed
+  [chromium] › epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.spec.ts:92:7 › Epic 1, Story 3: Session timeouts and account lockout › after 30 minutes with no activity, the user is returned to sign-in with a session-expired message
+  [chromium] › epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.spec.ts:118:7 › Epic 1, Story 3: Session timeouts and account lockout › a user who keeps working is still signed out with the session-expired message after 12 hours
+  [chromium] › epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.spec.ts:19:7 › Epic 1, Story 4: Enquiry and user records with sample data › Epic 1, Story 4: enquiry data and seed (deferred to consumer stories)
+Total: 10 tests in 4 files

@@ -1,0 +1,30 @@
+On branch epic/sign-in-and-app-shell
+Your branch is up to date with 'origin/epic/sign-in-and-app-shell'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   web/package-lock.json
+	modified:   web/package.json
+	modified:   web/src/app/layout.tsx
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	generated-docs/architecture.md
+	generated-docs/specs/
+	web/e2e/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.spec.ts
+	web/e2e/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.spec.ts
+	web/e2e/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.spec.ts
+	web/e2e/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.spec.ts
+	web/public/mockServiceWorker.js
+	web/src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx
+	web/src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx
+	web/src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx
+	web/src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx
+	web/src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx
+	web/src/components/MockProvider.tsx
+	web/src/lib/api/endpoints.ts
+	web/src/mocks/
+	web/src/types/api-generated.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")

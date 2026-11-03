@@ -292,17 +292,28 @@ function Do-Freeze {
   }
   if ($started.Count) { $fail += "a story was already built (overshoot): " + ($started -join '; ') }
 
-  # (c) overshoot guard: no developer-authored component/page/route source on the web tree.
+  # (c) overshoot guard: no developer-authored STORY source on the web tree. The stop window legitimately
+  # contains two kinds of non-test source that are NOT story code: (1) template scaffold shipped by the
+  # checkout itself (shadcn ui primitives, toast, app/layout+page), and (2) B0.1 mock-setup infrastructure
+  # (MockProvider, src/mocks) — the plan has mock-setup-agent run inside the stop window. Classify a file as
+  # overshoot ONLY if it is absent from the template tree AND not mock infrastructure, so a real story page
+  # (e.g. src/app/sign-in/page.tsx) still reds while scaffold/mock-setup do not false-positive. The
+  # startedAt-all-null check above remains the load-bearing stop proof; this is the belt-and-braces cross-check.
+  $tplWeb = Join-Path $TemplateRoot 'web'
   $devDirs = @('components','pages','routes','features','app') | ForEach-Object { Join-Path $web "src/$_" }
   $devHits = @()
   foreach ($d in $devDirs) {
-    if (Test-Path $d) {
-      $srcFiles = Get-ChildItem $d -Recurse -File -Include *.tsx,*.ts -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '\\__tests__\\' -and $_.Name -notmatch '\.(test|spec)\.' }
-      if ($srcFiles) { $devHits += "$d ($($srcFiles.Count) file(s))" }
+    if (-not (Test-Path $d)) { continue }
+    $srcFiles = Get-ChildItem $d -Recurse -File -Include *.tsx,*.ts -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch '\\__tests__\\' -and $_.Name -notmatch '\.(test|spec)\.' }
+    foreach ($sf in $srcFiles) {
+      $rel = $sf.FullName.Substring($web.Length).TrimStart('\', '/')  # e.g. src\app\page.tsx
+      if (Test-Path (Join-Path $tplWeb $rel)) { continue }            # shipped by the template → scaffold
+      if ($rel -match 'mock') { continue }                            # B0.1 mock-setup infrastructure
+      $devHits += $rel
     }
   }
-  if ($devHits.Count) { $fail += "developer source present (overshoot): " + ($devHits -join '; ') }
+  if ($devHits.Count) { $fail += "developer story source present (overshoot): " + ($devHits -join '; ') }
 
   # (d) every non-parked story has a spec; flag missing .test.tsx (Tier-2 decides if tag-justified).
   $vDir = Join-Path $web 'src/__tests__/integration'

@@ -1,0 +1,118 @@
+{
+  "status": "ok",
+  "project": {
+    "name": "Contact & Enquiry Management",
+    "slug": "contact-form"
+  },
+  "hasPlan": true,
+  "plan": [
+    {
+      "slug": "sign-in-and-app-shell",
+      "name": "Sign-in and App Shell",
+      "goal": "Everyone signs in with email and password, lands on the right page for their role, sees only the menu items their role allows, and gets a clear on-page message if they open a page they can't use.",
+      "dependsOn": [],
+      "status": "in-flight",
+      "waitingOn": []
+    },
+    {
+      "slug": "visitor-enquiries",
+      "name": "Contact Form and My Messages",
+      "goal": "A Visitor sends an enquiry, sees a 'Message sent!' confirmation of what they sent, and can look back over their own messages (and only theirs).",
+      "dependsOn": [
+        "sign-in-and-app-shell"
+      ],
+      "status": "blocked",
+      "waitingOn": [
+        "sign-in-and-app-shell"
+      ]
+    },
+    {
+      "slug": "inbox",
+      "name": "Inbox",
+      "goal": "Support Agents and Admins see every enquiry in one sortable, paged table and can narrow it down by category, status or text.",
+      "dependsOn": [
+        "sign-in-and-app-shell"
+      ],
+      "status": "blocked",
+      "waitingOn": [
+        "sign-in-and-app-shell"
+      ]
+    },
+    {
+      "slug": "enquiry-handling",
+      "name": "Working an Enquiry",
+      "goal": "Support Agents and Admins open an enquiry, mark it In Progress, and resolve it with a Reply Note; Admins can also delete spam after confirming.",
+      "dependsOn": [
+        "inbox"
+      ],
+      "status": "blocked",
+      "waitingOn": [
+        "inbox"
+      ]
+    }
+  ],
+  "inFlight": [
+    {
+      "slug": "sign-in-and-app-shell",
+      "branch": "epic/sign-in-and-app-shell",
+      "isActive": true,
+      "status": "ok",
+      "name": "Sign-in and App Shell",
+      "phase": "BUILD",
+      "stories": {
+        "total": 4,
+        "complete": 0,
+        "inProgress": null,
+        "halted": null
+      },
+      "halt": null,
+      "dependsOn": [],
+      "lastUpdated": "2026-11-03T07:21:33.683Z",
+      "storyList": [
+        {
+          "index": "1",
+          "title": null,
+          "status": "pending",
+          "e2eStatus": "deferred"
+        },
+        {
+          "index": "2",
+          "title": null,
+          "status": "pending",
+          "e2eStatus": "deferred"
+        },
+        {
+          "index": "3",
+          "title": null,
+          "status": "pending",
+          "e2eStatus": "deferred"
+        },
+        {
+          "index": "4",
+          "title": null,
+          "status": "pending",
+          "e2eStatus": "deferred"
+        }
+      ]
+    }
+  ],
+  "merged": [],
+  "offPlanMerged": [],
+  "overview": {
+    "epicsComplete": 0,
+    "epicsTotal": 4,
+    "storiesDone": 0,
+    "storiesTotal": 4
+  },
+  "now": {
+    "kind": "building",
+    "epicSlug": "sign-in-and-app-shell",
+    "epicName": "Sign-in and App Shell",
+    "phase": "BUILD",
+    "storyIndex": null,
+    "storyTitle": null,
+    "storiesComplete": 0,
+    "storiesTotal": 4
+  },
+  "generatedAt": "2026-11-03T07:23:53.141Z"
+}

@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign-in and App Shell — plan</title><style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#1e293b; --muted:#64748b; --line:#e2e8f0;
+  --accent:#2563eb; --accent-soft:#eff6ff; --ok:#059669; --warn:#b45309; --bad:#dc2626;
+  --radius:10px; --shadow:0 1px 2px rgba(15,23,42,.04),0 4px 12px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:0 0 5rem;background:var(--bg);color:var(--ink);
+  font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:52rem;margin:0 auto;padding:2.5rem 1.25rem}
+header.page{margin-bottom:2rem}
+header.page h1{margin:.25rem 0 .35rem;font-size:1.6rem;letter-spacing:-.015em}
+.lede{color:var(--muted);margin:0}
+.pill{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.02em;
+  text-transform:uppercase;color:var(--accent);background:var(--accent-soft);
+  padding:.25rem .6rem;border-radius:999px}
+.bar{height:4px;background:var(--line);border-radius:999px;overflow:hidden;margin:1rem 0 .4rem}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.15rem 1.25rem;margin:.75rem 0;box-shadow:var(--shadow);
+  transition:box-shadow .12s ease}
+/* Shadow only — no transform. A translateY lift re-rasterises the card's text at a
+   sub-pixel offset, and on a page this text-dense it reads as the whole card twitching
+   rather than as a deliberate hover effect. The deeper shadow is affordance enough. */
+.card:hover{box-shadow:0 2px 4px rgba(15,23,42,.05),0 8px 20px rgba(15,23,42,.08)}
+.card h3{margin:0 0 .3rem;font-size:1.02rem}
+.row{display:flex;align-items:flex-start;gap:.75rem}
+.grow{flex:1;min-width:0}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+[contenteditable]{border-radius:6px;padding:.1rem .3rem;margin:-.1rem -.3rem;
+  outline:none;transition:background .12s ease,box-shadow .12s ease}
+[contenteditable]:hover{background:#f8fafc;box-shadow:inset 0 0 0 1px var(--line)}
+[contenteditable]:focus{background:#fff;box-shadow:inset 0 0 0 2px var(--accent)}
+details{margin-top:.7rem}
+summary{cursor:pointer;color:var(--muted);font-size:.85rem;user-select:none}
+summary:hover{color:var(--accent)}
+details>div{padding:.6rem 0 .1rem}
+ul.tight{margin:.35rem 0;padding-left:1.15rem}
+ul.tight li{margin:.2rem 0}
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);padding:.32rem .6rem;transition:all .12s ease}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.icon{padding:.2rem .45rem;color:var(--muted);font-size:.85rem}
+.primary{background:var(--accent);border-color:var(--accent);color:#fff;
+  padding:.6rem 1.4rem;font-weight:600;font-size:.98rem}
+.primary:hover{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.actions{display:flex;gap:.4rem;flex-shrink:0}
+.footer{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(6px);border-top:1px solid var(--line);padding:.85rem 1.25rem}
+.footer .inner{max-width:52rem;margin:0 auto;display:flex;align-items:center;
+  gap:1rem;justify-content:flex-end;flex-wrap:wrap;position:relative}
+.toast{position:absolute;right:0;bottom:calc(100% + 1.35rem);pointer-events:none;
+  background:var(--card);border:1px solid var(--line);border-radius:7px;box-shadow:var(--shadow);
+  padding:.35rem .75rem;opacity:0;transition:opacity .2s ease;color:var(--ok);font-weight:600;font-size:.9rem}
+.toast.on{opacity:1}
+.ledger{background:#fffbeb;border-color:#fde68a}
+.ledger h2{margin:0 0 .5rem;font-size:1rem;color:var(--warn)}
+.drag{cursor:grab;color:#cbd5e1;user-select:none;padding-top:.15rem}
+.drag:active{cursor:grabbing}
+li.dragging,.card.dragging{opacity:.45}
+label.check{display:flex;gap:.6rem;align-items:flex-start;cursor:pointer;padding:.3rem 0}
+label.check input{margin-top:.35rem;width:1.05rem;height:1.05rem;accent-color:var(--accent);flex-shrink:0}
+.note{width:100%;margin-top:.4rem;font:inherit;font-size:.9rem;padding:.5rem .6rem;
+  border:1px solid var(--line);border-radius:7px;resize:vertical;min-height:3.2rem}
+.chip{display:inline-flex;align-items:center;gap:.45rem;border:1px solid var(--line);
+  border-radius:999px;padding:.3rem .7rem;margin:.2rem .3rem .2rem 0;background:#fff;font-size:.87rem}
+.chip b{font-weight:600}
+.chip .dot{width:.55rem;height:.55rem;border-radius:50%;flex-shrink:0}
+.chip .em{color:var(--muted);font-size:.82rem}
+.tally{font-variant-numeric:tabular-nums;font-size:.9rem;color:var(--muted);margin-right:auto}
+.tally b{color:var(--ink)}
+.opt{border:1px solid var(--line);border-radius:var(--radius);padding:.8rem .9rem;margin:.5rem 0}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt>label{display:block;cursor:pointer}
+.opt .preview{margin-top:.6rem;padding:.7rem;background:#fff;border:1px dashed var(--line);border-radius:7px}
+/* A preview is model-authored markup, so style the elements a mockup reaches for —
+   otherwise two options rendering the same idea can look different for no reason. */
+.preview table{border-collapse:collapse;font-size:.88rem}
+.preview th,.preview td{border:1px solid var(--line);padding:.3rem .55rem;text-align:left}
+.preview th{background:#f8fafc;font-weight:600}
+.preview p:first-child{margin-top:0}
+.preview p:last-child{margin-bottom:0}
+@media print{.footer{position:static}.actions,.drag{display:none}}
+</style></head>
+<body><div class="wrap">
+<header class="page">
+<span class="pill">Piece 1 of 4</span>
+<h1>Sign-in and App Shell</h1>
+<p class="lede">Everyone signs in with email and password, lands on the right page for their role, sees only the menu items their role allows, and gets a clear on-page message if they open a page they can&#39;t use.</p>
+<div class="bar"><i style="width:0%"></i></div>
+</header>
+
+<div id="stories"><div class="card story">
+  <div class="row">
+    <span class="drag" title="Drag to reorder">⠿</span>
+    <span class="muted n"></span>
+    <div class="grow">
+      <h3 contenteditable class="title">Sign in, land on your page, and sign out</h3>
+      
+      <div class="summary" contenteditable>You open the app, sign in with your email and password, and land on your role&#39;s page (a Visitor on the Contact form, a Support Agent or Admin on the Inbox). If sign-in fails you see a clear message on the sign-in screen, and you can sign out from any page.</div>
+      <div class="small muted" style="margin-top:.35rem">New screen · Visitor, Support Agent, Admin</div>
+      <details>
+        <summary>Detail — what "done" means, and what you'll check</summary>
+        <div>
+          <div class="small muted">Done when:</div>
+          <ul class="tight ac"><li contenteditable>Signing in with a seeded account&#39;s correct email and password takes a Visitor to the Contact page and a Support Agent or Admin to the Inbox</li><li contenteditable>Submitting a wrong email or password shows an inline &quot;email or password is incorrect&quot; error on the sign-in screen, keeps the entered email, clears the password and moves focus to the error summary</li><li contenteditable>When sign-in cannot reach the sign-in service, the sign-in screen shows a connection-problem error that is distinct from the wrong-credentials error</li><li contenteditable>While signed out, any app URL typed into the address bar, including the app root, sends the user to the sign-in screen instead of the welcome page or the requested page</li><li contenteditable>After signing out, pressing the browser Back button returns the user to the sign-in screen rather than revealing the previous app page</li><li contenteditable>The sign-in screen has no automated accessibility violations, every field is labelled, and the whole form can be completed with the keyboard alone</li></ul>
+          <div class="small muted">You'll check:</div>
+          <ul class="tight mt"><li contenteditable>Open the app while signed out → you land on the sign-in page, not a welcome page</li><li contenteditable>Sign in as visitor@example.com / Test123 → you land on the Contact page</li><li contenteditable>Sign in as agent@example.com (or admin@example.com) / Test123 → you land on the Inbox</li><li contenteditable>Sign in with the wrong password → you see a message saying the email or password is incorrect, and your email is still filled in</li><li contenteditable>Type the password → it is shown as dots, never as plain text</li><li contenteditable>Sign in, click Sign out, then press the browser Back button → you&#39;re sent to sign-in, not back into the app</li><li contenteditable>Using only the Tab and Enter keys, sign in successfully</li></ul>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button class="icon" onclick="moveCard(this.closest('.story'),-1)" title="Move up">↑</button>
+      <button class="icon" onclick="moveCard(this.closest('.story'),1)" title="Move down">↓</button>
+      <button class="icon" onclick="splitStory(this.closest('.story'))" title="Split into two">⑂</button>
+      <button class="icon" onclick="this.closest('.story').remove();renumber()" title="Remove">✕</button>
+    </div>
+  </div>
+</div>
+<div class="card story">
+  <div class="row">
+    <span class="drag" title="Drag to reorder">⠿</span>
+    <span class="muted n"></span>
+    <div class="grow">
+      <h3 contenteditable class="title">Role-based menu and permission-denied banner</h3>
+      
+      <div class="summary" contenteditable>Once signed in, the top menu shows only what your role can use (a Visitor sees Contact and My messages; a Support Agent or Admin sees Inbox). If you open a page your role can&#39;t use from a direct link, the page shows a banner explaining which permission you&#39;re missing, with a link back to your own page.</div>
+      <div class="small muted" style="margin-top:.35rem">Updates the app frame · Visitor, Support Agent, Admin</div>
+      <details>
+        <summary>Detail — what "done" means, and what you'll check</summary>
+        <div>
+          <div class="small muted">Done when:</div>
+          <ul class="tight ac"><li contenteditable>A signed-in Visitor sees exactly &quot;Contact&quot; and &quot;My messages&quot; in the top menu, with no Inbox item shown in any form</li><li contenteditable>A signed-in Support Agent or Admin sees exactly &quot;Inbox&quot; in the top menu, with no Contact or My messages item shown in any form</li><li contenteditable>A Visitor who opens the Inbox address directly sees a permission-denied banner on the page naming the missing permission, and its link takes them back to the Contact page</li><li contenteditable>A Support Agent or Admin who opens the Contact or My messages address directly sees the permission-denied banner, and its link takes them back to the Inbox</li><li contenteditable>The permission-denied banner is announced to screen readers when the page loads and its back link can be reached and followed with the keyboard</li></ul>
+          <div class="small muted">You'll check:</div>
+          <ul class="tight mt"><li contenteditable>Sign in as the Visitor → the top menu shows only Contact and My messages</li><li contenteditable>Sign in as the Support Agent, then the Admin → the top menu shows only Inbox</li><li contenteditable>As the Visitor, type /inbox in the address bar → you see a &quot;you don&#39;t have permission&quot; banner on the page (no error page) that names the missing permission</li><li contenteditable>Click the banner&#39;s link → you&#39;re taken back to the Contact page</li><li contenteditable>As the Support Agent, type /contact in the address bar → you see the banner, and its link takes you to the Inbox</li><li contenteditable>Using only the Tab key, reach the banner&#39;s link and press Enter → it takes you to your page</li></ul>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button class="icon" onclick="moveCard(this.closest('.story'),-1)" title="Move up">↑</button>
+      <button class="icon" onclick="moveCard(this.closest('.story'),1)" title="Move down">↓</button>
+      <button class="icon" onclick="splitStory(this.closest('.story'))" title="Split into two">⑂</button>
+      <button class="icon" onclick="this.closest('.story').remove();renumber()" title="Remove">✕</button>
+    </div>
+  </div>
+</div>
+<div class="card story">
+  <div class="row">
+    <span class="drag" title="Drag to reorder">⠿</span>
+    <span class="muted n"></span>
+    <div class="grow">
+      <h3 contenteditable class="title">Session timeouts and account lockout</h3>
+      
+      <div class="summary" contenteditable>Your session ends after 30 minutes without activity, or after 12 hours in total, and you&#39;re taken back to the sign-in screen with a message that your session expired. After 5 wrong passwords in a row the account is locked for 15 minutes, and the sign-in screen tells you so.</div>
+      <div class="small muted" style="margin-top:.35rem">Updates the sign-in screen · Visitor, Support Agent, Admin</div>
+      <details>
+        <summary>Detail — what "done" means, and what you'll check</summary>
+        <div>
+          <div class="small muted">Done when:</div>
+          <ul class="tight ac"><li contenteditable>On the 5th consecutive failed sign-in for an account, the sign-in screen says the account is locked and for how long (15 minutes)</li><li contenteditable>While an account is locked, signing in with its correct password is refused and the locked message is shown again</li><li contenteditable>Once 15 minutes have passed since the lockout, the account can sign in with the correct password and lands on its role&#39;s page</li><li contenteditable>After 30 minutes with no activity, a signed-in user is returned to the sign-in screen with a message that their session expired</li><li contenteditable>A user who keeps working is still signed out with the session-expired message once 12 hours have passed since signing in</li></ul>
+          <div class="small muted">You'll check:</div>
+          <ul class="tight mt"><li contenteditable>Enter the wrong password for agent@example.com five times → the sign-in screen says the account is locked for 15 minutes</li><li contenteditable>While it&#39;s locked, enter the correct password → you still can&#39;t sign in and see the locked message</li><li contenteditable>Sign in as another seeded user while that account is locked → that user signs in normally</li></ul>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button class="icon" onclick="moveCard(this.closest('.story'),-1)" title="Move up">↑</button>
+      <button class="icon" onclick="moveCard(this.closest('.story'),1)" title="Move down">↓</button>
+      <button class="icon" onclick="splitStory(this.closest('.story'))" title="Split into two">⑂</button>
+      <button class="icon" onclick="this.closest('.story').remove();renumber()" title="Remove">✕</button>
+    </div>
+  </div>
+</div>
+<div class="card story">
+  <div class="row">
+    <span class="drag" title="Drag to reorder">⠿</span>
+    <span class="muted n"></span>
+    <div class="grow">
+      <h3 contenteditable class="title">Enquiry and user records with sample data</h3>
+      <div class="small muted"><em>Under the hood — nothing to click; the next step proves it works.</em></div>
+      <div class="summary" contenteditable>The app holds enquiries and users in memory, starting with sample enquiries that cover every category and every status, so the later Contact, My messages and Inbox screens have data to show. Changes last until the page is reloaded.</div>
+      <div class="small muted" style="margin-top:.35rem">Behind the scenes</div>
+      <details>
+        <summary>Detail — what "done" means, and what you'll check</summary>
+        <div>
+          <div class="small muted">Done when:</div>
+          <ul class="tight ac"><li contenteditable>The seeded enquiries include at least one of each Category (Feedback, Question, General Enquiry) and each Status (New, In Progress, Resolved)</li><li contenteditable>Every seeded Resolved enquiry carries a Reply Note, and at least one seeded enquiry was submitted by visitor@example.com</li><li contenteditable>Enquiry records accept only the Category and Status values listed in the brief and enforce the brief&#39;s field validation rules</li><li contenteditable>A change made to an enquiry is visible on the next read in the same session, and a fresh load starts again from the seeded data</li></ul>
+          <div class="small muted">You'll check:</div>
+          <ul class="tight mt"></ul>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button class="icon" onclick="moveCard(this.closest('.story'),-1)" title="Move up">↑</button>
+      <button class="icon" onclick="moveCard(this.closest('.story'),1)" title="Move down">↓</button>
+      <button class="icon" onclick="splitStory(this.closest('.story'))" title="Split into two">⑂</button>
+      <button class="icon" onclick="this.closest('.story').remove();renumber()" title="Remove">✕</button>
+    </div>
+  </div>
+</div></div>
+<p><button onclick="addStory()">+ Add a step</button></p>
+
+
+
+<h2 style="margin-top:2.2rem;font-size:1.15rem">Not in this piece</h2>
+<p class="small muted">In case you expected any of these:</p>
+<ul class="tight" id="nongoals"><li contenteditable>The Contact form, confirmation page, My messages list, Inbox table, enquiry detail, status changes and delete — later epics deliver these; this epic only routes to their pages and guards access to them.</li><li contenteditable>The reviewer role switcher — dropped by your decision; reviewers sign in as each seeded user instead.</li><li contenteditable>Real authentication, password reset, registration, and account management.</li></ul>
+
+<p class="small muted" style="margin-top:2rem">Edit anything above, reorder with the handles or arrows,
+split a step that's too big, then choose Approve. Approve copies your version to the clipboard —
+paste it into the chat and the build starts from exactly that.</p>
+<!-- The blank card "+ Add a step" and Split clone. Rendered from the same template
+     as the real cards so the two can never drift apart. -->
+<template id="tpl-story"><div class="card story">
+  <div class="row">
+    <span class="drag" title="Drag to reorder">⠿</span>
+    <span class="muted n"></span>
+    <div class="grow">
+      <h3 contenteditable class="title"></h3>
+      
+      <div class="summary" contenteditable></div>
+      
+      <details>
+        <summary>Detail — what "done" means, and what you'll check</summary>
+        <div>
+          <div class="small muted">Done when:</div>
+          <ul class="tight ac"><li contenteditable></li></ul>
+          <div class="small muted">You'll check:</div>
+          <ul class="tight mt"><li contenteditable></li></ul>
+        </div>
+      </details>
+    </div>
+    <div class="actions">
+      <button class="icon" onclick="moveCard(this.closest('.story'),-1)" title="Move up">↑</button>
+      <button class="icon" onclick="moveCard(this.closest('.story'),1)" title="Move down">↓</button>
+      <button class="icon" onclick="splitStory(this.closest('.story'))" title="Split into two">⑂</button>
+      <button class="icon" onclick="this.closest('.story').remove();renumber()" title="Remove">✕</button>
+    </div>
+  </div>
+</div></template>
+</div>
+<div class="footer"><div class="inner">
+<button class="primary" onclick="approve()">Approve &amp; build</button>
+<button onclick="approve()">Copy again</button>
+<span id="toast" class="toast"></span>
+</div></div>
+<script>
+function flash(message){var toast=document.getElementById('toast');toast.textContent=message;toast.classList.add('on');
+  setTimeout(function(){toast.classList.remove('on')},2600)}
+function handoff(payload,name){
+  var json=JSON.stringify(payload,null,2);
+  function fallback(){
+    try{
+      var blob=new Blob([json],{type:'application/json'}),blobUrl=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=blobUrl;link.download=name+'.json';
+      /* The anchor has to be in the document and the URL has to outlive the click:
+         a detached anchor never downloads in Firefox, and revoking synchronously
+         cancels the download mid-flight. This is the path that runs when the
+         clipboard is blocked, so it has to actually produce the file. */
+      link.style.display='none';document.body.appendChild(link);link.click();
+      setTimeout(function(){URL.revokeObjectURL(blobUrl);link.remove()},1000);
+      flash('Downloaded — paste the file contents into chat.');
+    }catch(error){
+      var popup=window.open('','_blank');
+      if(popup){popup.document.write('<pre>'+json.replace(/</g,'&lt;')+'</pre>');flash('Copy the JSON shown, then paste it into chat.');}
+      else flash('Could not copy — use "Copy again".');
+    }
+  }
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(json).then(function(){flash('Copied — paste it into the chat to continue.')},fallback);
+  }else{fallback()}
+}
+/* Reorder helpers shared by the two plan pages. renumberIn takes the list it
+   renumbers, so moveCard and wireDrag renumber the container they already know
+   rather than calling out to a same-named global each page has to remember to
+   define — a contract a fourth page could only discover by reading the others. */
+function renumberIn(list){Array.prototype.forEach.call(list.children,function(card,i){
+  var numberLabel=card.querySelector('.n');if(numberLabel)numberLabel.textContent=(i+1)+'.'})}
+function moveCard(card,direction){var list=card.parentNode,neighbour=direction<0?card.previousElementSibling:card.nextElementSibling;
+  if(!neighbour)return; if(direction<0)list.insertBefore(card,neighbour); else list.insertBefore(neighbour,card); renumberIn(list);}
+function wireDrag(container,cardSelector){
+  var dragged=null;
+  /* Cards are draggable only while the ⠿ handle is held. A permanently draggable
+     card swallows the mousedown-drag gesture from every [contenteditable] inside
+     it, so drag-selecting a phrase to retype it silently selects nothing — on a
+     page whose whole promise is "edit anything above". */
+  container.addEventListener('mousedown',function(event){
+    var handle=event.target.closest('.drag');if(!handle)return;
+    var card=handle.closest(cardSelector);if(card)card.draggable=true;
+  });
+  function release(){Array.prototype.forEach.call(container.querySelectorAll(cardSelector),
+    function(card){card.draggable=false})}
+  container.addEventListener('mouseup',release);
+  container.addEventListener('dragstart',function(event){var card=event.target.closest(cardSelector);if(!card)return;
+    dragged=card;card.classList.add('dragging');event.dataTransfer.effectAllowed='move';
+    /* Firefox will not start a drag unless dragstart sets some data. */
+    event.dataTransfer.setData('text/plain','')});
+  container.addEventListener('dragend',function(){if(dragged)dragged.classList.remove('dragging');
+    dragged=null;release();renumberIn(container)});
+  container.addEventListener('dragover',function(event){event.preventDefault();
+    var card=event.target.closest(cardSelector);if(!card||card===dragged||!dragged)return;
+    var bounds=card.getBoundingClientRect();
+    var insertBeforeNode=(event.clientY-bounds.top)/bounds.height>.5?card.nextSibling:card;
+    /* Re-inserting a node at its current position still detaches and re-inserts
+       it, which invalidates layout and makes cards oscillate under the cursor. */
+    if(insertBeforeNode===dragged||insertBeforeNode===dragged.nextSibling)return;
+    container.insertBefore(dragged,insertBeforeNode)});
+  container.addEventListener('drop',function(event){event.preventDefault()});
+}
+/* textContent, not innerText: the acceptance criteria and manual-test lines live
+   inside a collapsed <details>, and innerText returns "" for a subtree the
+   browser isn't rendering. Reading innerText there handed back empty lists for
+   every story and reported the page as edited when nobody had touched it.
+   textContent is also layout-independent, so reading a row costs no reflow. */
+function textOf(element){return element?element.textContent.replace(/\s+/g,' ').trim():''}
+function listOf(root,selector){return Array.prototype.map.call(root.querySelectorAll(selector),textOf).filter(Boolean)}
+
+
+var LIST=document.getElementById('stories');
+function renumber(){renumberIn(LIST)}
+function pickOption(input){
+  var group=input.closest('.choice');
+  Array.prototype.forEach.call(group.querySelectorAll('.opt'),function(option){option.classList.remove('sel')});
+  input.closest('.opt').classList.add('sel');
+}
+function blankStory(title,summary){
+  var card=document.getElementById('tpl-story').content.firstElementChild.cloneNode(true);
+  card.querySelector('.title').textContent=title||'New step';
+  card.querySelector('.summary').textContent=summary||'What the user gets';
+  return card;
+}
+function addStory(){var card=blankStory();LIST.appendChild(card);
+  renumber();card.querySelector('.title').focus()}
+function splitStory(card){
+  var title=textOf(card.querySelector('.title'));
+  card.querySelector('.title').textContent=title+' (part 1)';
+  var secondPart=blankStory(title+' (part 2)',textOf(card.querySelector('.summary')));
+  card.parentNode.insertBefore(secondPart,card.nextSibling);renumber();
+}
+/* One reader for the whole page. ORIGINAL is a snapshot of it taken at load, so
+   the "did the user change anything" comparison comes from a single definition of
+   what the page says — there is no second, hand-written copy of these shapes to
+   drift out of agreement with this one. */
+function current(){
+  return {
+    stories:Array.prototype.map.call(LIST.querySelectorAll('.story'),function(card){
+      return {title:textOf(card.querySelector('.title')),plainSummary:textOf(card.querySelector('.summary')),
+        acceptanceCriteria:listOf(card,'.ac li'),manualTestChecklist:listOf(card,'.mt li')};
+    }),
+    nonGoals:listOf(document,'#nongoals li'),
+    /* Not scoped to #choices: a preview whose markup doesn't balance can close the
+       container early, which would drop every later choice from the hand-off while
+       the user still sees and answers it on the page. */
+    designChoices:Array.prototype.map.call(document.querySelectorAll('.choice'),function(choice){
+      var picked=choice.querySelector(':scope > .opt > label > input.optIn:checked');
+      return {question:textOf(choice.querySelector('.q')),screen:textOf(choice.querySelector('.screen'))||null,
+        answer:picked?picked.value:null};
+    })
+  };
+}
+function approve(){
+  var pageContent=current();
+  handoff({decision:'stories',edited:JSON.stringify(pageContent)!==ORIGINAL,
+    epic:"sign-in-and-app-shell",name:"Sign-in and App Shell",
+    summary:"Everyone signs in with email and password, lands on the right page for their role, sees only the menu items their role allows, and gets a clear on-page message if they open a page they can't use.",
+    stories:pageContent.stories,nonGoals:pageContent.nonGoals,designChoices:pageContent.designChoices},'stories');
+}
+wireDrag(LIST,'.story');renumber();
+var ORIGINAL=JSON.stringify(current());</script>
+</body></html>

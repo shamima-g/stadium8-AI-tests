@@ -1,0 +1,14 @@
+{
+  "note": "live /start+intake+PLAN+approve -> BUILD through B0.2 (one test-generator per story); STOPPED before any story coded (startedAt all null). Flat docs+web tree (no git bundle — test files uncommitted). recorded/ holds the criterion-2 command outputs for T2.5.",
+  "capturedFrom": "release-v1.5.0",
+  "epicSlug": "sign-in-and-app-shell",
+  "scenario": "build-tests-together",
+  "benchmark": "contact-form",
+  "stopPoint": "post-B0.2",
+  "startedAtAllNull": true,
+  "model": "opus",
+  "storyCount": 4,
+  "slot": "build-tests-together-contact-form",
+  "featureCommit": "4666e23",
+  "templateRef": "v1.4.0"
+}

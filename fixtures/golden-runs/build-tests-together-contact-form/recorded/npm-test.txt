@@ -1,0 +1,125 @@
+# cmd: npm test -- epic-sign-in-and-app-shell
+# cwd: C:\temp\build-tests-together-run\web
+# exit: 1
+# ----------------------------------------
+
+> web@1.0.0 test
+> vitest run epic-sign-in-and-app-shell
+
+
+ RUN  v4.1.12 C:/Temp/build-tests-together-run/web
+
+ ❯ src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx (0 test)
+ ❯ src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx (0 test)
+ ❯ src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx (0 test)
+ ❯ src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx (0 test)
+ ❯ src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx [ src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx ]
+Error: Failed to resolve import "@/components/shell/AppShell" from "src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Temp/build-tests-together-run/web/src/__tests__/integration/epic-sign-in-and-app-shell-baseline.test.tsx:16:0
+  7  |  const __vi_import_0__ = await import("react/jsx-dev-runtime");
+  8  |  const __vi_import_1__ = await import("@testing-library/react");
+  9  |  const __vi_import_2__ = await import("@/components/shell/AppShell");
+     |                                       ^
+  10 |  const __vi_import_3__ = await import("@/mocks/data/identity");
+  11 |  
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29250:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29247:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27370:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27428:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27396:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:29048:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22914:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx [ src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx ]
+Error: Failed to resolve import "@/app/login/page" from "src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Temp/build-tests-together-run/web/src/__tests__/integration/epic-sign-in-and-app-shell-story-1-sign-in-and-sign-out.test.tsx:17:0
+  9  |  const __vi_import_1__ = await import("@testing-library/react");
+  10 |  const __vi_import_2__ = await import("@testing-library/user-event");
+  11 |  const __vi_import_3__ = await import("@/app/login/page");
+     |                                       ^
+  12 |  const __vi_import_4__ = await import("@/lib/api/client");
+  13 |  const __vi_import_5__ = await import("@/mocks/data/user");
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29250:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29247:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27370:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27428:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27396:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:29048:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22914:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx [ src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx ]
+Error: Failed to resolve import "@/components/shell/AppNav" from "src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Temp/build-tests-together-run/web/src/__tests__/integration/epic-sign-in-and-app-shell-story-2-role-menu-and-permission-banner.test.tsx:23:0
+  19 |  const __vi_import_1__ = await import("@testing-library/react");
+  20 |  const __vi_import_2__ = await import("@testing-library/user-event");
+  21 |  const __vi_import_3__ = await import("@/components/shell/AppNav");
+     |                                       ^
+  22 |  const __vi_import_4__ = await import("@/components/shell/PermissionDeniedBanner");
+  23 |  const __vi_import_5__ = await import("@/mocks/data/identity");
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29250:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29247:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27370:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27428:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27396:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:29048:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22914:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx [ src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx ]
+Error: Failed to resolve import "@/app/login/page" from "src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Temp/build-tests-together-run/web/src/__tests__/integration/epic-sign-in-and-app-shell-story-3-session-timeouts-and-lockout.test.tsx:15:0
+  15 |  const __vi_import_1__ = await import("@testing-library/react");
+  16 |  const __vi_import_2__ = await import("@testing-library/user-event");
+  17 |  const __vi_import_3__ = await import("@/app/login/page");
+     |                                       ^
+  18 |  const __vi_import_4__ = await import("@/lib/api/client");
+  19 |  const __vi_import_5__ = await import("@/mocks/data/user");
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29250:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29247:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27370:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27428:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27396:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:29048:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22914:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx [ src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx ]
+Error: Failed to resolve import "@/lib/data/enquiryStore" from "src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: C:/Temp/build-tests-together-run/web/src/__tests__/integration/epic-sign-in-and-app-shell-story-4-enquiry-data-and-seed.test.tsx:26:40
+  4  |  async function loadFreshEnquiryStore() {
+  5  |    vi.resetModules();
+  6  |    const { enquiryStore } = await import("@/lib/data/enquiryStore");
+     |                                          ^
+  7  |    return enquiryStore;
+  8  |  }
+ ❯ TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:29250:43
+ ❯ TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:29247:14
+ ❯ normalizeUrl node_modules/vite/dist/node/chunks/config.js:27370:18
+ ❯ node_modules/vite/dist/node/chunks/config.js:27428:32
+ ❯ TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:27396:4
+ ❯ EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:29048:14
+ ❯ loadAndTransform node_modules/vite/dist/node/chunks/config.js:22914:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  5 failed (5)
+      Tests  no tests
+   Start at  11:36:17
+   Duration  5.31s (transform 357ms, setup 3.49s, import 0ms, tests 0ms, environment 17.30s)
+

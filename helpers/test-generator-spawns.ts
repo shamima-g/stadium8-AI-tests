@@ -6,8 +6,9 @@
  *   - T3.2: NO story gets a separate Vitest agent and a separate Playwright agent (the two-agent baseline)
  *
  * TRANSCRIPT SHAPE (verified against real captures): each JSONL line is one event. A spawn is an
- * `assistant` line whose `message.content[]` holds `{ type:'tool_use', id, name:'Task',
- * input:{ subagent_type, description, prompt }, caller:{ type } }`. The agent's return is a later `user`
+ * `assistant` line whose `message.content[]` holds `{ type:'tool_use', id, name:'Task'|'Agent',
+ * input:{ subagent_type, description, prompt }, caller:{ type } }` (the spawn tool is 'Task' in older
+ * CLIs, 'Agent' in CLI 2.1.x — same block shape). The agent's return is a later `user`
  * line with `{ type:'tool_result', tool_use_id, content }` (content is a string OR an array of text blocks).
  *
  * CLASSIFICATION — robust across template versions:
@@ -114,7 +115,9 @@ export function parseTestGeneratorSpawns(jsonl: string): TgSpawn[] {
     const msg = (o.message ?? o) as { content?: unknown };
     if (!Array.isArray(msg.content)) continue;
     for (const b of msg.content as Array<Record<string, unknown>>) {
-      if (b.type !== 'tool_use' || b.name !== 'Task') continue;
+      // The orchestrator's subagent-spawn tool is named 'Task' in older CLIs and 'Agent' in newer ones
+      // (CLI 2.1.x). The block shape is otherwise identical (input.subagent_type/prompt/description, caller).
+      if (b.type !== 'tool_use' || (b.name !== 'Task' && b.name !== 'Agent')) continue;
       const input = (b.input ?? {}) as { subagent_type?: string; prompt?: string; description?: string };
       if (input.subagent_type !== 'test-generator') continue;
       const caller = b.caller as { type?: string } | undefined;

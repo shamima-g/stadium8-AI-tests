@@ -1,0 +1,15 @@
+# cmd: npm run lint
+# cwd: C:\temp\build-tests-together-run\web
+# exit: 0
+# ----------------------------------------
+
+> web@1.0.0 lint
+> eslint
+
+
+C:\Temp\build-tests-together-run\web\public\mockServiceWorker.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)
+
+✖ 1 problem (0 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

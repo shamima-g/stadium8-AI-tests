@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "epic": {
+    "epicId": "05253a20-a110-4732-8acc-8f1554c7da4f",
+    "slug": "sign-in-and-app-shell",
+    "name": "Sign-in and App Shell",
+    "createdAt": "2026-11-03T07:21:33.683Z",
+    "dependsOn": [],
+    "introducesSharedSurface": true,
+    "unverifiedAssumptions": [],
+    "manualTestResults": [],
+    "parkedDesignUpdate": false,
+    "designFingerprint": null,
+    "designDecisions": []
+  },
+  "phase": "BUILD",
+  "stories": {
+    "1": { "storyId": "19115301-90e3-442a-b980-87c6156052fd", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
+    "2": { "storyId": "7966a665-e8d8-45ab-a32a-999db3399ab0", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
+    "3": { "storyId": "e99f794c-39d5-4eec-b78d-3cdda03b1fc1", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null },
+    "4": { "storyId": "23a4b576-8ec4-47a0-b756-b2799731852b", "status": "pending", "e2eStatus": "deferred", "startedAt": null, "completedAt": null }
+  },
+  "halt": null,
+  "lastUpdated": "2026-11-03T07:21:33.683Z"
+}
