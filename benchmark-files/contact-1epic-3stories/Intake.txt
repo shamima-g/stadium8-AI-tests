@@ -1,0 +1,17 @@
+I want a simple Contacts app — a personal address book. No login, no real backend; just use pretend/mock data stored in the browser.
+
+It should have three features:
+
+List contacts — a page showing all contacts (name and email) in a list.
+Create a contact — a form with a Name box, an Email box, and a Save contact button. Saving adds the contact to the list and shows a “Contact saved” message.
+Delete a contact — a Delete button next to each contact that removes it.
+Build this as EXACTLY 3 stories — one per feature (List, Create, Delete), no more and no fewer. Keep it small and simple. Use the default styling.
+
+Follow-up answers (keep it fast and simple):
+
+If it asks about…	Answer
+Login / users / roles	No login — anyone can use it
+Backend / API	No backend — use mock data only
+Compliance (GDPR, etc.)	None
+Colours / branding	Use the defaults
+Expected: the feature “slug” will be contacts, so files look like epic-contacts-story-2-create-contact.test.tsx (<N> = the story number).

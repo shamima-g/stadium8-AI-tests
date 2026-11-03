@@ -1,0 +1,13 @@
+/* FeedbackWall design tokens. Part of the design. */
+:root {
+  --color-primary: #2563eb;   /* the Post message button */
+  --color-primary-hover: #1d4ed8;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --radius: 8px;
+  --space: 16px;
+}
