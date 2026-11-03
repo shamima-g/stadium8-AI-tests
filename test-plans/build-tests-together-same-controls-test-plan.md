@@ -335,8 +335,17 @@ broken-case wording.
    `distinctStories`. Unit-tested on synthetic one-agent/two-agent fixtures **and smoke-tested against a real
    captured two-agent transcript**. (Story numbers are unique only within an epic — fine, the capture stops
    after the first epic.)
-4. **`tier-3-automated/capture-build-tests-together.ps1`** — phased, portable, spend-gated; stops after B0.2;
-   freeze gate = files-present + `startedAt`-all-null + no-dev-source; targets the first ≥2-story epic. *(pending)*
+4. ✅ **DONE — `tier-3-automated/capture-build-tests-together.ps1`** — phased (`dryrun`/`setup`/`plan-dry`/
+   `build`/`freeze`), portable (roots are params / `$PSScriptRoot`-derived), spend-gated (only `plan-dry` +
+   `build` spend, each prints a sign-in/cost notice). Dot-sources `live-driver.ps1` for `New-Tier3Scaffold`
+   + the timeout-guarded process-tree kill. `build` drives `/start`→intake→approve→BUILD through B0.2 then
+   stops; `plan-dry` is a cheap throwaway probe that confirms the first epic has ≥2 stories before the full
+   spend. **Freeze gate** = ≥2 non-parked stories + every `state.json.stories[N].startedAt` null +
+   no dev component/page/route source on the web tree + every story has a spec (missing `.test.tsx` noted,
+   Tier-2 tag-decides) → then a **flat docs+web working-tree copy** (robocopy, `node_modules` excluded) +
+   `recorded/{npm-test,test-e2e-list,lint,git-status}.txt` + `transcript.jsonl` + `meta.json` into the slot,
+   and finally runs the Tier-2 suite with `REQUIRE_BUILD_TESTS_TOGETHER=1` as the conformance gate. Parses
+   clean; dry-run verified. *(Not yet RUN live — needs an authenticated CLI + token spend.)*
 5. ◑ **PARTIAL — calibration** built: the control-refs fixture pairs at `tier-1-unit/build-tests-together/
    fixtures/` **and** the Tier-2 planted-bad golden-run slot `fixtures/golden-runs/build-tests-together-
    divergent/` (a docs-tree one-agent run whose Story 2 files diverge — runs now, reds T2.2). The GOOD slot
